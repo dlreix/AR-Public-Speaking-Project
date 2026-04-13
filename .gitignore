@@ -1,0 +1,35 @@
+# Bu dosya, Unity'nin otomatik oluşturduğu ve GitHub'a yüklenmemesi gereken dosyaları engeller.
+
+# Geçici ve otomatik oluşturulan klasörler
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]serSettings/
+/[Mm]emoryCaptures/
+
+# Visual Studio ve IDE dosyaları
+.vs/
+.vscode/
+ExportedObj/
+.consulo/
+*.csproj
+*.unityproj
+*.sln
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+
+# İşletim sistemi kalıntıları
+.DS_Store
+Thumbs.db
