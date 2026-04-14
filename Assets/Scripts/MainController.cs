@@ -27,6 +27,9 @@ public class MainController : MonoBehaviour
     [Tooltip("Bu obje veya başka bir obje üzerindeki CircleEventSystem scripti")]
     public CircleEventSystem circleEvent;
 
+    [Tooltip("GazeScoringSystem scripti (oturum sonu skoru için)")]
+    public GazeScoringSystem gazeScoringSystem;
+
     [Tooltip("XR Origin içindeki kamera transformu (bilgi amaçlı referans; VR SDK tarafından yönetilir)")]
     public Transform playerHead;
 
@@ -101,6 +104,8 @@ public class MainController : MonoBehaviour
             cameraYaw   = angles.y;
         }
 
+        Debug.Log("[MainController] Initialized. Mode: " + (isVRMode ? "VR" : "PC"));
+
         ClearAllUI();
     }
 
@@ -172,7 +177,11 @@ public class MainController : MonoBehaviour
         if (dPressed && sessionRunning) ToggleDebug();
 
         // C / Grip: Circle event (sadece oturum sırasında)
-        if (cPressed && sessionRunning) circleEvent.ToggleEvent();
+        if (cPressed && sessionRunning)
+        {
+            Debug.Log("[MainController] Circle event toggled.");
+            circleEvent.ToggleEvent();
+        }
     }
 
     /// <summary>Herhangi bir VR controller'da belirtilen düğmeye basılıp basılmadığını döner.</summary>
@@ -201,6 +210,8 @@ public class MainController : MonoBehaviour
         SetActive(statusText, true);
         SetActive(timerText, true);
         SetActive(reviewInfoText, false);
+
+        Debug.Log("[MainController] *** Session Started ***");
     }
 
     void StopSession()
@@ -211,6 +222,15 @@ public class MainController : MonoBehaviour
         eyeTracking.Deactivate();
         circleEvent.ForceStop();
 
+        float finalScore = gazeScoringSystem != null
+            ? gazeScoringSystem.FinalizeSession()
+            : -1f;
+
+        if (finalScore >= 0f)
+            Debug.Log(string.Format("[MainController] *** Session Ended *** Duration: {0:F1}s | Gaze Score: {1:F1}/100", sessionDuration, finalScore));
+        else
+            Debug.Log(string.Format("[MainController] *** Session Ended *** Duration: {0:F1}s | (GazeScoringSystem not assigned)", sessionDuration));
+
         ClearSessionUI();
         EnterReview();
     }
@@ -218,6 +238,7 @@ public class MainController : MonoBehaviour
     void ToggleDebug()
     {
         debugMode = !debugMode;
+        Debug.Log("[MainController] Debug mode: " + (debugMode ? "ON" : "OFF"));
         eyeTracking.SetDebugVisible(debugMode);
 
         SetText(statusText, debugMode

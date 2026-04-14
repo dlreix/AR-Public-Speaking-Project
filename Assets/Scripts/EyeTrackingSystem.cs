@@ -179,6 +179,11 @@ public class EyeTrackingSystem : MonoBehaviour
     private float eyeDeviceRefreshTimer;
     private const float EYE_DEVICE_REFRESH_INTERVAL = 2f;
 
+    // Durum değişimi log takibi (her frame spam yapmamak için)
+    private bool prevStareWarning;
+    private bool prevHeadWarning;
+    private bool prevLookingAtAudience;
+
     // ══════════════════════════════════════════════
     //  YAŞAM DÖNGÜSÜ
     // ══════════════════════════════════════════════
@@ -186,6 +191,7 @@ public class EyeTrackingSystem : MonoBehaviour
     void Awake()
     {
         cachedTransform = transform;
+        Debug.Log("[EyeTrackingSystem] Initialized.");
     }
 
     void Update()
@@ -209,6 +215,23 @@ public class EyeTrackingSystem : MonoBehaviour
                 lastHeadRotation = cachedTransform.rotation;
                 lookingAtAudience = false;
             }
+        }
+
+        // Log state changes (only when value flips, no per-frame spam)
+        if (stareWarningActive != prevStareWarning)
+        {
+            prevStareWarning = stareWarningActive;
+            Debug.Log("[EyeTrackingSystem] Stare warning: " + (stareWarningActive ? "ON" : "OFF"));
+        }
+        if (headWarningActive != prevHeadWarning)
+        {
+            prevHeadWarning = headWarningActive;
+            Debug.Log("[EyeTrackingSystem] Head speed warning: " + (headWarningActive ? "ON" : "OFF"));
+        }
+        if (lookingAtAudience != prevLookingAtAudience)
+        {
+            prevLookingAtAudience = lookingAtAudience;
+            Debug.Log("[EyeTrackingSystem] Looking at audience: " + (lookingAtAudience ? "YES" : "NO"));
         }
     }
 
@@ -234,6 +257,12 @@ public class EyeTrackingSystem : MonoBehaviour
         gazeInitialized = false;
         consecutiveOutliers = 0;
         lastFrameWasDropped = false;
+
+        prevStareWarning = false;
+        prevHeadWarning = false;
+        prevLookingAtAudience = false;
+
+        Debug.Log("[EyeTrackingSystem] Activated. XR eye tracking: " + (useXREyeTracking ? "enabled" : "disabled (head direction)"));
     }
 
     public void Deactivate()
@@ -242,6 +271,7 @@ public class EyeTrackingSystem : MonoBehaviour
         stareWarningActive = false;
         headWarningActive = false;
         lookingAtAudience = false;
+        Debug.Log("[EyeTrackingSystem] Deactivated. Total heatmap points recorded: " + heatmapPoints.Count);
     }
 
     public void SetPaused(bool paused)
@@ -254,6 +284,7 @@ public class EyeTrackingSystem : MonoBehaviour
             lookingAtAudience = false;
             stareTimer = 0f;
         }
+        Debug.Log("[EyeTrackingSystem] " + (paused ? "Paused (circle event active)" : "Resumed from pause"));
     }
 
     public void SetDebugVisible(bool visible)

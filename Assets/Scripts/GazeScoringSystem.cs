@@ -128,6 +128,10 @@ public class GazeScoringSystem : MonoBehaviour
     // Aktiflik (EyeTrackingSystem aktifken çalışır)
     private bool wasActive;
 
+    // Periyodik log zamanlayıcısı
+    private float nextLogTime;
+    private const float LOG_INTERVAL = 5f;
+
     // ══════════════════════════════════════════════
     //  YAŞAM DÖNGÜSÜ
     // ══════════════════════════════════════════════
@@ -142,7 +146,11 @@ public class GazeScoringSystem : MonoBehaviour
 
         // Oturum başladığında buffer'ı sıfırla
         if (eyeTracking.IsActive && !wasActive)
+        {
             ResetBuffer();
+            nextLogTime = Time.time + LOG_INTERVAL;
+            Debug.Log("[GazeScoringSystem] Session detected — buffer reset, scoring started.");
+        }
         wasActive = eyeTracking.IsActive;
 
         if (!eyeTracking.IsActive)
@@ -156,6 +164,13 @@ public class GazeScoringSystem : MonoBehaviour
 
         // Pencere içindeki sample'lardan puan hesapla
         ComputeScore();
+
+        // Her LOG_INTERVAL saniyede bir skoru logla
+        if (Time.time >= nextLogTime)
+        {
+            nextLogTime = Time.time + LOG_INTERVAL;
+            Debug.Log(string.Format("[GazeScoringSystem] Live score: {0:F1}/100", gazeScore));
+        }
     }
 
     // ══════════════════════════════════════════════
@@ -173,6 +188,7 @@ public class GazeScoringSystem : MonoBehaviour
     public void ReportBonus(float amount)
     {
         externalBonusAccum += Mathf.Clamp(amount, 0f, 15f);
+        Debug.Log(string.Format("[GazeScoringSystem] Bonus reported: +{0:F1} pts", amount));
     }
 
     /// <summary>
@@ -186,6 +202,7 @@ public class GazeScoringSystem : MonoBehaviour
     public void ReportPenalty(float amount)
     {
         externalPenaltyAccum += Mathf.Clamp(amount, 0f, 15f);
+        Debug.Log(string.Format("[GazeScoringSystem] Penalty reported: -{0:F1} pts", amount));
     }
 
     /// <summary>
@@ -195,6 +212,7 @@ public class GazeScoringSystem : MonoBehaviour
     public float FinalizeSession()
     {
         float finalScore = gazeScore;
+        Debug.Log(string.Format("[GazeScoringSystem] Session finalized. Final gaze score: {0:F1}/100", finalScore));
         ResetBuffer();
         return finalScore;
     }

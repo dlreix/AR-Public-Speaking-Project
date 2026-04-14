@@ -99,6 +99,7 @@ public class CircleEventSystem : MonoBehaviour
     {
         if (mainCamera != null)
             camTransform = mainCamera.transform;
+        Debug.Log("[CircleEventSystem] Initialized. Spawn points: " + (spawnPoints != null ? spawnPoints.Length.ToString() : "0"));
     }
 
     void Update()
@@ -143,6 +144,7 @@ public class CircleEventSystem : MonoBehaviour
         eventActive = true;
         eyeTracking.SetPaused(true);
         nextSpawnTimer = 1f;
+        Debug.Log("[CircleEventSystem] Event started. First circle spawns in 1s.");
     }
 
     void StopEvent()
@@ -156,6 +158,7 @@ public class CircleEventSystem : MonoBehaviour
         }
 
         eyeTracking.SetPaused(false);
+        Debug.Log("[CircleEventSystem] Event stopped.");
     }
 
     // ══════════════════════════════════════════════
@@ -188,6 +191,8 @@ public class CircleEventSystem : MonoBehaviour
             OnCircleComplete,
             standardShader, spritesDefaultShader, particlesUnlitShader
         );
+
+        Debug.Log("[CircleEventSystem] Circle spawned at spawn point #" + index + " — fill duration: " + fillDuration + "s");
     }
 
     void CheckGazeOnCircle()
@@ -207,6 +212,7 @@ public class CircleEventSystem : MonoBehaviour
     {
         currentCircle = null;
         nextSpawnTimer = timeBetweenCircles;
+        Debug.Log("[CircleEventSystem] Circle completed! Next circle in " + timeBetweenCircles + "s.");
     }
 
     // ══════════════════════════════════════════════

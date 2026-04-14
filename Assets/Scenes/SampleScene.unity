@@ -579,6 +579,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MainController
   eyeTracking: {fileID: 1676524480}
   circleEvent: {fileID: 1179980501}
+  gazeScoringSystem: {fileID: 0}
   playerHead: {fileID: 1362541001}
   mainCamera: {fileID: 1676524484}
   statusText: {fileID: 1291951059}
@@ -2008,7 +2009,7 @@ GameObject:
   - component: {fileID: 1666722892}
   m_Layer: 3
   m_Name: Cube
-  m_TagString: Untagged
+  m_TagString: Audience
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -2721,7 +2722,7 @@ GameObject:
   - component: {fileID: 1915282980}
   m_Layer: 3
   m_Name: Cube (1)
-  m_TagString: Untagged
+  m_TagString: Audience
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
