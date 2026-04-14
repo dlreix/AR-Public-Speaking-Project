@@ -1,15 +1,16 @@
 using UnityEngine;
-using System.Collections.Generic;
 using System.IO;
-
+using System.Collections.Generic;
+using System.Globalization;
 [System.Serializable]
 public class SessionData
 {
-    public string date; // Sadece Tarih
+    public string date;
     public float overallScore;
     public float eyeContact;
     public float pace;
     public float posture;
+    public FeedbackReport detailedReport; // Takým arkadaþýnýn yazdýðý AI Raporu
 }
 
 [System.Serializable]
@@ -26,24 +27,35 @@ public class DataManager : MonoBehaviour
 
     void Awake()
     {
-        if (Instance == null) Instance = this;
-        filePath = Application.persistentDataPath + "/history_v2.json";
-        LoadData();
+        if (Instance == null)
+        {
+            Instance = this;
+            filePath = Application.persistentDataPath + "/history_v3.json";
+            LoadData();
+        }
+        else
+        {
+            Destroy(gameObject);
+        }
     }
 
-    public void SaveSession(float score, float eye, float pace, float post)
+    // Engine'den gelen raporu eski sistemle birleþtirip kaydeder
+    public void SaveSession(FeedbackReport report)
     {
         SessionData newSession = new SessionData
         {
-            date = System.DateTime.Now.ToString("MMM dd"), // Örn: "Mar 23"
-            overallScore = score,
-            eyeContact = eye,
-            pace = pace,
-            posture = post
+            date = System.DateTime.Now.ToString("MMM dd | HH:mm", System.Globalization.CultureInfo.InvariantCulture),
+            overallScore = report.totalScore,
+            eyeContact = report.eyeScore,
+            pace = report.speechScore,
+            posture = report.postureScore,
+            detailedReport = report
         };
+
         history.allSessions.Add(newSession);
-        File.WriteAllText(filePath, JsonUtility.ToJson(history, true));
-        // Bunu SaveSession fonksiyonunun en altýna, File.WriteAllText satýrýndan sonraya ekle:
+
+        string json = JsonUtility.ToJson(history, true);
+        File.WriteAllText(filePath, json);
         Debug.Log("Dosya Konumu: <color=yellow>" + Application.persistentDataPath + "</color>");
     }
 
@@ -51,15 +63,17 @@ public class DataManager : MonoBehaviour
     {
         if (File.Exists(filePath))
         {
-            history = JsonUtility.FromJson<SessionHistory>(File.ReadAllText(filePath));
+            string json = File.ReadAllText(filePath);
+            history = JsonUtility.FromJson<SessionHistory>(json);
         }
     }
+
     public void DeleteAllData()
     {
         if (File.Exists(filePath))
         {
-            File.Delete(filePath); // Dosyayý sildik
-            history = new SessionHistory(); // Hafýzadaki listeyi boþalttýk
+            File.Delete(filePath);
+            history = new SessionHistory();
             Debug.Log("Tüm geçmiþ veriler temizlendi!");
         }
     }
