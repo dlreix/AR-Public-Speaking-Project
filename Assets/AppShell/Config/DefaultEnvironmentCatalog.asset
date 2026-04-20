@@ -1,0 +1,51 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b0a0a0366771f6c47ac0eabae28db98d, type: 3}
+  m_Name: DefaultEnvironmentCatalog
+  m_EditorClassIdentifier: Assembly-CSharp::VRPublicSpeaking.AppShell.Data.AppEnvironmentCatalog
+  environments:
+  - id: classroom
+    displayName: Classroom
+    description: Rehearse structured talks in a familiar learning space with clear
+      sightlines and moderate audience pressure.
+    sceneName: Scene_Classroom
+    spawnPointName: 
+    previewSprite: {fileID: 0}
+    available: 1
+    availabilityReason: 
+    recommendedModeLabel: Guided Practice
+    audienceHint: Best for confidence-building reps, lecture pacing, and steady eye-contact
+      habits.
+  - id: conferencehall
+    displayName: Conference Hall
+    description: Practice formal presentations in a larger venue where projection,
+      pacing, and stage presence matter more.
+    sceneName: Scene_ConferenceHall
+    spawnPointName: 
+    previewSprite: {fileID: 0}
+    available: 1
+    availabilityReason: 
+    recommendedModeLabel: Evaluation Mode
+    audienceHint: Best for keynote-style delivery, stronger vocal projection, and
+      larger-room pressure.
+  - id: meetingroom
+    displayName: Meeting Room
+    description: Prepare for stakeholder updates and team briefings in a smaller
+      room built for conversational delivery.
+    sceneName: Scene_MeetingRoom
+    spawnPointName: 
+    previewSprite: {fileID: 0}
+    available: 1
+    availabilityReason: 
+    recommendedModeLabel: Free Practice
+    audienceHint: Best for concise updates, conversational tone, and close-range
+      audience feedback.

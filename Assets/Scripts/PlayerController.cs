@@ -142,7 +142,7 @@ public class PlayerController : MonoBehaviour
             return;
         }
 
-        if (FindObjectsOfType<AudioListener>().Length == 0)
+        if (FindObjectsByType<AudioListener>(FindObjectsSortMode.None).Length == 0)
         {
             cameraObject.AddComponent<AudioListener>();
         }

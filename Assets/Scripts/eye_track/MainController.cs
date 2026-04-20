@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.XR;
 using System.Collections.Generic;
+using System;
 
 /// <summary>
 /// Ana kontrolcü: UI yönetimi ve mod geçişleri.
@@ -54,6 +55,7 @@ public class MainController : MonoBehaviour
     private bool inReview;
     private float sessionStartTime;
     private float sessionDuration;
+    private float lastFinalGazeScore = -1f;
 
     // ──────────────────────────────────────────────
     //  PC MOD AYARLARI
@@ -65,6 +67,10 @@ public class MainController : MonoBehaviour
 
     [Tooltip("Oyun başlarken fare imlecini kilitle (PC modunda önerilir)")]
     public bool lockCursor = true;
+
+    [Header("Shell Integration")]
+    public bool allowRuntimeInput = true;
+    public bool allowAutomaticReview = true;
 
     // Uyarı fade zamanlayıcıları
     private float stareFadeTimer;
@@ -79,6 +85,17 @@ public class MainController : MonoBehaviour
     private bool isVRMode;
     private float cameraPitch;
     private float cameraYaw;
+
+    public bool IsSessionRunning => sessionRunning;
+    public bool IsInReview => inReview;
+    public float SessionDuration => sessionDuration;
+    public float LiveSessionElapsedSeconds => sessionRunning ? Time.time - sessionStartTime : sessionDuration;
+    public float LastFinalGazeScore => lastFinalGazeScore;
+
+    public event Action SessionStarted;
+    public event Action<float, float> SessionEnded;
+    public event Action ReviewEntered;
+    public event Action ReviewExited;
 
     // ══════════════════════════════════════════════
     //  YAŞAM DÖNGÜSÜ
@@ -141,6 +158,9 @@ public class MainController : MonoBehaviour
 
     void HandleModeInput()
     {
+        if (!allowRuntimeInput)
+            return;
+
         // VR controller anlık durumu
         bool xrPrimary   = GetXRButton(CommonUsages.primaryButton);   // A / X
         bool xrSecondary = GetXRButton(CommonUsages.secondaryButton); // B / Y
@@ -202,6 +222,8 @@ public class MainController : MonoBehaviour
         inReview = false;
         debugMode = false;
         sessionStartTime = Time.time;
+        sessionDuration = 0f;
+        lastFinalGazeScore = -1f;
 
         eyeTracking.Activate();
         SetText(statusText, ControlHint(
@@ -212,6 +234,7 @@ public class MainController : MonoBehaviour
         SetActive(reviewInfoText, false);
 
         Debug.Log("[MainController] *** Session Started ***");
+        SessionStarted?.Invoke();
     }
 
     void StopSession()
@@ -222,17 +245,20 @@ public class MainController : MonoBehaviour
         eyeTracking.Deactivate();
         circleEvent.ForceStop();
 
-        float finalScore = gazeScoringSystem != null
+        lastFinalGazeScore = gazeScoringSystem != null
             ? gazeScoringSystem.FinalizeSession()
             : -1f;
 
-        if (finalScore >= 0f)
-            Debug.Log(string.Format("[MainController] *** Session Ended *** Duration: {0:F1}s | Gaze Score: {1:F1}/100", sessionDuration, finalScore));
+        if (lastFinalGazeScore >= 0f)
+            Debug.Log(string.Format("[MainController] *** Session Ended *** Duration: {0:F1}s | Gaze Score: {1:F1}/100", sessionDuration, lastFinalGazeScore));
         else
             Debug.Log(string.Format("[MainController] *** Session Ended *** Duration: {0:F1}s | (GazeScoringSystem not assigned)", sessionDuration));
 
         ClearSessionUI();
-        EnterReview();
+        SessionEnded?.Invoke(sessionDuration, lastFinalGazeScore);
+
+        if (allowAutomaticReview)
+            EnterReview();
     }
 
     void ToggleDebug()
@@ -265,6 +291,7 @@ public class MainController : MonoBehaviour
         SetText(reviewInfoText, info);
         SetActive(reviewInfoText, true);
         SetActive(statusText, false);
+        ReviewEntered?.Invoke();
     }
 
     void ExitReview()
@@ -272,6 +299,35 @@ public class MainController : MonoBehaviour
         inReview = false;
         eyeTracking.ExitReviewMode();
         SetActive(reviewInfoText, false);
+        ReviewExited?.Invoke();
+    }
+
+    public void StartSessionFromShell()
+    {
+        if (!sessionRunning)
+            StartSession();
+    }
+
+    public void StopSessionFromShell()
+    {
+        if (sessionRunning)
+            StopSession();
+    }
+
+    public void ExitReviewFromShell()
+    {
+        if (inReview)
+            ExitReview();
+    }
+
+    public void SetShellInputEnabled(bool enabled)
+    {
+        allowRuntimeInput = enabled;
+    }
+
+    public void SetAutomaticReviewEnabled(bool enabled)
+    {
+        allowAutomaticReview = enabled;
     }
 
     // ══════════════════════════════════════════════
