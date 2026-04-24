@@ -27,6 +27,15 @@ public class MainController : MonoBehaviour
     [Tooltip("Bu obje veya başka bir obje üzerindeki CircleEventSystem scripti")]
     public CircleEventSystem circleEvent;
 
+    [Tooltip("Tek bakımlık hızlı nokta event sistemi (Özellik 1)")]
+    public QuickGazeDotSystem quickGazeDot;
+
+    [Tooltip("Hareketli takip noktası event sistemi (Özellik 2)")]
+    public MovingGazeDotSystem movingGazeDot;
+
+    [Tooltip("Tüm gaze event'leri arasında çakışmayı önleyen koordinatör")]
+    public GazeEventCoordinator eventCoordinator;
+
     [Tooltip("GazeScoringSystem scripti (oturum sonu skoru için)")]
     public GazeScoringSystem gazeScoringSystem;
 
@@ -204,6 +213,8 @@ public class MainController : MonoBehaviour
         sessionStartTime = Time.time;
 
         eyeTracking.Activate();
+        NotifyEventSystemsSessionStarted();
+
         SetText(statusText, ControlHint(
             "KAYIT YAPILIYOR (A: durdur | B: debug | Grip: circle event)",
             "KAYIT YAPILIYOR (R: durdur | D: debug | C/Sol-Tık: circle event)"));
@@ -220,7 +231,7 @@ public class MainController : MonoBehaviour
         sessionDuration = Time.time - sessionStartTime;
 
         eyeTracking.Deactivate();
-        circleEvent.ForceStop();
+        NotifyEventSystemsSessionEnded();
 
         float finalScore = gazeScoringSystem != null
             ? gazeScoringSystem.FinalizeSession()
@@ -233,6 +244,28 @@ public class MainController : MonoBehaviour
 
         ClearSessionUI();
         EnterReview();
+    }
+
+    // ══════════════════════════════════════════════
+    //  EVENT SİSTEM BİLDİRİMLERİ
+    // ══════════════════════════════════════════════
+
+    /// <summary>Oturum başladığında tüm event sistemlerini haberdar et.</summary>
+    void NotifyEventSystemsSessionStarted()
+    {
+        if (quickGazeDot != null)  quickGazeDot.OnSessionStarted();
+        if (movingGazeDot != null) movingGazeDot.OnSessionStarted();
+        // CircleEventSystem kullanıcı tetiklemeli olduğu için otomatik başlatılmaz.
+    }
+
+    /// <summary>Oturum bittiğinde tüm event sistemlerini durdur.</summary>
+    void NotifyEventSystemsSessionEnded()
+    {
+        if (circleEvent != null)   circleEvent.ForceStop();
+        if (quickGazeDot != null)  quickGazeDot.OnSessionEnded();
+        if (movingGazeDot != null) movingGazeDot.OnSessionEnded();
+        // Güvenlik ağı: koordinatör varsa kalıntı bir kilit kaldıysa temizle.
+        if (eventCoordinator != null) eventCoordinator.StopAll();
     }
 
     void ToggleDebug()

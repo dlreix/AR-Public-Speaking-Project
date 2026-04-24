@@ -91,6 +91,19 @@ public class GazeScoringSystem : MonoBehaviour
     public float headSpeedPenaltyFull = 200f;
 
     // ──────────────────────────────────────────────
+    //  EVENT BONUS SINIRLARI
+    // ──────────────────────────────────────────────
+    [Header("Event Bonus/Ceza Sınırları")]
+    [Tooltip("Oturum boyunca birikmiş event bonus puanlarının üst sınırı.\n" +
+             "Çok sayıda başarılı event skoru 100'e sabitlemesin diye makul bir tavan.")]
+    [Range(0f, 100f)]
+    public float maxEventBonusTotal = 40f;
+
+    [Tooltip("Oturum boyunca birikmiş event ceza puanlarının üst sınırı")]
+    [Range(0f, 100f)]
+    public float maxEventPenaltyTotal = 40f;
+
+    // ──────────────────────────────────────────────
     //  ÇIKTI  —  DİĞER SİSTEMLER BU DEĞERİ OKUR
     // ──────────────────────────────────────────────
 
@@ -121,9 +134,12 @@ public class GazeScoringSystem : MonoBehaviour
     private int bufferHead;
     private int bufferCount;
 
-    // Dış kaynaklardan gelen bonus/ceza birikimi (CircleEvent vb.)
-    private float externalBonusAccum;
-    private float externalPenaltyAccum;
+    // Oturum boyunca biriken event bonus/cezaları (her frame SIFIRLANMAZ).
+    // ReportBonus / ReportPenalty çağrıları buraya ekler; ResetBuffer sıfırlar.
+    // Bu sayede tek-seferlik event bonusları sadece 1 frame değil, tüm oturum boyunca
+    // skora katkıda bulunur.
+    private float eventBonusTotal;
+    private float eventPenaltyTotal;
 
     // Aktiflik (EyeTrackingSystem aktifken çalışır)
     private bool wasActive;
@@ -178,31 +194,38 @@ public class GazeScoringSystem : MonoBehaviour
     // ══════════════════════════════════════════════
 
     /// <summary>
-    /// Dış bir sistemden bonus puan bildir.
+    /// Dış bir sistemden tek seferlik bonus puan bildir.
     /// Örneğin CircleEvent başarıyla tamamlandığında çağrılabilir.
-    /// Bonus 0–15 arası clamp edilir ve bir sonraki skor hesabında uygulanır.
+    /// Bonus değeri 0–15 arası clamp edilir, toplam birikim ise maxEventBonusTotal ile sınırlıdır.
+    /// Birikim oturum boyunca kalıcıdır; her ComputeScore çağrısında skora eklenir.
     ///
     /// Kullanım:
     ///   gazeScoringSystem.ReportBonus(10f);  // circle event başarısı
     /// </summary>
     public void ReportBonus(float amount)
     {
-        externalBonusAccum += Mathf.Clamp(amount, 0f, 15f);
-        Debug.Log(string.Format("[GazeScoringSystem] Bonus reported: +{0:F1} pts", amount));
+        float clamped = Mathf.Clamp(amount, 0f, 15f);
+        eventBonusTotal = Mathf.Min(eventBonusTotal + clamped, maxEventBonusTotal);
+        Debug.Log(string.Format(
+            "[GazeScoringSystem] Bonus reported: +{0:F1} pts (session total: {1:F1}/{2:F0})",
+            clamped, eventBonusTotal, maxEventBonusTotal));
     }
 
     /// <summary>
     /// Dış bir sistemden ceza puan bildir.
     /// Örneğin circle event kaçırıldığında çağrılabilir.
-    /// Ceza 0–15 arası clamp edilir.
+    /// Ceza 0–15 arası clamp edilir, toplam birikim maxEventPenaltyTotal ile sınırlıdır.
     ///
     /// Kullanım:
     ///   gazeScoringSystem.ReportPenalty(5f);  // circle event kaçırıldı
     /// </summary>
     public void ReportPenalty(float amount)
     {
-        externalPenaltyAccum += Mathf.Clamp(amount, 0f, 15f);
-        Debug.Log(string.Format("[GazeScoringSystem] Penalty reported: -{0:F1} pts", amount));
+        float clamped = Mathf.Clamp(amount, 0f, 15f);
+        eventPenaltyTotal = Mathf.Min(eventPenaltyTotal + clamped, maxEventPenaltyTotal);
+        Debug.Log(string.Format(
+            "[GazeScoringSystem] Penalty reported: -{0:F1} pts (session total: {1:F1}/{2:F0})",
+            clamped, eventPenaltyTotal, maxEventPenaltyTotal));
     }
 
     /// <summary>
@@ -324,13 +347,11 @@ public class GazeScoringSystem : MonoBehaviour
         // 0–100 ölçeğine çevir
         float score = rawScore * 100f;
 
-        // ── Dış bonus/ceza uygula ──
-        score += externalBonusAccum;
-        score -= externalPenaltyAccum;
-
-        // Bonuslar uygulandıktan sonra birikimi sıfırla
-        externalBonusAccum  = 0f;
-        externalPenaltyAccum = 0f;
+        // ── Oturum boyunca biriken event bonus/cezalarını uygula ──
+        // DİKKAT: Sıfırlamıyoruz — bunlar tüm oturum boyunca skora katkıda bulunur.
+        // Sadece ResetBuffer (oturum başı) sıfırlar.
+        score += eventBonusTotal;
+        score -= eventPenaltyTotal;
 
         // 0–100 clamp
         gazeScore = Mathf.Clamp(score, 0f, 100f);
@@ -345,8 +366,8 @@ public class GazeScoringSystem : MonoBehaviour
         bufferHead   = 0;
         bufferCount  = 0;
         gazeScore    = 0f;
-        externalBonusAccum  = 0f;
-        externalPenaltyAccum = 0f;
+        eventBonusTotal   = 0f;
+        eventPenaltyTotal = 0f;
     }
 
     // ══════════════════════════════════════════════

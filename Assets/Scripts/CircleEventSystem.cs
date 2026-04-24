@@ -6,7 +6,7 @@ using UnityEngine.UI;
 /// kullanıcının bakışıyla doldurulmasını yönetir.
 /// GameManager veya ayrı bir objeye atanır.
 /// </summary>
-public class CircleEventSystem : MonoBehaviour
+public class CircleEventSystem : MonoBehaviour, IGazeEvent
 {
     // ──────────────────────────────────────────────
     //  REFERANSLAR
@@ -20,6 +20,10 @@ public class CircleEventSystem : MonoBehaviour
 
     [Tooltip("Dairelerin çıkabileceği noktalar")]
     public Transform[] spawnPoints;
+
+    [Tooltip("Çakışmayı önleyen merkezi koordinatör (opsiyonel — null olsa da " +
+             "script geriye dönük uyumlu çalışır)")]
+    public GazeEventCoordinator coordinator;
 
     // ──────────────────────────────────────────────
     //  ZAMANLAMA
@@ -122,6 +126,9 @@ public class CircleEventSystem : MonoBehaviour
     //  KAMU API
     // ══════════════════════════════════════════════
 
+    /// <summary>IGazeEvent: event aktif mi?</summary>
+    public bool IsRunning => eventActive;
+
     /// <summary>Event'i başlat veya durdur (toggle).</summary>
     public void ToggleEvent()
     {
@@ -129,7 +136,7 @@ public class CircleEventSystem : MonoBehaviour
         else              StopEvent();
     }
 
-    /// <summary>Event'i zorla durdur (oturum bittiğinde çağrılır).</summary>
+    /// <summary>Event'i zorla durdur (oturum bittiğinde veya koordinatör preempt edince çağrılır).</summary>
     public void ForceStop()
     {
         if (eventActive) StopEvent();
@@ -141,6 +148,9 @@ public class CircleEventSystem : MonoBehaviour
 
     void StartEvent()
     {
+        // Kullanıcı tetiklemeli — koordinatörden kilidi ZORLA al (varsa mevcut event iptal edilir).
+        if (coordinator != null) coordinator.ForceAcquire(this);
+
         eventActive = true;
         eyeTracking.SetPaused(true);
         nextSpawnTimer = 1f;
@@ -158,6 +168,7 @@ public class CircleEventSystem : MonoBehaviour
         }
 
         eyeTracking.SetPaused(false);
+        coordinator?.Release(this);
         Debug.Log("[CircleEventSystem] Event stopped.");
     }
 
