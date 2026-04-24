@@ -1,7 +1,5 @@
 using UnityEngine;
 
-namespace VRPublicSpeaking.MainBranchGaze
-{
 /// <summary>
 /// Hareketli takip noktası event'i (Özellik 2).
 ///
@@ -176,7 +174,7 @@ public class MovingGazeDotSystem : MonoBehaviour, IGazeEvent
         Destroy(activeDot.gameObject);
         activeDot = null;
 
-        if (eyeTracking != null) eyeTracking.SetPaused(false);
+        if (eyeTracking != null) eyeTracking.SetPaused(TrackingPauseSource.CircleEvent, false);
         coordinator?.Release(this);
 
         Debug.Log("[MovingGazeDotSystem] Event force-stopped.");
@@ -238,7 +236,7 @@ public class MovingGazeDotSystem : MonoBehaviour, IGazeEvent
             OnDotSucceeded, OnDotFailed,
             standardShader, spritesDefaultShader, particlesUnlitShader);
 
-        if (eyeTracking != null) eyeTracking.SetPaused(true);
+        if (eyeTracking != null) eyeTracking.SetPaused(TrackingPauseSource.CircleEvent, true);
 
         Debug.Log($"[MovingGazeDotSystem] Dot spawned. Duration: {totalDuration:F1}s, " +
                   $"speed: {movementSpeed:F2}m/s, required ratio: {requiredGazeRatio:F2}");
@@ -269,7 +267,7 @@ public class MovingGazeDotSystem : MonoBehaviour, IGazeEvent
                   $"awarded {bonusPoints:F1} pts.");
 
         activeDot = null;
-        if (eyeTracking != null) eyeTracking.SetPaused(false);
+        if (eyeTracking != null) eyeTracking.SetPaused(TrackingPauseSource.CircleEvent, false);
         coordinator?.Release(this);
     }
 
@@ -279,7 +277,7 @@ public class MovingGazeDotSystem : MonoBehaviour, IGazeEvent
                   $"(required {requiredGazeRatio:F2}). No points awarded.");
 
         activeDot = null;
-        if (eyeTracking != null) eyeTracking.SetPaused(false);
+        if (eyeTracking != null) eyeTracking.SetPaused(TrackingPauseSource.CircleEvent, false);
         coordinator?.Release(this);
     }
 }
@@ -570,5 +568,4 @@ public class MovingGazeDot : MonoBehaviour
         rend.material = new Material(particlesUnlitShader);
         rend.material.color = Color.white;
     }
-}
 }

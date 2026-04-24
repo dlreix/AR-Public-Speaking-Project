@@ -2,8 +2,6 @@ using UnityEngine;
 using UnityEngine.XR;
 using System.Collections.Generic;
 
-namespace VRPublicSpeaking.MainBranchGaze
-{
 /// <summary>
 /// Göz/kafa takip sistemi — v3 (Stabilite odaklı, skor harici)
 ///
@@ -140,6 +138,9 @@ public class EyeTrackingSystem : MonoBehaviour
     /// <summary>Yumuşatılmış kafa açısal hızı (derece/saniye).</summary>
     public float SmoothedHeadSpeed => headAngularSpeed;
 
+    /// <summary>Sistem şu anda harici bir kaynak tarafından duraklatıldı mı?</summary>
+    public bool IsPaused => isPaused;
+
     // ──────────────────────────────────────────────
     //  ÖZEL DEĞİŞKENLER
     // ──────────────────────────────────────────────
@@ -166,6 +167,7 @@ public class EyeTrackingSystem : MonoBehaviour
     private bool headWarningActive;
 
     private readonly List<HeatmapPoint> heatmapPoints = new List<HeatmapPoint>();
+    private readonly HashSet<TrackingPauseSource> activePauseSources = new HashSet<TrackingPauseSource>();
 
     private Transform cachedTransform;
 
@@ -245,6 +247,7 @@ public class EyeTrackingSystem : MonoBehaviour
     {
         ClearHeatmapData();
         isActive = true;
+        activePauseSources.Clear();
         isPaused = false;
         reviewMode = false;
         stareWarningActive = false;
@@ -270,6 +273,8 @@ public class EyeTrackingSystem : MonoBehaviour
     public void Deactivate()
     {
         isActive = false;
+        activePauseSources.Clear();
+        isPaused = false;
         stareWarningActive = false;
         headWarningActive = false;
         lookingAtAudience = false;
@@ -278,15 +283,33 @@ public class EyeTrackingSystem : MonoBehaviour
 
     public void SetPaused(bool paused)
     {
-        isPaused = paused;
-        if (paused)
+        SetPaused(TrackingPauseSource.Legacy, paused);
+    }
+
+    public void SetPaused(TrackingPauseSource source, bool paused)
+    {
+        bool sourceChanged = paused
+            ? activePauseSources.Add(source)
+            : activePauseSources.Remove(source);
+        bool wasPaused = isPaused;
+
+        isPaused = activePauseSources.Count > 0;
+
+        if (isPaused)
         {
             stareWarningActive = false;
             headWarningActive = false;
             lookingAtAudience = false;
             stareTimer = 0f;
         }
-        Debug.Log("[EyeTrackingSystem] " + (paused ? "Paused (circle event active)" : "Resumed from pause"));
+
+        if (wasPaused == isPaused)
+        {
+            return;
+        }
+
+        string reason = sourceChanged ? $" ({source})" : string.Empty;
+        Debug.Log("[EyeTrackingSystem] " + (isPaused ? "Paused" : "Resumed from pause") + reason);
     }
 
     public void SetDebugVisible(bool visible)
@@ -567,5 +590,4 @@ public class HeatmapPoint
     public Vector3 position;
     public int intensity;
     public GameObject visual;
-}
 }

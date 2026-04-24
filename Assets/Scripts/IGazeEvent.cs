@@ -1,5 +1,3 @@
-namespace VRPublicSpeaking.MainBranchGaze
-{
 /// <summary>
 /// Koordinatör tarafından yönetilen tüm gaze event'lerinin uyması gereken sözleşme.
 ///
@@ -17,5 +15,4 @@ public interface IGazeEvent
     /// (MainController.StopSession) tarafından çağrılabilir.
     /// </summary>
     void ForceStop();
-}
 }

@@ -1,7 +1,5 @@
 using UnityEngine;
 
-namespace VRPublicSpeaking.MainBranchGaze
-{
 /// <summary>
 /// Göz Teması Puanlama Sistemi
 ///
@@ -145,6 +143,7 @@ public class GazeScoringSystem : MonoBehaviour
 
     // Aktiflik (EyeTrackingSystem aktifken çalışır)
     private bool wasActive;
+    private bool wasPaused;
 
     // Periyodik log zamanlayıcısı
     private float nextLogTime;
@@ -174,6 +173,21 @@ public class GazeScoringSystem : MonoBehaviour
         if (!eyeTracking.IsActive)
         {
             // Oturum bitmişse skoru koru (son değer kalır)
+            wasPaused = false;
+            return;
+        }
+
+        if (eyeTracking.IsPaused)
+        {
+            wasPaused = true;
+            return;
+        }
+
+        if (wasPaused)
+        {
+            ResetSamplesPreservingScore();
+            nextLogTime = Time.time + LOG_INTERVAL;
+            wasPaused = false;
             return;
         }
 
@@ -372,6 +386,12 @@ public class GazeScoringSystem : MonoBehaviour
         eventPenaltyTotal = 0f;
     }
 
+    void ResetSamplesPreservingScore()
+    {
+        bufferHead = 0;
+        bufferCount = 0;
+    }
+
     // ══════════════════════════════════════════════
     //  VERİ YAPISI
     // ══════════════════════════════════════════════
@@ -385,5 +405,4 @@ public class GazeScoringSystem : MonoBehaviour
         public bool  isStaring;
         public float headSpeed;
     }
-}
 }

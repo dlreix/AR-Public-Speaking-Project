@@ -1,7 +1,5 @@
 using UnityEngine;
 
-namespace VRPublicSpeaking.MainBranchGaze
-{
 /// <summary>
 /// Tek bakımlık hızlı nokta event'i (Özellik 1).
 ///
@@ -171,7 +169,7 @@ public class QuickGazeDotSystem : MonoBehaviour, IGazeEvent
         Destroy(activeDot.gameObject);
         activeDot = null;
 
-        if (eyeTracking != null) eyeTracking.SetPaused(false);
+        if (eyeTracking != null) eyeTracking.SetPaused(TrackingPauseSource.CircleEvent, false);
         coordinator?.Release(this);
 
         Debug.Log("[QuickGazeDotSystem] Event force-stopped.");
@@ -228,7 +226,7 @@ public class QuickGazeDotSystem : MonoBehaviour, IGazeEvent
         activeDot.Setup(dotLifetime, dotScale, OnDotHit, OnDotMissed,
                         standardShader, particlesUnlitShader);
 
-        if (eyeTracking != null) eyeTracking.SetPaused(true);
+        if (eyeTracking != null) eyeTracking.SetPaused(TrackingPauseSource.CircleEvent, true);
 
         Debug.Log($"[QuickGazeDotSystem] Dot spawned at point #{index} — lifetime: {dotLifetime:F1}s");
     }
@@ -266,7 +264,7 @@ public class QuickGazeDotSystem : MonoBehaviour, IGazeEvent
         Debug.Log($"[QuickGazeDotSystem] Dot hit! Awarded {bonusPoints:F1} pts.");
 
         activeDot = null;
-        if (eyeTracking != null) eyeTracking.SetPaused(false);
+        if (eyeTracking != null) eyeTracking.SetPaused(TrackingPauseSource.CircleEvent, false);
         coordinator?.Release(this);
     }
 
@@ -275,7 +273,7 @@ public class QuickGazeDotSystem : MonoBehaviour, IGazeEvent
         Debug.Log("[QuickGazeDotSystem] Dot missed (timeout). No points awarded.");
 
         activeDot = null;
-        if (eyeTracking != null) eyeTracking.SetPaused(false);
+        if (eyeTracking != null) eyeTracking.SetPaused(TrackingPauseSource.CircleEvent, false);
         coordinator?.Release(this);
     }
 }
@@ -497,5 +495,4 @@ internal static class LayerMaskUtils
         while (val > 1) { val >>= 1; layer++; }
         return layer;
     }
-}
 }

@@ -1,7 +1,5 @@
 using UnityEngine;
 
-namespace VRPublicSpeaking.MainBranchGaze
-{
 /// <summary>
 /// Gaze event koordinatörü.
 ///
@@ -103,5 +101,4 @@ public class GazeEventCoordinator : MonoBehaviour
         currentHolder = null;
         holder.ForceStop();
     }
-}
 }
