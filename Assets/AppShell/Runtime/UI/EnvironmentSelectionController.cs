@@ -210,12 +210,12 @@ namespace VRPublicSpeaking.AppShell.UI
                     string reason = string.IsNullOrWhiteSpace(environmentDefinition.AvailabilityReason)
                         ? "This environment is visible in the shell, but it is not available right now."
                         : environmentDefinition.AvailabilityReason;
-                    return $"{environmentDefinition.DisplayName} is unavailable. {reason}";
+                    return $"{environmentDefinition.DisplayName} is unavailable.\n{CompactMessage(reason, 88)}";
                 }
 
                 if (environmentDefinition.IsMisconfigured)
                 {
-                    return $"{environmentDefinition.DisplayName} is visible, but its scene wiring is incomplete. Add the missing scene/spawn configuration before launching.";
+                    return $"{environmentDefinition.DisplayName} needs setup.\nComplete scene and spawn wiring before launch.";
                 }
 
                 return BuildSelectionPreviewMessage(environmentDefinition);
@@ -223,24 +223,22 @@ namespace VRPublicSpeaking.AppShell.UI
 
             return HasSelectableEnvironment()
                 ? "Select the room that best matches the speaking context you want to rehearse."
-                : "No launch-ready environments are configured yet. The visible cards stay here so the product shell remains intact while scene setup is completed.";
+                : "No launch-ready rooms are configured yet.\nVisible cards stay here while scene setup is completed.";
         }
 
         private static string BuildSelectionPreviewMessage(AppEnvironmentDefinition environmentDefinition)
         {
-            string message = $"{environmentDefinition.DisplayName} is ready.";
+            string recommendedMode = string.IsNullOrWhiteSpace(environmentDefinition.RecommendedModeLabel)
+                ? "Any visible mode"
+                : environmentDefinition.RecommendedModeLabel;
+            string focus = CompactMessage(environmentDefinition.AudienceHint, 72);
 
-            if (!string.IsNullOrWhiteSpace(environmentDefinition.RecommendedModeLabel))
+            if (string.IsNullOrWhiteSpace(focus))
             {
-                message += $" Recommended mode: {environmentDefinition.RecommendedModeLabel}.";
+                return $"{environmentDefinition.DisplayName} is ready.\nMode: {recommendedMode}";
             }
 
-            if (!string.IsNullOrWhiteSpace(environmentDefinition.AudienceHint))
-            {
-                message += $" {environmentDefinition.AudienceHint}";
-            }
-
-            return message.Trim();
+            return $"{environmentDefinition.DisplayName} is ready.\nMode: {recommendedMode}\nFocus: {focus}";
         }
 
         private static string BuildSelectionConfirmedMessage(AppEnvironmentDefinition environmentDefinition)
@@ -269,6 +267,27 @@ namespace VRPublicSpeaking.AppShell.UI
             }
 
             return false;
+        }
+
+        private static string CompactMessage(string value, int maxLength)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return string.Empty;
+            }
+
+            string compact = value.Replace("\r", " ").Replace("\n", " ").Trim();
+            while (compact.Contains("  "))
+            {
+                compact = compact.Replace("  ", " ");
+            }
+
+            if (compact.Length <= maxLength)
+            {
+                return compact;
+            }
+
+            return compact.Substring(0, Mathf.Max(0, maxLength - 3)).TrimEnd() + "...";
         }
     }
 }

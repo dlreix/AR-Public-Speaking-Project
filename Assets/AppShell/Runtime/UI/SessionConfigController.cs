@@ -196,15 +196,15 @@ namespace VRPublicSpeaking.AppShell.UI
                     ? snapshot.SelectedEnvironmentName
                     : "Choose an environment";
                 string launchNote = !snapshot.HasAnyScoringEnabled
-                    ? "\nLaunch note: results will be limited because both core scoring systems are disabled."
+                    ? "\nNote: core scoring is off, so results will be limited."
                     : string.Empty;
 
                 summaryPreviewLabel.text =
-                    $"Mode: {snapshot.PracticeMode}\n" +
-                    $"Environment: {environmentName}\n" +
-                    $"Setup: {snapshot.DifficultyLevel} | {snapshot.AudiencePreset} | {snapshot.GetDurationDisplay()}\n" +
+                    $"Room: {environmentName}\n" +
+                    $"Mode: {snapshot.PracticeMode}  |  {snapshot.GetDurationDisplay()}\n" +
+                    $"Context: {snapshot.DifficultyLevel} / {snapshot.AudiencePreset}\n" +
                     $"Feedback: {snapshot.FeedbackLevel}\n" +
-                    $"Systems: {snapshot.GetEnabledSystemsSummary()}" +
+                    $"Systems: {BuildCompactSystemsSummary(snapshot)}" +
                     launchNote;
             }
         }
@@ -223,6 +223,53 @@ namespace VRPublicSpeaking.AppShell.UI
             {
                 toggle.onValueChanged.AddListener(_ => RefreshSummaryPreview());
             }
+        }
+
+        private static string BuildCompactSystemsSummary(SessionConfig snapshot)
+        {
+            if (snapshot == null)
+            {
+                return "None";
+            }
+
+            System.Collections.Generic.List<string> enabledSystems = new System.Collections.Generic.List<string>();
+
+            if (snapshot.EyeTrackingEnabled)
+            {
+                enabledSystems.Add("Eye");
+            }
+
+            if (snapshot.GazeScoringEnabled)
+            {
+                enabledSystems.Add("Gaze");
+            }
+
+            if (snapshot.PerformanceScoringEnabled)
+            {
+                enabledSystems.Add("Performance");
+            }
+
+            if (snapshot.VoiceAnalysisEnabled)
+            {
+                enabledSystems.Add("Voice");
+            }
+
+            if (snapshot.PostureAnalysisEnabled)
+            {
+                enabledSystems.Add("Posture");
+            }
+
+            if (enabledSystems.Count == 0)
+            {
+                return "None";
+            }
+
+            if (enabledSystems.Count <= 3)
+            {
+                return string.Join(", ", enabledSystems);
+            }
+
+            return string.Join(", ", enabledSystems.GetRange(0, 3)) + $" +{enabledSystems.Count - 3}";
         }
     }
 }

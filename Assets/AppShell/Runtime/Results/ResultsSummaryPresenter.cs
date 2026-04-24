@@ -9,7 +9,9 @@ namespace VRPublicSpeaking.AppShell.Results
     public class ResultsSummaryPresenter : MonoBehaviour
     {
         [SerializeField] private AppRuntimeState runtimeState;
+        [SerializeField] private TMP_Text scoreLabel;
         [SerializeField] private TMP_Text summaryLabel;
+        [SerializeField] private TMP_Text metricsLabel;
         [SerializeField] private TMP_Text recommendationsLabel;
 
         private void OnEnable()
@@ -35,32 +37,19 @@ namespace VRPublicSpeaking.AppShell.Results
                 ? runtimeState.SelectedEnvironment.DisplayName
                 : "No environment selected";
 
+            if (scoreLabel != null)
+            {
+                scoreLabel.text = BuildScoreText(summary);
+            }
+
             if (summaryLabel != null)
             {
-                var builder = new StringBuilder();
-                builder.AppendLine($"Environment: {environmentName}");
-                builder.AppendLine($"Mode: {config.PracticeMode}");
-                builder.AppendLine(summary.HasOverallScore
-                    ? $"Overall: {summary.TotalScore:0.0}{BuildBandSuffix(summary.PerformanceBand)}"
-                    : "Overall: Unavailable");
-                builder.AppendLine(summary.HasEyeContactScore
-                    ? $"Eye Contact: {summary.EyeContactScore:0.0}"
-                    : "Eye Contact: Unavailable");
-                builder.AppendLine(summary.HasSpeechPaceScore
-                    ? $"Speech Pace: {summary.SpeechPaceScore:0.0}"
-                    : "Speech Pace: Unavailable");
-                builder.AppendLine(summary.HasPostureScore
-                    ? $"Posture: {summary.PostureScore:0.0}"
-                    : "Posture: Unavailable");
-                builder.AppendLine($"Filler Words: {summary.FillerWordCount:0}  |  Time: {summary.DurationSeconds / 60f:0.#} min");
+                summaryLabel.text = BuildOverviewText(summary, config, environmentName);
+            }
 
-                string focusLine = BuildFocusLine(summary);
-                if (!string.IsNullOrWhiteSpace(focusLine))
-                {
-                    builder.AppendLine(focusLine);
-                }
-
-                summaryLabel.text = builder.ToString().TrimEnd();
+            if (metricsLabel != null)
+            {
+                metricsLabel.text = BuildMetricsText(summary);
             }
 
             if (recommendationsLabel != null)
@@ -88,9 +77,64 @@ namespace VRPublicSpeaking.AppShell.Results
             }
         }
 
+        private static string BuildScoreText(SessionResultSummary summary)
+        {
+            if (!summary.HasOverallScore)
+            {
+                return "<size=52><b>--</b></size>\n<size=22>Awaiting scored session</size>";
+            }
+
+            string bandSuffix = string.IsNullOrWhiteSpace(summary.PerformanceBand)
+                ? "Latest overall score"
+                : summary.PerformanceBand;
+            return $"<size=68><b>{summary.TotalScore:0.0}</b></size>\n<size=22>{bandSuffix}</size>";
+        }
+
+        private static string BuildOverviewText(SessionResultSummary summary, SessionConfig config, string environmentName)
+        {
+            var builder = new StringBuilder();
+            builder.AppendLine($"Environment: {environmentName}");
+            builder.AppendLine($"Mode: {config.PracticeMode}");
+            builder.AppendLine($"Duration: {(summary.DurationSeconds > 0f ? $"{summary.DurationSeconds / 60f:0.#} min" : config.GetDurationDisplay())}");
+            builder.AppendLine($"Filler Words: {summary.FillerWordCount:0}");
+
+            string focusLine = BuildFocusLine(summary);
+            if (!string.IsNullOrWhiteSpace(focusLine))
+            {
+                builder.AppendLine(focusLine);
+            }
+
+            return builder.ToString().TrimEnd();
+        }
+
+        private static string BuildMetricsText(SessionResultSummary summary)
+        {
+            var builder = new StringBuilder();
+            builder.AppendLine($"Eye Contact  {FormatMetric(summary.HasEyeContactScore, summary.EyeContactScore)}");
+            builder.AppendLine($"Speech Pace  {FormatMetric(summary.HasSpeechPaceScore, summary.SpeechPaceScore)}");
+            builder.AppendLine($"Posture      {FormatMetric(summary.HasPostureScore, summary.PostureScore)}");
+
+            if (!string.IsNullOrWhiteSpace(summary.StrongestArea))
+            {
+                builder.AppendLine($"Strongest    {CompactText(summary.StrongestArea, 28)}");
+            }
+
+            if (!string.IsNullOrWhiteSpace(summary.WeakestArea))
+            {
+                builder.Append($"Improve      {CompactText(summary.WeakestArea, 28)}");
+            }
+
+            return builder.ToString().TrimEnd();
+        }
+
         private static string BuildBandSuffix(string performanceBand)
         {
             return string.IsNullOrWhiteSpace(performanceBand) ? string.Empty : $" ({performanceBand})";
+        }
+
+        private static string FormatMetric(bool hasValue, float value)
+        {
+            return hasValue ? $"{value:0.0}" : "Unavailable";
         }
 
         private static string BuildFocusLine(SessionResultSummary summary)

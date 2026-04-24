@@ -37,7 +37,12 @@ namespace VRPublicSpeaking.AppShell.UI
                 ? environmentDefinition.DisplayName
                 : "No environment selected";
 
-            summaryLabel.text = config.BuildLaunchSummary(fallbackEnvironmentName);
+            summaryLabel.text =
+                $"Environment: {fallbackEnvironmentName}\n" +
+                $"Mode: {config.PracticeMode}  |  Duration: {config.GetDurationDisplay()}\n" +
+                $"Context: {config.DifficultyLevel} / {config.AudiencePreset}\n" +
+                $"Feedback: {config.FeedbackLevel}\n" +
+                $"Systems: {config.GetEnabledSystemsSummary()}";
             SetWarning(BuildWarningText(config, environmentDefinition));
         }
 
@@ -94,6 +99,11 @@ namespace VRPublicSpeaking.AppShell.UI
             if (config.EyeTrackingEnabled && !config.GazeScoringEnabled)
             {
                 warnings.Add("Eye Tracking is enabled while Gaze Scoring is off. Tracking can still run, but gaze-based scoring will not contribute to the score.");
+            }
+
+            if (warnings.Count == 0)
+            {
+                return "No launch blockers detected. The current session setup is ready to start.";
             }
 
             return string.Join("\n", warnings).Trim();

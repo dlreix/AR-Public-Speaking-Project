@@ -127,6 +127,7 @@ public class GazeScoringSystem : MonoBehaviour
 
     // Aktiflik (EyeTrackingSystem aktifken çalışır)
     private bool wasActive;
+    private bool wasPaused;
 
     // Periyodik log zamanlayıcısı
     private float nextLogTime;
@@ -156,6 +157,21 @@ public class GazeScoringSystem : MonoBehaviour
         if (!eyeTracking.IsActive)
         {
             // Oturum bitmişse skoru koru (son değer kalır)
+            wasPaused = false;
+            return;
+        }
+
+        if (eyeTracking.IsPaused)
+        {
+            wasPaused = true;
+            return;
+        }
+
+        if (wasPaused)
+        {
+            ResetSamplesPreservingScore();
+            nextLogTime = Time.time + LOG_INTERVAL;
+            wasPaused = false;
             return;
         }
 
@@ -277,7 +293,6 @@ public class GazeScoringSystem : MonoBehaviour
         // Yeterli veri yoksa henüz puan verme
         if (totalInWindow < 10)
         {
-            gazeScore = 0f;
             return;
         }
 
@@ -346,6 +361,14 @@ public class GazeScoringSystem : MonoBehaviour
         bufferCount  = 0;
         gazeScore    = 0f;
         externalBonusAccum  = 0f;
+        externalPenaltyAccum = 0f;
+    }
+
+    void ResetSamplesPreservingScore()
+    {
+        bufferHead = 0;
+        bufferCount = 0;
+        externalBonusAccum = 0f;
         externalPenaltyAccum = 0f;
     }
 

@@ -51,10 +51,13 @@ public class MainController : MonoBehaviour
     //  ÖZEL DURUM DEĞİŞKENLERİ
     // ──────────────────────────────────────────────
     private bool sessionRunning;
+    private bool sessionPaused;
     private bool debugMode;
     private bool inReview;
     private float sessionStartTime;
     private float sessionDuration;
+    private float pausedDurationAccum;
+    private float pauseStartedAt = -1f;
     private float lastFinalGazeScore = -1f;
 
     // ──────────────────────────────────────────────
@@ -80,22 +83,52 @@ public class MainController : MonoBehaviour
     private bool xrPrimaryWasPressed;
     private bool xrSecondaryWasPressed;
     private bool xrGripWasPressed;
+    private float xrSecondaryPressStartedAt = -1f;
+    private bool xrSecondaryLongPressHandled;
 
     // PC mod: fare bakış durumu
     private bool isVRMode;
     private float cameraPitch;
     private float cameraYaw;
+    private const float VrPauseLongPressSeconds = 0.6f;
 
     public bool IsSessionRunning => sessionRunning;
+    public bool IsSessionPaused => sessionPaused;
     public bool IsInReview => inReview;
+    public bool IsVrMode => isVRMode;
     public float SessionDuration => sessionDuration;
-    public float LiveSessionElapsedSeconds => sessionRunning ? Time.time - sessionStartTime : sessionDuration;
+    public float LiveSessionElapsedSeconds => sessionRunning ? GetCurrentElapsedSessionTime() : sessionDuration;
     public float LastFinalGazeScore => lastFinalGazeScore;
 
     public event Action SessionStarted;
+    public event Action SessionPaused;
+    public event Action SessionResumed;
     public event Action<float, float> SessionEnded;
     public event Action ReviewEntered;
     public event Action ReviewExited;
+
+    public bool TryGetLiveWarningState(out string message, out float alpha)
+    {
+        message = string.Empty;
+        alpha = 0f;
+
+        if (!sessionRunning || sessionPaused)
+        {
+            return false;
+        }
+
+        if (TryGetActiveWarningState(headWarningText, out message, out alpha))
+        {
+            return true;
+        }
+
+        if (TryGetActiveWarningState(stareWarningText, out message, out alpha))
+        {
+            return true;
+        }
+
+        return false;
+    }
 
     // ══════════════════════════════════════════════
     //  YAŞAM DÖNGÜSÜ
@@ -110,8 +143,7 @@ public class MainController : MonoBehaviour
 
         if (!isVRMode && lockCursor)
         {
-            Cursor.lockState = CursorLockMode.Locked;
-            Cursor.visible = false;
+            ApplyDesktopCursorState(true);
         }
 
         if (playerHead != null)
@@ -131,7 +163,7 @@ public class MainController : MonoBehaviour
         if (!isVRMode) HandleMouseLook();
         HandleModeInput();
 
-        if (sessionRunning)
+        if (sessionRunning && !sessionPaused)
         {
             UpdateSessionUI();
             UpdateWarnings();
@@ -171,19 +203,64 @@ public class MainController : MonoBehaviour
                               && UnityEngine.InputSystem.Mouse.current != null
                               && UnityEngine.InputSystem.Mouse.current.leftButton.wasPressedThisFrame;
 
+        bool keyboardPrimaryPressed = UnityEngine.InputSystem.Keyboard.current != null && UnityEngine.InputSystem.Keyboard.current.rKey.wasPressedThisFrame;
+        bool keyboardDebugPressed = UnityEngine.InputSystem.Keyboard.current != null && UnityEngine.InputSystem.Keyboard.current.dKey.wasPressedThisFrame;
+        bool keyboardCirclePressed = UnityEngine.InputSystem.Keyboard.current != null && UnityEngine.InputSystem.Keyboard.current.cKey.wasPressedThisFrame;
+        bool keyboardPausePressed = UnityEngine.InputSystem.Keyboard.current != null && UnityEngine.InputSystem.Keyboard.current.escapeKey.wasPressedThisFrame;
+
+        bool vrPauseTogglePressed = false;
+        bool vrDebugPressed = false;
+
+        if (xrSecondary && !xrSecondaryWasPressed)
+        {
+            xrSecondaryPressStartedAt = Time.unscaledTime;
+            xrSecondaryLongPressHandled = false;
+        }
+
+        if (xrSecondary &&
+            !xrSecondaryLongPressHandled &&
+            xrSecondaryPressStartedAt >= 0f &&
+            sessionRunning &&
+            Time.unscaledTime - xrSecondaryPressStartedAt >= VrPauseLongPressSeconds)
+        {
+            xrSecondaryLongPressHandled = true;
+            vrPauseTogglePressed = true;
+        }
+
+        if (!xrSecondary && xrSecondaryWasPressed)
+        {
+            if (!xrSecondaryLongPressHandled && sessionRunning && !sessionPaused)
+            {
+                vrDebugPressed = true;
+            }
+
+            xrSecondaryPressStartedAt = -1f;
+            xrSecondaryLongPressHandled = false;
+        }
+
         // "Bu karede basıldı mı?" — klavye veya VR controller
-        bool rPressed = (UnityEngine.InputSystem.Keyboard.current != null && UnityEngine.InputSystem.Keyboard.current.rKey.wasPressedThisFrame)
-                        || (xrPrimary   && !xrPrimaryWasPressed);
-        bool dPressed = (UnityEngine.InputSystem.Keyboard.current != null && UnityEngine.InputSystem.Keyboard.current.dKey.wasPressedThisFrame)
-                        || (xrSecondary && !xrSecondaryWasPressed);
-        bool cPressed = (UnityEngine.InputSystem.Keyboard.current != null && UnityEngine.InputSystem.Keyboard.current.cKey.wasPressedThisFrame)
-                        || (xrGrip      && !xrGripWasPressed)
+        bool rPressed = keyboardPrimaryPressed || (xrPrimary && !xrPrimaryWasPressed);
+        bool dPressed = keyboardDebugPressed || vrDebugPressed;
+        bool cPressed = keyboardCirclePressed
+                        || (xrGrip && !xrGripWasPressed)
                         || mouseLeftClick;
+        bool pausePressed = keyboardPausePressed || vrPauseTogglePressed;
 
         // Önceki kare durumunu sakla
         xrPrimaryWasPressed   = xrPrimary;
         xrSecondaryWasPressed = xrSecondary;
         xrGripWasPressed      = xrGrip;
+
+        if (pausePressed && sessionRunning)
+        {
+            TogglePauseFromShell();
+            return;
+        }
+
+        if (sessionPaused)
+        {
+            return;
+        }
 
         // R / A: Oturum başlat / durdur / review kapat
         if (rPressed)
@@ -219,16 +296,24 @@ public class MainController : MonoBehaviour
     void StartSession()
     {
         sessionRunning = true;
+        sessionPaused = false;
         inReview = false;
         debugMode = false;
         sessionStartTime = Time.time;
         sessionDuration = 0f;
+        pausedDurationAccum = 0f;
+        pauseStartedAt = -1f;
         lastFinalGazeScore = -1f;
 
-        eyeTracking.Activate();
-        SetText(statusText, ControlHint(
-            "KAYIT YAPILIYOR (A: durdur | B: debug | Grip: circle event)",
-            "KAYIT YAPILIYOR (R: durdur | D: debug | C/Sol-Tık: circle event)"));
+        if (eyeTracking != null)
+        {
+            eyeTracking.Activate();
+            eyeTracking.SetPaused(TrackingPauseSource.PauseMenu, false);
+        }
+
+        ApplyDesktopCursorState(true);
+
+        UpdateActiveStatusText();
         SetActive(statusText, true);
         SetActive(timerText, true);
         SetActive(reviewInfoText, false);
@@ -239,11 +324,22 @@ public class MainController : MonoBehaviour
 
     void StopSession()
     {
+        sessionDuration = GetCurrentElapsedSessionTime();
         sessionRunning = false;
-        sessionDuration = Time.time - sessionStartTime;
+        sessionPaused = false;
+        pauseStartedAt = -1f;
+        pausedDurationAccum = 0f;
+        debugMode = false;
 
-        eyeTracking.Deactivate();
-        circleEvent.ForceStop();
+        if (eyeTracking != null)
+        {
+            eyeTracking.SetDebugVisible(false);
+            eyeTracking.SetPaused(TrackingPauseSource.PauseMenu, false);
+            eyeTracking.Deactivate();
+        }
+
+        if (circleEvent != null)
+            circleEvent.ForceStop();
 
         lastFinalGazeScore = gazeScoringSystem != null
             ? gazeScoringSystem.FinalizeSession()
@@ -255,6 +351,7 @@ public class MainController : MonoBehaviour
             Debug.Log(string.Format("[MainController] *** Session Ended *** Duration: {0:F1}s | (GazeScoringSystem not assigned)", sessionDuration));
 
         ClearSessionUI();
+        ApplyDesktopCursorState(false);
         SessionEnded?.Invoke(sessionDuration, lastFinalGazeScore);
 
         if (allowAutomaticReview)
@@ -265,15 +362,10 @@ public class MainController : MonoBehaviour
     {
         debugMode = !debugMode;
         Debug.Log("[MainController] Debug mode: " + (debugMode ? "ON" : "OFF"));
-        eyeTracking.SetDebugVisible(debugMode);
+        if (eyeTracking != null)
+            eyeTracking.SetDebugVisible(debugMode);
 
-        SetText(statusText, debugMode
-            ? ControlHint(
-                "KAYIT YAPILIYOR [DEBUG] (A: durdur | B: debug kapat | Grip: circle)",
-                "KAYIT YAPILIYOR [DEBUG] (R: durdur | D: debug kapat | C/Sol-Tık: circle)")
-            : ControlHint(
-                "KAYIT YAPILIYOR (A: durdur | B: debug | Grip: circle event)",
-                "KAYIT YAPILIYOR (R: durdur | D: debug | C/Sol-Tık: circle event)"));
+        UpdateActiveStatusText();
     }
 
     void EnterReview()
@@ -314,6 +406,36 @@ public class MainController : MonoBehaviour
             StopSession();
     }
 
+    public void AbortSessionFromShell()
+    {
+        if (!sessionRunning && !sessionPaused && !inReview)
+            return;
+
+        sessionDuration = 0f;
+        sessionRunning = false;
+        sessionPaused = false;
+        inReview = false;
+        debugMode = false;
+        pauseStartedAt = -1f;
+        pausedDurationAccum = 0f;
+        lastFinalGazeScore = -1f;
+
+        if (circleEvent != null)
+            circleEvent.ForceStop();
+
+        if (eyeTracking != null)
+        {
+            eyeTracking.SetDebugVisible(false);
+            eyeTracking.SetPaused(TrackingPauseSource.PauseMenu, false);
+            eyeTracking.ExitReviewMode();
+            eyeTracking.Deactivate();
+        }
+
+        ClearSessionUI();
+        SetActive(reviewInfoText, false);
+        ApplyDesktopCursorState(false);
+    }
+
     public void ExitReviewFromShell()
     {
         if (inReview)
@@ -330,13 +452,59 @@ public class MainController : MonoBehaviour
         allowAutomaticReview = enabled;
     }
 
+    public void PauseSessionFromShell()
+    {
+        if (!sessionRunning || sessionPaused)
+            return;
+
+        sessionPaused = true;
+        pauseStartedAt = Time.time;
+        debugMode = false;
+
+        if (eyeTracking != null)
+        {
+            eyeTracking.SetDebugVisible(false);
+            eyeTracking.SetPaused(TrackingPauseSource.PauseMenu, true);
+        }
+
+        ApplyDesktopCursorState(false);
+        SetActive(stareWarningText, false);
+        SetActive(headWarningText, false);
+        SessionPaused?.Invoke();
+    }
+
+    public void ResumeSessionFromShell()
+    {
+        if (!sessionRunning || !sessionPaused)
+            return;
+
+        pausedDurationAccum += Mathf.Max(0f, Time.time - pauseStartedAt);
+        pauseStartedAt = -1f;
+        sessionPaused = false;
+
+        if (eyeTracking != null)
+            eyeTracking.SetPaused(TrackingPauseSource.PauseMenu, false);
+
+        ApplyDesktopCursorState(true);
+        UpdateActiveStatusText();
+        SessionResumed?.Invoke();
+    }
+
+    public void TogglePauseFromShell()
+    {
+        if (sessionPaused)
+            ResumeSessionFromShell();
+        else
+            PauseSessionFromShell();
+    }
+
     // ══════════════════════════════════════════════
     //  UYARI SİSTEMİ
     // ══════════════════════════════════════════════
 
     void UpdateSessionUI()
     {
-        float elapsed = Time.time - sessionStartTime;
+        float elapsed = GetCurrentElapsedSessionTime();
         SetText(timerText, string.Format("{0:F1}s", elapsed));
     }
 
@@ -417,5 +585,69 @@ public class MainController : MonoBehaviour
     static void SetActive(Text t, bool active)
     {
         if (t != null) t.gameObject.SetActive(active);
+    }
+
+    static bool TryGetActiveWarningState(Text textElement, out string message, out float alpha)
+    {
+        message = string.Empty;
+        alpha = 0f;
+
+        if (textElement == null || !textElement.gameObject.activeSelf)
+        {
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(textElement.text))
+        {
+            return false;
+        }
+
+        alpha = textElement.color.a;
+        if (alpha <= 0.01f)
+        {
+            return false;
+        }
+
+        message = textElement.text;
+        return true;
+    }
+
+    float GetCurrentElapsedSessionTime()
+    {
+        if (!sessionRunning)
+            return sessionDuration;
+
+        float pauseOffset = pausedDurationAccum;
+        if (sessionPaused && pauseStartedAt >= 0f)
+            pauseOffset += Mathf.Max(0f, Time.time - pauseStartedAt);
+
+        return Mathf.Max(0f, Time.time - sessionStartTime - pauseOffset);
+    }
+
+    void UpdateActiveStatusText()
+    {
+        SetText(statusText, debugMode
+            ? ControlHint(
+                "KAYIT YAPILIYOR [DEBUG] (A: durdur | B: pause için basılı tut | Grip: circle)",
+                "KAYIT YAPILIYOR [DEBUG] (R: durdur | D: debug kapat | Esc: pause | C/Sol-Tık: circle)")
+            : ControlHint(
+                "KAYIT YAPILIYOR (A: durdur | B: kısa bas debug | B: basılı tut pause | Grip: circle)",
+                "KAYIT YAPILIYOR (R: durdur | D: debug | Esc: pause | C/Sol-Tık: circle event)"));
+    }
+
+    void ApplyDesktopCursorState(bool locked)
+    {
+        if (!lockCursor)
+            return;
+
+        bool hasDesktopInput =
+            UnityEngine.InputSystem.Keyboard.current != null ||
+            UnityEngine.InputSystem.Mouse.current != null;
+
+        if (!hasDesktopInput)
+            return;
+
+        Cursor.lockState = locked ? CursorLockMode.Locked : CursorLockMode.None;
+        Cursor.visible = !locked;
     }
 }

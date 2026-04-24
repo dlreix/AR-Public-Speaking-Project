@@ -128,6 +128,21 @@ namespace VRPublicSpeaking.AppShell.Core
             currentRuntimeState.MarkSessionEnded();
         }
 
+        public void MarkSessionPaused()
+        {
+            currentRuntimeState.MarkSessionPaused();
+        }
+
+        public void MarkSessionResumed()
+        {
+            currentRuntimeState.MarkSessionResumed();
+        }
+
+        public void MarkSessionCancelled()
+        {
+            currentRuntimeState.MarkSessionCancelled();
+        }
+
         public void UpdateTimeRemaining(float timeRemainingSeconds)
         {
             currentRuntimeState.TimeRemainingSeconds = timeRemainingSeconds;
@@ -148,6 +163,16 @@ namespace VRPublicSpeaking.AppShell.Core
         public void ResetRequestedHubPanel()
         {
             currentRuntimeState.RequestedHubPanel = AppPanelType.Home;
+        }
+
+        public void SetPauseMenuVisible(bool visible)
+        {
+            currentRuntimeState.PauseMenuVisible = visible;
+        }
+
+        public void SetResultsOverlayVisible(bool visible)
+        {
+            currentRuntimeState.ResultsOverlayVisible = visible;
         }
 
         private SessionConfig SanitizeSessionConfig(SessionConfig config)

@@ -20,20 +20,33 @@ namespace VRPublicSpeaking.AppShell.Editor
         internal const string ResultsScenePath = "Assets/Scenes/ResultsScene.unity";
         internal const string EnvironmentCatalogPath = "Assets/AppShell/Config/DefaultEnvironmentCatalog.asset";
 
-        internal static readonly Color PanelColor = new Color(0.09f, 0.12f, 0.16f, 0.92f);
-        internal static readonly Color AccentColor = new Color(0.18f, 0.55f, 0.84f, 1f);
-        internal static readonly Color SecondaryColor = new Color(0.20f, 0.24f, 0.30f, 0.96f);
+        internal static readonly Color PanelColor = new Color(0.08f, 0.11f, 0.15f, 0.96f);
+        internal static readonly Color AccentColor = new Color(0.21f, 0.63f, 0.96f, 1f);
+        internal static readonly Color SecondaryColor = new Color(0.20f, 0.24f, 0.30f, 0.98f);
         internal static readonly Color TextColor = new Color(0.95f, 0.97f, 0.99f, 1f);
         internal static readonly Color MutedTextColor = new Color(0.74f, 0.80f, 0.86f, 1f);
         internal static readonly Color OverlayColor = new Color(0f, 0f, 0f, 0.94f);
-        internal static readonly Color HeaderSurfaceColor = new Color(0.39f, 0.49f, 0.59f, 0.96f);
-        internal static readonly Color ElevatedSurfaceColor = new Color(0.12f, 0.15f, 0.20f, 0.98f);
-        internal static readonly Color TileSurfaceColor = new Color(0.18f, 0.24f, 0.31f, 0.98f);
-        internal static readonly Color SoftAccentColor = new Color(0.67f, 0.79f, 0.91f, 1f);
-        internal static readonly Color BorderColor = new Color(0.28f, 0.34f, 0.42f, 0.72f);
-        internal static readonly Color DangerColor = new Color(0.45f, 0.23f, 0.22f, 1f);
-        internal static readonly Color SuccessColor = new Color(0.34f, 0.62f, 0.54f, 1f);
-        internal static readonly Color HeroSurfaceColor = new Color(0.10f, 0.13f, 0.18f, 0.99f);
+        internal static readonly Color HeaderSurfaceColor = new Color(0.17f, 0.24f, 0.32f, 0.96f);
+        internal static readonly Color ElevatedSurfaceColor = new Color(0.11f, 0.15f, 0.21f, 0.98f);
+        internal static readonly Color TileSurfaceColor = new Color(0.15f, 0.20f, 0.27f, 0.99f);
+        internal static readonly Color UtilitySurfaceColor = new Color(0.14f, 0.18f, 0.24f, 0.98f);
+        internal static readonly Color PreviewSurfaceColor = new Color(0.17f, 0.22f, 0.29f, 1f);
+        internal static readonly Color SoftAccentColor = new Color(0.72f, 0.84f, 0.96f, 1f);
+        internal static readonly Color BorderColor = new Color(0.33f, 0.42f, 0.52f, 0.72f);
+        internal static readonly Color SoftBorderColor = new Color(0.42f, 0.52f, 0.63f, 0.24f);
+        internal static readonly Color HeroSurfaceColor = new Color(0.11f, 0.15f, 0.23f, 0.99f);
+        internal static readonly Color HeroGlowColor = new Color(0.97f, 0.67f, 0.35f, 0.22f);
+        internal static readonly Color HeroAccentColor = new Color(0.97f, 0.69f, 0.38f, 1f);
+        internal static readonly Color SelectedSurfaceColor = new Color(0.14f, 0.20f, 0.31f, 0.99f);
+        internal static readonly Color SelectedAccentColor = new Color(0.32f, 0.72f, 1f, 1f);
+        internal static readonly Color DisabledSurfaceColor = new Color(0.11f, 0.13f, 0.17f, 0.96f);
+        internal static readonly Color DisabledTextColor = new Color(0.53f, 0.59f, 0.66f, 1f);
+        internal static readonly Color WarningSurfaceColor = new Color(0.24f, 0.18f, 0.14f, 0.98f);
+        internal static readonly Color WarningAccentColor = new Color(0.98f, 0.74f, 0.39f, 1f);
+        internal static readonly Color DangerColor = new Color(0.53f, 0.24f, 0.23f, 1f);
+        internal static readonly Color SuccessColor = new Color(0.31f, 0.67f, 0.56f, 1f);
+        internal static readonly Color SuccessSurfaceColor = new Color(0.14f, 0.24f, 0.21f, 0.98f);
+        internal static readonly Color BadgeSurfaceColor = new Color(0.17f, 0.23f, 0.32f, 0.98f);
 
         internal static Scene OpenOrCreateScene(string scenePath)
         {
@@ -232,6 +245,32 @@ namespace VRPublicSpeaking.AppShell.Editor
             image.type = Image.Type.Sliced;
             image.color = color;
             image.raycastTarget = raycastTarget;
+        }
+
+        internal static Outline ApplyOutline(GameObject gameObject, Color effectColor, Vector2 effectDistance)
+        {
+            Outline outline = GetOrAddComponent<Outline>(gameObject);
+            outline.effectColor = effectColor;
+            outline.effectDistance = effectDistance;
+            outline.useGraphicAlpha = true;
+            return outline;
+        }
+
+        internal static Color WithAlpha(Color color, float alpha)
+        {
+            return new Color(color.r, color.g, color.b, Mathf.Clamp01(alpha));
+        }
+
+        internal static float GetRelativeLuminance(Color color)
+        {
+            return (0.2126f * color.r) + (0.7152f * color.g) + (0.0722f * color.b);
+        }
+
+        internal static Color GetContrastingTextColor(Color backgroundColor)
+        {
+            return GetRelativeLuminance(backgroundColor) >= 0.63f
+                ? new Color(0.08f, 0.10f, 0.14f, 1f)
+                : TextColor;
         }
 
         internal static T GetBuiltinExtraResource<T>(string resourcePath) where T : UnityEngine.Object

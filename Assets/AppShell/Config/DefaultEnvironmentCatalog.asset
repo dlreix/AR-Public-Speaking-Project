@@ -19,7 +19,7 @@ MonoBehaviour:
       sightlines and moderate audience pressure.
     sceneName: Scene_Classroom
     spawnPointName: 
-    previewSprite: {fileID: 0}
+    previewSprite: {fileID: 21300000, guid: d3e82c2346e905f47bdfe651c19f17f3, type: 3}
     available: 1
     availabilityReason: 
     recommendedModeLabel: Guided Practice
@@ -31,7 +31,7 @@ MonoBehaviour:
       pacing, and stage presence matter more.
     sceneName: Scene_ConferenceHall
     spawnPointName: 
-    previewSprite: {fileID: 0}
+    previewSprite: {fileID: 21300000, guid: 3e413d2a7e69edc4996c1b4e73152fb0, type: 3}
     available: 1
     availabilityReason: 
     recommendedModeLabel: Evaluation Mode
@@ -43,7 +43,7 @@ MonoBehaviour:
       room built for conversational delivery.
     sceneName: Scene_MeetingRoom
     spawnPointName: 
-    previewSprite: {fileID: 0}
+    previewSprite: {fileID: 21300000, guid: 4efd7077cdfdd6f469e1851a17fda4c2, type: 3}
     available: 1
     availabilityReason: 
     recommendedModeLabel: Free Practice

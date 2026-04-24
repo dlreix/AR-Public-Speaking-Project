@@ -8,7 +8,10 @@ namespace VRPublicSpeaking.AppShell.Data
     {
         [SerializeField] private bool sessionLaunchRequested;
         [SerializeField] private bool sessionRunning;
+        [SerializeField] private bool sessionPaused;
         [SerializeField] private bool resultsAvailable;
+        [SerializeField] private bool pauseMenuVisible;
+        [SerializeField] private bool resultsOverlayVisible;
         [SerializeField] private float timeRemainingSeconds;
         [SerializeField] private string currentSceneName = string.Empty;
         [SerializeField] private string selectedSpawnPointName = string.Empty;
@@ -31,6 +34,24 @@ namespace VRPublicSpeaking.AppShell.Data
         {
             get => resultsAvailable;
             set => resultsAvailable = value;
+        }
+
+        public bool SessionPaused
+        {
+            get => sessionPaused;
+            set => sessionPaused = value;
+        }
+
+        public bool PauseMenuVisible
+        {
+            get => pauseMenuVisible;
+            set => pauseMenuVisible = value;
+        }
+
+        public bool ResultsOverlayVisible
+        {
+            get => resultsOverlayVisible;
+            set => resultsOverlayVisible = value;
         }
 
         public float TimeRemainingSeconds
@@ -67,7 +88,10 @@ namespace VRPublicSpeaking.AppShell.Data
         {
             sessionLaunchRequested = true;
             sessionRunning = false;
+            sessionPaused = false;
             resultsAvailable = false;
+            pauseMenuVisible = false;
+            resultsOverlayVisible = false;
             timeRemainingSeconds = 0f;
             currentSceneName = sceneName ?? string.Empty;
             selectedSpawnPointName = spawnPointName ?? string.Empty;
@@ -79,7 +103,10 @@ namespace VRPublicSpeaking.AppShell.Data
         {
             sessionLaunchRequested = false;
             sessionRunning = true;
+            sessionPaused = false;
             resultsAvailable = false;
+            pauseMenuVisible = false;
+            resultsOverlayVisible = false;
             currentSceneName = sceneName ?? string.Empty;
             timeRemainingSeconds = Mathf.Max(0f, timeRemaining);
             sessionStartedAtUtcTicks = DateTime.UtcNow.Ticks;
@@ -89,8 +116,38 @@ namespace VRPublicSpeaking.AppShell.Data
         {
             sessionRunning = false;
             sessionLaunchRequested = false;
+            sessionPaused = false;
             resultsAvailable = true;
+            pauseMenuVisible = false;
+            resultsOverlayVisible = false;
             timeRemainingSeconds = 0f;
+        }
+
+        public void MarkSessionPaused()
+        {
+            if (!sessionRunning)
+            {
+                return;
+            }
+
+            sessionPaused = true;
+        }
+
+        public void MarkSessionResumed()
+        {
+            sessionPaused = false;
+        }
+
+        public void MarkSessionCancelled()
+        {
+            sessionLaunchRequested = false;
+            sessionRunning = false;
+            sessionPaused = false;
+            resultsAvailable = false;
+            pauseMenuVisible = false;
+            resultsOverlayVisible = false;
+            timeRemainingSeconds = 0f;
+            sessionStartedAtUtcTicks = 0L;
         }
     }
 }

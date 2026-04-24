@@ -12,6 +12,7 @@ namespace VRPublicSpeaking.AppShell.Editor
         private const string ConfigFolderPath = "Assets/AppShell/Config";
         private const string CatalogAssetPath = ConfigFolderPath + "/DefaultEnvironmentCatalog.asset";
         private const string ScenesFolderPath = "Assets/Scenes";
+        private const string PreviewFolderPath = "Assets/Materials";
         private const string EnvironmentScenePrefix = "Scene_";
 
         [MenuItem("Tools/VR Public Speaking/App Shell/Create Default Environment Catalog")]
@@ -79,6 +80,7 @@ namespace VRPublicSpeaking.AppShell.Editor
                     Description = BuildDefaultDescription(displayName, rawName),
                     SceneName = sceneName,
                     SpawnPointName = string.Empty,
+                    PreviewSprite = LoadPreviewSprite(rawName),
                     Available = true,
                     RecommendedModeLabel = BuildRecommendedMode(rawName),
                     AudienceHint = BuildAudienceHint(rawName),
@@ -244,6 +246,29 @@ namespace VRPublicSpeaking.AppShell.Editor
             {
                 definition.AudienceHint = existing.AudienceHint;
             }
+        }
+
+        private static Sprite LoadPreviewSprite(string rawName)
+        {
+            string environmentId = MakeEnvironmentId(rawName);
+            string previewFileName;
+
+            switch (environmentId)
+            {
+                case "conferencehall":
+                    previewFileName = "ConferenceHallPreview.png";
+                    break;
+
+                case "meetingroom":
+                    previewFileName = "MeetingRoomPreview.png";
+                    break;
+
+                default:
+                    previewFileName = "ClassroomPreview.png";
+                    break;
+            }
+
+            return AssetDatabase.LoadAssetAtPath<Sprite>($"{PreviewFolderPath}/{previewFileName}");
         }
 
         private static bool IsLegacyGeneratedDescription(string description, string displayName)

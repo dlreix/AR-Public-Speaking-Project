@@ -34,6 +34,21 @@ namespace VRPublicSpeaking.AppShell.Flow
         private bool rigSafetyApplied;
         private bool backdropSafetyApplied;
 
+        private static readonly string[] MainHubBackdropViewBlockers =
+        {
+            "CeilingBeam_Front",
+            "CeilingBeam_Mid",
+            "CeilingBeam_Back",
+            "CeilingLightRail",
+            "LightCan_Left",
+            "LightCan_Center",
+            "LightCan_Right",
+            "LightCan_LeftWide",
+            "LightCan_LeftTight",
+            "LightCan_RightTight",
+            "LightCan_RightWide"
+        };
+
         private void Start()
         {
             InitializeNow();
@@ -201,6 +216,8 @@ namespace VRPublicSpeaking.AppShell.Flow
                 return;
             }
 
+            ApplyMainHubBackdropViewSafety(backdropRoot);
+
             Transform[] children = backdropRoot.GetComponentsInChildren<Transform>(true);
             for (int index = 0; index < children.Length; index++)
             {
@@ -223,6 +240,191 @@ namespace VRPublicSpeaking.AppShell.Flow
             }
 
             backdropSafetyApplied = true;
+        }
+
+        private static void ApplyMainHubBackdropViewSafety(Transform backdropRoot)
+        {
+            if (backdropRoot == null ||
+                !string.Equals(backdropRoot.name, "MainHubBackdrop", StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            for (int index = 0; index < MainHubBackdropViewBlockers.Length; index++)
+            {
+                ToggleChildActive(backdropRoot, MainHubBackdropViewBlockers[index], false);
+            }
+
+            SetBackdropChildPose(backdropRoot, "CeilingWall", new Vector2(0f, 6.35f), 2.25f, new Vector3(11.85f, 0.16f, 7.8f));
+            SetBackdropChildPose(backdropRoot, "BackWall", new Vector2(0f, 3.15f), 6.15f, new Vector3(11.85f, 6.3f, 0.2f));
+            SetBackdropChildPose(backdropRoot, "FrontWall", new Vector2(0f, 3.15f), -1.65f, new Vector3(11.85f, 6.3f, 0.2f));
+            SetBackdropChildPose(backdropRoot, "LeftWall", new Vector2(-5.92f, 3.15f), 2.25f, new Vector3(0.2f, 6.3f, 7.8f));
+            SetBackdropChildPose(backdropRoot, "RightWall", new Vector2(5.92f, 3.15f), 2.25f, new Vector3(0.2f, 6.3f, 7.8f));
+            SetBackdropChildPose(backdropRoot, "BackCurtainPanel", new Vector2(0f, 3.12f), 6.03f, new Vector3(11.5f, 5.86f, 0.08f));
+            SetBackdropChildPose(backdropRoot, "BackCurtainFold_Left01", new Vector2(-5.15f, 3.12f), 5.95f, new Vector3(0.24f, 5.68f, 0.14f));
+            SetBackdropChildPose(backdropRoot, "BackCurtainFold_Left02", new Vector2(-2.55f, 3.08f), 5.94f, new Vector3(0.16f, 5.56f, 0.12f));
+            SetBackdropChildPose(backdropRoot, "BackCurtainFold_Right01", new Vector2(5.15f, 3.12f), 5.95f, new Vector3(0.24f, 5.68f, 0.14f));
+            SetBackdropChildPose(backdropRoot, "BackCurtainFold_Right02", new Vector2(2.55f, 3.08f), 5.94f, new Vector3(0.16f, 5.56f, 0.12f));
+
+            EnsureBackdropVisualPrimitive(backdropRoot, "BackCurtainValance", PrimitiveType.Cube, new Vector3(0f, 5.72f, 5.88f), Vector3.zero, new Vector3(11.62f, 0.46f, 0.18f), new Color(0.115f, 0.022f, 0.03f, 1f), 0.58f);
+            EnsureBackdropVisualPrimitive(backdropRoot, "BackCurtainBottomHem", PrimitiveType.Cube, new Vector3(0f, 0.38f, 5.88f), Vector3.zero, new Vector3(11.48f, 0.18f, 0.16f), new Color(0.055f, 0.010f, 0.016f, 1f), 0.46f);
+            EnsureBackdropVisualPrimitive(backdropRoot, "BackCurtainPleat_LeftOuter", PrimitiveType.Cube, new Vector3(-4.15f, 3.04f, 5.88f), Vector3.zero, new Vector3(0.10f, 5.42f, 0.16f), new Color(0.055f, 0.010f, 0.016f, 1f), 0.46f);
+            EnsureBackdropVisualPrimitive(backdropRoot, "BackCurtainPleat_LeftInner", PrimitiveType.Cube, new Vector3(-1.35f, 3.02f, 5.87f), Vector3.zero, new Vector3(0.08f, 5.32f, 0.14f), new Color(0.055f, 0.010f, 0.016f, 1f), 0.46f);
+            EnsureBackdropVisualPrimitive(backdropRoot, "BackCurtainPleat_CenterLeft", PrimitiveType.Cube, new Vector3(-0.38f, 3.02f, 5.865f), Vector3.zero, new Vector3(0.06f, 5.24f, 0.12f), new Color(0.055f, 0.010f, 0.016f, 1f), 0.46f);
+            EnsureBackdropVisualPrimitive(backdropRoot, "BackCurtainPleat_CenterRight", PrimitiveType.Cube, new Vector3(0.38f, 3.02f, 5.865f), Vector3.zero, new Vector3(0.06f, 5.24f, 0.12f), new Color(0.055f, 0.010f, 0.016f, 1f), 0.46f);
+            EnsureBackdropVisualPrimitive(backdropRoot, "BackCurtainPleat_RightInner", PrimitiveType.Cube, new Vector3(1.35f, 3.02f, 5.87f), Vector3.zero, new Vector3(0.08f, 5.32f, 0.14f), new Color(0.055f, 0.010f, 0.016f, 1f), 0.46f);
+            EnsureBackdropVisualPrimitive(backdropRoot, "BackCurtainPleat_RightOuter", PrimitiveType.Cube, new Vector3(4.15f, 3.04f, 5.88f), Vector3.zero, new Vector3(0.10f, 5.42f, 0.16f), new Color(0.055f, 0.010f, 0.016f, 1f), 0.46f);
+            EnsureBackdropVisualPrimitive(backdropRoot, "StageDeck", PrimitiveType.Cube, new Vector3(0f, 0.13f, 4.72f), Vector3.zero, new Vector3(8.65f, 0.24f, 1.72f), new Color(0.028f, 0.032f, 0.039f, 1f), 0.64f);
+            EnsureBackdropVisualPrimitive(backdropRoot, "StageFrontEdge", PrimitiveType.Cube, new Vector3(0f, 0.30f, 3.84f), Vector3.zero, new Vector3(8.65f, 0.16f, 0.08f), new Color(1f, 0.62f, 0.22f, 1f), 0.72f);
+            EnsureBackdropVisualPrimitive(backdropRoot, "CenterFloorRunner", PrimitiveType.Cube, new Vector3(0f, 0.028f, 1.28f), Vector3.zero, new Vector3(2.18f, 0.022f, 3.55f), new Color(0.135f, 0.018f, 0.024f, 1f), 0.55f);
+            EnsureBackdropVisualPrimitive(backdropRoot, "RunnerEdge_Left", PrimitiveType.Cube, new Vector3(-1.14f, 0.04f, 1.28f), Vector3.zero, new Vector3(0.045f, 0.018f, 3.55f), new Color(0.95f, 0.54f, 0.18f, 1f), 0.5f);
+            EnsureBackdropVisualPrimitive(backdropRoot, "RunnerEdge_Right", PrimitiveType.Cube, new Vector3(1.14f, 0.04f, 1.28f), Vector3.zero, new Vector3(0.045f, 0.018f, 3.55f), new Color(0.95f, 0.54f, 0.18f, 1f), 0.5f);
+            EnsureBackdropVisualPrimitive(backdropRoot, "Footlight_Left", PrimitiveType.Cube, new Vector3(-2.7f, 0.24f, 3.68f), new Vector3(-8f, 0f, 0f), new Vector3(0.36f, 0.16f, 0.20f), new Color(1f, 0.62f, 0.22f, 1f), 0.72f);
+            EnsureBackdropVisualPrimitive(backdropRoot, "Footlight_Center", PrimitiveType.Cube, new Vector3(0f, 0.24f, 3.68f), new Vector3(-8f, 0f, 0f), new Vector3(0.36f, 0.16f, 0.20f), new Color(1f, 0.62f, 0.22f, 1f), 0.72f);
+            EnsureBackdropVisualPrimitive(backdropRoot, "Footlight_Right", PrimitiveType.Cube, new Vector3(2.7f, 0.24f, 3.68f), new Vector3(-8f, 0f, 0f), new Vector3(0.36f, 0.16f, 0.20f), new Color(1f, 0.62f, 0.22f, 1f), 0.72f);
+            EnsureBackdropVisualPrimitive(backdropRoot, "LeftWingFlat", PrimitiveType.Cube, new Vector3(-4.88f, 2.72f, 5.34f), new Vector3(0f, -10f, 0f), new Vector3(0.18f, 4.62f, 0.86f), new Color(0.028f, 0.032f, 0.039f, 1f), 0.64f);
+            EnsureBackdropVisualPrimitive(backdropRoot, "RightWingFlat", PrimitiveType.Cube, new Vector3(4.88f, 2.72f, 5.34f), new Vector3(0f, 10f, 0f), new Vector3(0.18f, 4.62f, 0.86f), new Color(0.028f, 0.032f, 0.039f, 1f), 0.64f);
+        }
+
+        private static void SetBackdropChildPose(
+            Transform root,
+            string childName,
+            Vector2 anchoredPosition,
+            float localZ,
+            Vector3 localScale)
+        {
+            Transform child = FindChildRecursive(root, childName);
+            if (child == null)
+            {
+                return;
+            }
+
+            RectTransform rectTransform = child as RectTransform;
+            if (rectTransform != null)
+            {
+                rectTransform.anchoredPosition = anchoredPosition;
+                Vector3 localPosition = rectTransform.localPosition;
+                localPosition.z = localZ;
+                rectTransform.localPosition = localPosition;
+            }
+            else
+            {
+                child.localPosition = new Vector3(anchoredPosition.x, anchoredPosition.y, localZ);
+            }
+
+            child.localScale = localScale;
+        }
+
+        private static void EnsureBackdropVisualPrimitive(
+            Transform root,
+            string childName,
+            PrimitiveType primitiveType,
+            Vector3 localPosition,
+            Vector3 localEulerAngles,
+            Vector3 localScale,
+            Color color,
+            float smoothness)
+        {
+            if (root == null)
+            {
+                return;
+            }
+
+            Transform child = FindChildRecursive(root, childName);
+            if (child == null)
+            {
+                child = new GameObject(childName).transform;
+                child.SetParent(root, false);
+            }
+
+            MeshFilter meshFilter = child.GetComponent<MeshFilter>();
+            if (meshFilter == null)
+            {
+                meshFilter = child.gameObject.AddComponent<MeshFilter>();
+            }
+
+            MeshRenderer meshRenderer = child.GetComponent<MeshRenderer>();
+            if (meshRenderer == null)
+            {
+                meshRenderer = child.gameObject.AddComponent<MeshRenderer>();
+            }
+
+            if (meshFilter.sharedMesh == null)
+            {
+                GameObject primitive = GameObject.CreatePrimitive(primitiveType);
+                MeshFilter primitiveFilter = primitive.GetComponent<MeshFilter>();
+                if (primitiveFilter != null)
+                {
+                    meshFilter.sharedMesh = primitiveFilter.sharedMesh;
+                }
+
+                if (Application.isPlaying)
+                {
+                    Destroy(primitive);
+                }
+                else
+                {
+                    DestroyImmediate(primitive);
+                }
+            }
+
+            Collider collider = child.GetComponent<Collider>();
+            if (collider != null)
+            {
+                collider.enabled = false;
+            }
+
+            child.localPosition = localPosition;
+            child.localRotation = Quaternion.Euler(localEulerAngles);
+            child.localScale = localScale;
+            child.gameObject.SetActive(true);
+
+            Material material = CreateRuntimeBackdropMaterial(color, smoothness);
+            if (material != null)
+            {
+                meshRenderer.sharedMaterial = material;
+            }
+        }
+
+        private static Material CreateRuntimeBackdropMaterial(Color color, float smoothness)
+        {
+            Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+            if (shader == null || shader.name == "Hidden/InternalErrorShader")
+            {
+                shader = Shader.Find("Standard");
+            }
+
+            if (shader == null)
+            {
+                return null;
+            }
+
+            Material material = new Material(shader)
+            {
+                color = color
+            };
+
+            if (material.HasProperty("_BaseColor"))
+            {
+                material.SetColor("_BaseColor", color);
+            }
+
+            if (material.HasProperty("_Color"))
+            {
+                material.SetColor("_Color", color);
+            }
+
+            if (material.HasProperty("_Smoothness"))
+            {
+                material.SetFloat("_Smoothness", smoothness);
+            }
+
+            if (material.HasProperty("_Glossiness"))
+            {
+                material.SetFloat("_Glossiness", smoothness);
+            }
+
+            return material;
         }
 
         private void ApplyStableRigState()

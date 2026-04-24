@@ -5,6 +5,7 @@ using System.Reflection;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 using VRPublicSpeaking.AppShell.Core;
 using VRPublicSpeaking.AppShell.Data;
@@ -297,11 +298,11 @@ namespace VRPublicSpeaking.AppShell.Editor
                     warnings.Add($"Environment scene '{sceneName}' is missing the AppShellSceneBindings root.");
                 }
 
-                RequireSceneComponent<EnvironmentSceneInstaller>(
+                EnvironmentSceneInstaller installer = RequireSceneComponent<EnvironmentSceneInstaller>(
                     scene,
                     $"Environment scene '{sceneName}' is missing EnvironmentSceneInstaller.",
                     warnings);
-                RequireSceneComponent<ExistingSceneFlowAdapter>(
+                ExistingSceneFlowAdapter flowAdapter = RequireSceneComponent<ExistingSceneFlowAdapter>(
                     scene,
                     $"Environment scene '{sceneName}' is missing ExistingSceneFlowAdapter.",
                     warnings);
@@ -309,9 +310,25 @@ namespace VRPublicSpeaking.AppShell.Editor
                     scene,
                     $"Environment scene '{sceneName}' is missing PlayerRigAdapter.",
                     warnings);
-                RequireSceneComponent<InSessionHudPresenter>(
+                RequireSceneComponent<EventSystem>(
+                    scene,
+                    $"Environment scene '{sceneName}' is missing EventSystem.",
+                    warnings);
+                InSessionHudPresenter hudPresenter = RequireSceneComponent<InSessionHudPresenter>(
                     scene,
                     $"Environment scene '{sceneName}' is missing InSessionHudPresenter.",
+                    warnings);
+                EnvironmentSessionOverlayController overlayController = RequireSceneComponent<EnvironmentSessionOverlayController>(
+                    scene,
+                    $"Environment scene '{sceneName}' is missing EnvironmentSessionOverlayController.",
+                    warnings);
+                ResultsSummaryPresenter resultsPresenter = RequireSceneComponent<ResultsSummaryPresenter>(
+                    scene,
+                    $"Environment scene '{sceneName}' is missing ResultsSummaryPresenter.",
+                    warnings);
+                ResultsFlowController resultsFlowController = RequireSceneComponent<ResultsFlowController>(
+                    scene,
+                    $"Environment scene '{sceneName}' is missing ResultsFlowController.",
                     warnings);
                 RequireSceneComponent<MainController>(
                     scene,
@@ -320,6 +337,87 @@ namespace VRPublicSpeaking.AppShell.Editor
                 RequireSceneComponent<PlayerController>(
                     scene,
                     $"Environment scene '{sceneName}' is missing PlayerController.",
+                    warnings);
+
+                ValidateFieldReference(
+                    overlayController,
+                    "hudPresenter",
+                    $"Environment scene '{sceneName}' overlay controller is missing HUD wiring.",
+                    warnings);
+                ValidateFieldReference(
+                    installer,
+                    "environmentSessionOverlayController",
+                    $"Environment scene '{sceneName}' installer is missing overlay controller wiring.",
+                    warnings);
+                ValidateFieldReference(
+                    flowAdapter,
+                    "environmentSessionOverlayController",
+                    $"Environment scene '{sceneName}' flow adapter is missing overlay controller wiring.",
+                    warnings);
+                ValidateFieldReference(
+                    overlayController,
+                    "pausePanel",
+                    $"Environment scene '{sceneName}' overlay controller is missing PauseOverlayPanel wiring.",
+                    warnings);
+                ValidateFieldReference(
+                    overlayController,
+                    "resultsPanel",
+                    $"Environment scene '{sceneName}' overlay controller is missing ResultsOverlayPanel wiring.",
+                    warnings);
+                ValidateFieldReference(
+                    overlayController,
+                    "resultsSummaryPresenter",
+                    $"Environment scene '{sceneName}' overlay controller is missing ResultsSummaryPresenter wiring.",
+                    warnings);
+                ValidateFieldReference(
+                    overlayController,
+                    "resultsFlowController",
+                    $"Environment scene '{sceneName}' overlay controller is missing ResultsFlowController wiring.",
+                    warnings);
+                ValidateFieldReference(
+                    resultsFlowController,
+                    "environmentSessionOverlayController",
+                    $"Environment scene '{sceneName}' ResultsFlowController is missing overlay controller wiring.",
+                    warnings);
+                ValidateFieldReference(
+                    resultsFlowController,
+                    "statusLabel",
+                    $"Environment scene '{sceneName}' ResultsFlowController is missing statusLabel wiring.",
+                    warnings);
+                ValidateFieldReference(
+                    resultsPresenter,
+                    "summaryLabel",
+                    $"Environment scene '{sceneName}' ResultsSummaryPresenter is missing summaryLabel wiring.",
+                    warnings);
+                ValidateFieldReference(
+                    resultsPresenter,
+                    "recommendationsLabel",
+                    $"Environment scene '{sceneName}' ResultsSummaryPresenter is missing recommendationsLabel wiring.",
+                    warnings);
+                ValidateFieldReference(
+                    hudPresenter,
+                    "timerLabel",
+                    $"Environment scene '{sceneName}' InSessionHudPresenter is missing timerLabel wiring.",
+                    warnings);
+                ValidateFieldReference(
+                    hudPresenter,
+                    "statusLabel",
+                    $"Environment scene '{sceneName}' InSessionHudPresenter is missing statusLabel wiring.",
+                    warnings);
+                ValidateFieldReference(
+                    hudPresenter,
+                    "warningRoot",
+                    $"Environment scene '{sceneName}' InSessionHudPresenter is missing warningRoot wiring.",
+                    warnings);
+                ValidateFieldReference(
+                    hudPresenter,
+                    "warningFollower",
+                    $"Environment scene '{sceneName}' InSessionHudPresenter is missing warningFollower wiring.",
+                    warnings);
+                ValidateFieldReference(
+                    hudPresenter,
+                    "warningLabel",
+                    $"Environment scene '{sceneName}' InSessionHudPresenter is missing warningLabel wiring.",
                     warnings);
 
                 ValidateSpawnPoints(scene, catalog, warnings);

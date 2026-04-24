@@ -1,9 +1,11 @@
 using TMPro;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 using VRPublicSpeaking.AppShell.Core;
 using VRPublicSpeaking.AppShell.Data;
 using VRPublicSpeaking.AppShell.Flow;
+using VRPublicSpeaking.AppShell.UI;
 
 namespace VRPublicSpeaking.AppShell.Results
 {
@@ -12,6 +14,7 @@ namespace VRPublicSpeaking.AppShell.Results
         [SerializeField] private AppRuntimeState runtimeState;
         [SerializeField] private TransitionManager transitionManager;
         [SerializeField] private DashboardAdapter dashboardAdapter;
+        [SerializeField] private EnvironmentSessionOverlayController environmentSessionOverlayController;
         [SerializeField] private TMP_Text statusLabel;
         [SerializeField] private string retryLoadingMessage = "Retrying session...";
         [SerializeField] private string changeEnvironmentLoadingMessage = "Returning to environments...";
@@ -161,6 +164,9 @@ namespace VRPublicSpeaking.AppShell.Results
         {
             routeInProgress = true;
             SetStatus(statusMessage);
+            runtimeState?.SetPauseMenuVisible(false);
+            runtimeState?.SetResultsOverlayVisible(false);
+            environmentSessionOverlayController?.HideTransientPanels();
             transitionManager ??= TransitionManager.Instance;
 
             if (transitionManager != null)
@@ -177,8 +183,19 @@ namespace VRPublicSpeaking.AppShell.Results
         {
             if (statusLabel != null)
             {
-                statusLabel.text = message ?? string.Empty;
+                statusLabel.text = BuildStatusMessage(message);
             }
+        }
+
+        private static string BuildStatusMessage(string message)
+        {
+            string baseMessage = message ?? string.Empty;
+            if (Keyboard.current == null)
+            {
+                return baseMessage;
+            }
+
+            return $"{baseMessage}\n\nKeys: [Enter/R/1] Retry  [C/2] Change Env  [D/3] Dashboard  [H/4] Hub";
         }
     }
 }

@@ -4,6 +4,7 @@ using UnityEngine.SceneManagement;
 using VRPublicSpeaking.AppShell.Core;
 using VRPublicSpeaking.AppShell.Data;
 using VRPublicSpeaking.AppShell.Flow;
+using VRPublicSpeaking.AppShell.UI;
 
 namespace VRPublicSpeaking.AppShell.Integration
 {
@@ -11,6 +12,7 @@ namespace VRPublicSpeaking.AppShell.Integration
     {
         [SerializeField] private MainController mainController;
         [SerializeField] private ScoringAdapter scoringAdapter;
+        [SerializeField] private EnvironmentSessionOverlayController environmentSessionOverlayController;
         [SerializeField] private bool routeAfterSessionEnd = true;
         [SerializeField] private float autoStartDelay = 0.35f;
         [SerializeField] private string resultsLoadingMessage = "Loading results...";
@@ -70,6 +72,8 @@ namespace VRPublicSpeaking.AppShell.Integration
             {
                 Debug.LogWarning("[ExistingSceneFlowAdapter] MainController was not found. Session start/end routing will be unavailable.");
             }
+
+            environmentSessionOverlayController?.Configure(runtimeState, mainController);
         }
 
         public void TryAutoStartSession()
@@ -113,6 +117,7 @@ namespace VRPublicSpeaking.AppShell.Integration
                 SceneManager.GetActiveScene().name,
                 activeConfig.SessionDurationSeconds);
             runtimeState.UpdateTimeRemaining(activeConfig.SessionDurationSeconds);
+            environmentSessionOverlayController?.HandleSessionStarted();
         }
 
         private void HandleSessionEnded(float durationSeconds, float gazeScore)
@@ -144,6 +149,12 @@ namespace VRPublicSpeaking.AppShell.Integration
             runtimeState.StoreResult(summary);
 
             if (!routeAfterSessionEnd)
+            {
+                return;
+            }
+
+            if (environmentSessionOverlayController != null &&
+                environmentSessionOverlayController.ShowResultsOverlay())
             {
                 return;
             }
@@ -218,6 +229,11 @@ namespace VRPublicSpeaking.AppShell.Integration
             if (scoringAdapter == null)
             {
                 scoringAdapter = GetComponent<ScoringAdapter>();
+            }
+
+            if (environmentSessionOverlayController == null)
+            {
+                environmentSessionOverlayController = GetComponentInChildren<EnvironmentSessionOverlayController>(true);
             }
 
             if (mainController == null)

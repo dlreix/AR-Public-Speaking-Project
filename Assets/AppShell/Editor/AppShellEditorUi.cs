@@ -13,6 +13,14 @@ namespace VRPublicSpeaking.AppShell.Editor
 {
     internal static class AppShellEditorUi
     {
+        internal enum ButtonTone
+        {
+            Primary,
+            Secondary,
+            Utility,
+            Danger
+        }
+
         internal static AppPanelView CreatePanelRoot(
             Transform parent,
             string name,
@@ -36,6 +44,7 @@ namespace VRPublicSpeaking.AppShell.Editor
 
             Image background = AppShellEditorCommon.GetOrAddComponent<Image>(panelRoot);
             AppShellEditorCommon.StyleSlicedImage(background, AppShellEditorCommon.PanelColor);
+            AppShellEditorCommon.ApplyOutline(panelRoot, AppShellEditorCommon.SoftBorderColor, new Vector2(1f, -1f));
 
             CanvasGroup canvasGroup = AppShellEditorCommon.GetOrAddComponent<CanvasGroup>(panelRoot);
             canvasGroup.alpha = 1f;
@@ -43,8 +52,8 @@ namespace VRPublicSpeaking.AppShell.Editor
             canvasGroup.blocksRaycasts = true;
 
             VerticalLayoutGroup layout = AppShellEditorCommon.GetOrAddComponent<VerticalLayoutGroup>(panelRoot);
-            layout.spacing = 18f;
-            layout.padding = new RectOffset(40, 40, 34, 34);
+            layout.spacing = 20f;
+            layout.padding = new RectOffset(42, 42, 36, 36);
             layout.childAlignment = TextAnchor.UpperLeft;
             layout.childControlWidth = true;
             layout.childControlHeight = true;
@@ -55,6 +64,18 @@ namespace VRPublicSpeaking.AppShell.Editor
             fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
             fitter.verticalFit = ContentSizeFitter.FitMode.Unconstrained;
 
+            GameObject topGlow = AppShellEditorCommon.FindOrCreateChild(panelRoot.transform, "TopGlow");
+            Image glowImage = AppShellEditorCommon.GetOrAddComponent<Image>(topGlow);
+            AppShellEditorCommon.StyleSlicedImage(glowImage, AppShellEditorCommon.WithAlpha(AppShellEditorCommon.AccentColor, 0.16f), false);
+            AppShellEditorCommon.ConfigureRect(
+                topGlow.GetComponent<RectTransform>(),
+                new Vector2(0f, 1f),
+                new Vector2(1f, 1f),
+                new Vector2(0f, 14f),
+                new Vector2(0f, -6f));
+            AppShellEditorCommon.GetOrAddComponent<LayoutElement>(topGlow).ignoreLayout = true;
+            topGlow.transform.SetAsFirstSibling();
+
             AppPanelView panelView = AppShellEditorCommon.GetOrAddComponent<AppPanelView>(panelRoot);
             AppShellEditorCommon.SetField(panelView, "panelType", panelType);
             return panelView;
@@ -64,7 +85,13 @@ namespace VRPublicSpeaking.AppShell.Editor
         {
             for (int index = parent.childCount - 1; index >= 0; index--)
             {
-                UnityEngine.Object.DestroyImmediate(parent.GetChild(index).gameObject);
+                Transform child = parent.GetChild(index);
+                if (child != null && child.name == "TopGlow")
+                {
+                    continue;
+                }
+
+                UnityEngine.Object.DestroyImmediate(child.gameObject);
             }
         }
 
@@ -110,13 +137,31 @@ namespace VRPublicSpeaking.AppShell.Editor
             {
                 AppShellEditorCommon.StyleSlicedImage(background, backgroundColor);
             }
+            button.targetGraphic = background;
+
+            GameObject accentBar = AppShellEditorCommon.FindOrCreateChild(buttonObject.transform, "AccentBar");
+            Image accentImage = AppShellEditorCommon.GetOrAddComponent<Image>(accentBar);
+            AppShellEditorCommon.StyleSlicedImage(accentImage, AppShellEditorCommon.WithAlpha(Color.Lerp(backgroundColor, Color.white, 0.28f), 0.92f), false);
+            AppShellEditorCommon.ConfigureRect(
+                accentBar.GetComponent<RectTransform>(),
+                new Vector2(0f, 1f),
+                new Vector2(1f, 1f),
+                new Vector2(0f, 6f),
+                new Vector2(0f, -3f));
+            AppShellEditorCommon.GetOrAddComponent<LayoutElement>(accentBar).ignoreLayout = true;
+            accentBar.transform.SetAsFirstSibling();
+
+            AppShellEditorCommon.ApplyOutline(
+                buttonObject,
+                AppShellEditorCommon.WithAlpha(Color.Lerp(backgroundColor, Color.white, 0.18f), 0.65f),
+                new Vector2(1f, -1f));
 
             TextMeshProUGUI labelText = buttonObject.GetComponentInChildren<TextMeshProUGUI>(true);
             if (labelText != null)
             {
                 labelText.text = label;
-                labelText.color = AppShellEditorCommon.TextColor;
-                labelText.fontSize = 22f;
+                labelText.color = AppShellEditorCommon.GetContrastingTextColor(backgroundColor);
+                labelText.fontSize = height >= 62f ? 23f : 20f;
                 labelText.fontStyle = FontStyles.Bold;
                 labelText.alignment = TextAlignmentOptions.Center;
                 labelText.enableAutoSizing = false;
@@ -132,6 +177,11 @@ namespace VRPublicSpeaking.AppShell.Editor
             }
 
             return button;
+        }
+
+        internal static Button CreateStyledButton(Transform parent, string name, string label, ButtonTone tone, float width = -1f, float height = 68f)
+        {
+            return CreateButton(parent, name, label, ResolveButtonColor(tone), width, height);
         }
 
         internal static Slider CreateSlider(Transform parent, string name, float min, float max, bool wholeNumbers, float value)
@@ -176,6 +226,7 @@ namespace VRPublicSpeaking.AppShell.Editor
             {
                 AppShellEditorCommon.StyleSlicedImage(background, AppShellEditorCommon.TileSurfaceColor);
             }
+            AppShellEditorCommon.ApplyOutline(dropdownObject, AppShellEditorCommon.SoftBorderColor, new Vector2(1f, -1f));
 
             if (dropdown.captionText != null)
             {
@@ -205,7 +256,7 @@ namespace VRPublicSpeaking.AppShell.Editor
             toggle.SetIsOnWithoutNotify(defaultValue);
 
             LayoutElement layout = AppShellEditorCommon.GetOrAddComponent<LayoutElement>(toggleObject);
-            layout.preferredHeight = 42f;
+            layout.preferredHeight = 44f;
 
             LegacyText legacyLabel = toggleObject.GetComponentInChildren<LegacyText>(true);
             if (legacyLabel != null)
@@ -213,12 +264,55 @@ namespace VRPublicSpeaking.AppShell.Editor
                 legacyLabel.text = label;
                 legacyLabel.color = AppShellEditorCommon.TextColor;
                 legacyLabel.fontSize = 18;
+                legacyLabel.alignment = TextAnchor.MiddleLeft;
+            }
+
+            Transform labelRoot = toggleObject.transform.Find("Label");
+            if (labelRoot != null)
+            {
+                RectTransform labelRect = labelRoot.GetComponent<RectTransform>();
+                if (labelRect != null)
+                {
+                    labelRect.anchorMin = new Vector2(0f, 0f);
+                    labelRect.anchorMax = new Vector2(1f, 1f);
+                    labelRect.offsetMin = new Vector2(40f, 0f);
+                    labelRect.offsetMax = Vector2.zero;
+                }
             }
 
             Image background = toggleObject.GetComponent<Image>();
             if (background != null)
             {
-                AppShellEditorCommon.StyleSlicedImage(background, AppShellEditorCommon.TileSurfaceColor);
+                AppShellEditorCommon.StyleSlicedImage(background, AppShellEditorCommon.UtilitySurfaceColor);
+            }
+
+            Transform backgroundRoot = toggleObject.transform.Find("Background");
+            if (backgroundRoot != null)
+            {
+                RectTransform backgroundRect = backgroundRoot.GetComponent<RectTransform>();
+                if (backgroundRect != null)
+                {
+                    backgroundRect.anchorMin = new Vector2(0f, 0.5f);
+                    backgroundRect.anchorMax = new Vector2(0f, 0.5f);
+                    backgroundRect.sizeDelta = new Vector2(20f, 20f);
+                    backgroundRect.anchoredPosition = new Vector2(10f, 0f);
+                }
+
+                Image toggleBackground = backgroundRoot.GetComponent<Image>();
+                if (toggleBackground != null)
+                {
+                    AppShellEditorCommon.StyleSlicedImage(toggleBackground, AppShellEditorCommon.UtilitySurfaceColor, false);
+                }
+
+                Transform checkmarkRoot = backgroundRoot.Find("Checkmark");
+                if (checkmarkRoot != null)
+                {
+                    Image checkmark = checkmarkRoot.GetComponent<Image>();
+                    if (checkmark != null)
+                    {
+                        checkmark.color = AppShellEditorCommon.AccentColor;
+                    }
+                }
             }
 
             return toggle;
@@ -256,7 +350,7 @@ namespace VRPublicSpeaking.AppShell.Editor
             layout.spacing = spacing;
             layout.childAlignment = TextAnchor.MiddleLeft;
             layout.childControlWidth = true;
-            layout.childControlHeight = false;
+            layout.childControlHeight = true;
             layout.childForceExpandWidth = false;
             layout.childForceExpandHeight = false;
 
@@ -273,7 +367,7 @@ namespace VRPublicSpeaking.AppShell.Editor
             layout.spacing = spacing;
             layout.childAlignment = TextAnchor.UpperLeft;
             layout.childControlWidth = true;
-            layout.childControlHeight = false;
+            layout.childControlHeight = true;
             layout.childForceExpandWidth = false;
             layout.childForceExpandHeight = false;
 
@@ -289,11 +383,13 @@ namespace VRPublicSpeaking.AppShell.Editor
             Color backgroundColor,
             int paddingHorizontal = 20,
             int paddingVertical = 18,
-            float spacing = 12f)
+            float spacing = 12f,
+            Color? accentColor = null)
         {
             GameObject card = AppShellEditorCommon.FindOrCreateChild(parent, name);
             Image background = AppShellEditorCommon.GetOrAddComponent<Image>(card);
             AppShellEditorCommon.StyleSlicedImage(background, backgroundColor);
+            AppShellEditorCommon.ApplyOutline(card, AppShellEditorCommon.SoftBorderColor, new Vector2(1f, -1f));
 
             VerticalLayoutGroup layout = AppShellEditorCommon.GetOrAddComponent<VerticalLayoutGroup>(card);
             layout.padding = new RectOffset(paddingHorizontal, paddingHorizontal, paddingVertical, paddingVertical);
@@ -308,6 +404,19 @@ namespace VRPublicSpeaking.AppShell.Editor
             fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
             fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
+            GameObject accentBar = AppShellEditorCommon.FindOrCreateChild(card.transform, "AccentBar");
+            Image accentImage = AppShellEditorCommon.GetOrAddComponent<Image>(accentBar);
+            Color resolvedAccent = accentColor ?? Color.Lerp(backgroundColor, AppShellEditorCommon.AccentColor, 0.45f);
+            AppShellEditorCommon.StyleSlicedImage(accentImage, AppShellEditorCommon.WithAlpha(resolvedAccent, 0.92f), false);
+            AppShellEditorCommon.ConfigureRect(
+                accentBar.GetComponent<RectTransform>(),
+                new Vector2(0f, 1f),
+                new Vector2(1f, 1f),
+                new Vector2(0f, 8f),
+                new Vector2(0f, -4f));
+            AppShellEditorCommon.GetOrAddComponent<LayoutElement>(accentBar).ignoreLayout = true;
+            accentBar.transform.SetAsFirstSibling();
+
             return card;
         }
 
@@ -319,32 +428,49 @@ namespace VRPublicSpeaking.AppShell.Editor
             string badge,
             Sprite previewSprite,
             float preferredWidth,
-            float preferredHeight)
+            float preferredHeight,
+            float previewHeight = 148f,
+            float descriptionHeight = 72f,
+            Color? backgroundColor = null,
+            Color? accentColor = null)
         {
-            GameObject card = CreateSectionCard(parent, name, AppShellEditorCommon.ElevatedSurfaceColor, 22, 22, 12f);
+            GameObject card = CreateSectionCard(
+                parent,
+                name,
+                backgroundColor ?? AppShellEditorCommon.HeroSurfaceColor,
+                24,
+                24,
+                12f,
+                accentColor ?? AppShellEditorCommon.HeroAccentColor);
             AppShellEditorCommon.ConfigureLayoutElement(card, preferredWidth, preferredHeight);
 
             if (!string.IsNullOrWhiteSpace(badge))
             {
-                CreateTextBlock(card.transform, "BadgeLabel", badge, 15f, FontStyles.Bold, TextAlignmentOptions.Left, 22f, AppShellEditorCommon.SoftAccentColor);
+                CreateTextBlock(card.transform, "BadgeLabel", badge.ToUpperInvariant(), 15f, FontStyles.Bold, TextAlignmentOptions.Left, 22f, AppShellEditorCommon.HeroAccentColor);
             }
 
             GameObject previewRoot = AppShellEditorCommon.FindOrCreateChild(card.transform, "Preview");
             Image previewImage = AppShellEditorCommon.GetOrAddComponent<Image>(previewRoot);
-            AppShellEditorCommon.StyleSlicedImage(previewImage, new Color(0.17f, 0.22f, 0.29f, 1f));
+            AppShellEditorCommon.StyleSlicedImage(previewImage, AppShellEditorCommon.PreviewSurfaceColor);
+            AppShellEditorCommon.ApplyOutline(previewRoot, AppShellEditorCommon.WithAlpha(AppShellEditorCommon.HeroAccentColor, 0.28f), new Vector2(1f, -1f));
             if (previewSprite != null)
             {
                 previewImage.sprite = previewSprite;
+                previewImage.type = Image.Type.Simple;
                 previewImage.preserveAspect = true;
+                previewImage.color = Color.white;
             }
             else
             {
+                previewImage.type = Image.Type.Sliced;
                 previewImage.preserveAspect = false;
             }
-            AppShellEditorCommon.ConfigureLayoutElement(previewRoot, -1f, 108f);
+            AppShellEditorCommon.ConfigureLayoutElement(previewRoot, -1f, previewHeight);
 
-            CreateTextBlock(card.transform, "TitleLabel", title, 26f, FontStyles.Bold, TextAlignmentOptions.Left, 36f, AppShellEditorCommon.TextColor);
-            CreateTextBlock(card.transform, "DescriptionLabel", description, 17f, FontStyles.Normal, TextAlignmentOptions.Left, 52f, AppShellEditorCommon.MutedTextColor);
+            CreateTextBlock(card.transform, "TitleLabel", title, 30f, FontStyles.Bold, TextAlignmentOptions.Left, 40f, AppShellEditorCommon.TextColor);
+            TMP_Text descriptionLabel = CreateTextBlock(card.transform, "DescriptionLabel", description, 17f, FontStyles.Normal, TextAlignmentOptions.Left, descriptionHeight, AppShellEditorCommon.MutedTextColor);
+            descriptionLabel.textWrappingMode = TextWrappingModes.Normal;
+            descriptionLabel.overflowMode = TextOverflowModes.Ellipsis;
 
             return card;
         }
@@ -371,6 +497,7 @@ namespace VRPublicSpeaking.AppShell.Editor
             {
                 AppShellEditorCommon.StyleSlicedImage(background, backgroundColor);
             }
+            AppShellEditorCommon.ApplyOutline(tileObject, AppShellEditorCommon.SoftBorderColor, new Vector2(1f, -1f));
 
             HorizontalLayoutGroup existingHorizontal = tileObject.GetComponent<HorizontalLayoutGroup>();
             if (existingHorizontal != null)
@@ -390,17 +517,18 @@ namespace VRPublicSpeaking.AppShell.Editor
             for (int index = tileObject.transform.childCount - 1; index >= 0; index--)
             {
                 Transform child = tileObject.transform.GetChild(index);
-                if (child.name != "TitleLabel" && child.name != "SubtitleLabel")
+                if (child.name != "KickerLabel" && child.name != "TitleLabel" && child.name != "SubtitleLabel")
                 {
                     UnityEngine.Object.DestroyImmediate(child.gameObject);
                 }
             }
 
+            CreateTextBlock(tileObject.transform, "KickerLabel", "SHORTCUT", 13f, FontStyles.Bold, TextAlignmentOptions.Left, 20f, AppShellEditorCommon.SoftAccentColor);
             TMP_Text titleLabel = CreateTextBlock(tileObject.transform, "TitleLabel", title, 24f, FontStyles.Bold, TextAlignmentOptions.Left, 38f, AppShellEditorCommon.TextColor);
             titleLabel.textWrappingMode = TextWrappingModes.NoWrap;
             titleLabel.overflowMode = TextOverflowModes.Ellipsis;
 
-            TMP_Text subtitleLabel = CreateTextBlock(tileObject.transform, "SubtitleLabel", subtitle, 17f, FontStyles.Normal, TextAlignmentOptions.Left, 60f, AppShellEditorCommon.MutedTextColor);
+            TMP_Text subtitleLabel = CreateTextBlock(tileObject.transform, "SubtitleLabel", subtitle, 16f, FontStyles.Normal, TextAlignmentOptions.Left, 56f, AppShellEditorCommon.MutedTextColor);
             subtitleLabel.textWrappingMode = TextWrappingModes.Normal;
             subtitleLabel.overflowMode = TextOverflowModes.Ellipsis;
 
@@ -414,8 +542,8 @@ namespace VRPublicSpeaking.AppShell.Editor
             string title,
             string value)
         {
-            GameObject strip = CreateSectionCard(parent, name, AppShellEditorCommon.TileSurfaceColor, 18, 16, 6f);
-            CreateTextBlock(strip.transform, "StripTitle", title, 16f, FontStyles.Bold, TextAlignmentOptions.Left, 22f, AppShellEditorCommon.SoftAccentColor);
+            GameObject strip = CreateSectionCard(parent, name, AppShellEditorCommon.UtilitySurfaceColor, 18, 16, 6f, AppShellEditorCommon.WithAlpha(AppShellEditorCommon.AccentColor, 0.72f));
+            CreateTextBlock(strip.transform, "StripTitle", title.ToUpperInvariant(), 15f, FontStyles.Bold, TextAlignmentOptions.Left, 22f, AppShellEditorCommon.SoftAccentColor);
             CreateTextBlock(strip.transform, "StripValue", value, 19f, FontStyles.Normal, TextAlignmentOptions.Left, 38f, AppShellEditorCommon.TextColor);
             return strip;
         }
@@ -444,19 +572,20 @@ namespace VRPublicSpeaking.AppShell.Editor
             GameObject root = AppShellEditorCommon.FindOrCreateChild(parent, name);
             Image background = AppShellEditorCommon.GetOrAddComponent<Image>(root);
             AppShellEditorCommon.StyleSlicedImage(background, AppShellEditorCommon.ElevatedSurfaceColor);
+            AppShellEditorCommon.ApplyOutline(root, AppShellEditorCommon.SoftBorderColor, new Vector2(1f, -1f));
 
             VerticalLayoutGroup layout = AppShellEditorCommon.GetOrAddComponent<VerticalLayoutGroup>(root);
             layout.padding = new RectOffset(16, 16, 16, 16);
             layout.spacing = 8f;
             layout.childControlWidth = true;
-            layout.childControlHeight = false;
+            layout.childControlHeight = true;
             layout.childForceExpandWidth = true;
             layout.childForceExpandHeight = false;
 
             EnvironmentCardView cardView = AppShellEditorCommon.GetOrAddComponent<EnvironmentCardView>(root);
 
             Image selectionHighlight = AppShellEditorCommon.GetOrAddComponent<Image>(AppShellEditorCommon.FindOrCreateChild(root.transform, "SelectionHighlight"));
-            selectionHighlight.color = new Color(0.18f, 0.55f, 0.84f, 0.20f);
+            selectionHighlight.color = AppShellEditorCommon.WithAlpha(AppShellEditorCommon.SelectedAccentColor, 0.20f);
             selectionHighlight.raycastTarget = false;
             AppShellEditorCommon.ConfigureStretchRect(selectionHighlight.rectTransform);
             AppShellEditorCommon.GetOrAddComponent<LayoutElement>(selectionHighlight.gameObject).ignoreLayout = true;
@@ -465,33 +594,43 @@ namespace VRPublicSpeaking.AppShell.Editor
 
             Image previewImage = AppShellEditorCommon.GetOrAddComponent<Image>(AppShellEditorCommon.FindOrCreateChild(root.transform, "PreviewImage"));
             LayoutElement previewLayout = AppShellEditorCommon.GetOrAddComponent<LayoutElement>(previewImage.gameObject);
-            previewLayout.preferredHeight = 96f;
-            AppShellEditorCommon.StyleSlicedImage(previewImage, new Color(0.16f, 0.20f, 0.26f, 1f), false);
+            previewLayout.preferredHeight = 88f;
+            AppShellEditorCommon.StyleSlicedImage(previewImage, AppShellEditorCommon.PreviewSurfaceColor, false);
+            AppShellEditorCommon.ApplyOutline(previewImage.gameObject, AppShellEditorCommon.WithAlpha(AppShellEditorCommon.AccentColor, 0.24f), new Vector2(1f, -1f));
             previewImage.preserveAspect = true;
 
             TMP_Text titleLabel = CreateTextBlock(root.transform, "TitleLabel", "Environment", 22f, FontStyles.Bold, TextAlignmentOptions.Left, 28f, AppShellEditorCommon.TextColor);
             titleLabel.textWrappingMode = TextWrappingModes.NoWrap;
             titleLabel.overflowMode = TextOverflowModes.Ellipsis;
 
-            TMP_Text descriptionLabel = CreateTextBlock(root.transform, "DescriptionLabel", "Short environment description.", 15f, FontStyles.Normal, TextAlignmentOptions.Left, 52f, AppShellEditorCommon.MutedTextColor);
+            TMP_Text descriptionLabel = CreateTextBlock(root.transform, "DescriptionLabel", "Short environment description.", 14f, FontStyles.Normal, TextAlignmentOptions.Left, 44f, AppShellEditorCommon.MutedTextColor);
             descriptionLabel.textWrappingMode = TextWrappingModes.Normal;
             descriptionLabel.overflowMode = TextOverflowModes.Ellipsis;
 
-            TMP_Text stateLabel = CreateTextBlock(root.transform, "StateLabel", "Select", 16f, FontStyles.Bold, TextAlignmentOptions.Left, 22f, AppShellEditorCommon.SoftAccentColor);
-            Button selectButton = CreateButton(root.transform, "SelectButton", "Select", AppShellEditorCommon.AccentColor, 160f, 44f);
+            GameObject metaRow = CreateHorizontalContainer(root.transform, "MetaRow", 10f);
+            TMP_Text stateLabel = CreateTextBlock(metaRow.transform, "StateLabel", "Ready", 15f, FontStyles.Bold, TextAlignmentOptions.Left, 22f, AppShellEditorCommon.SoftAccentColor);
+            AppShellEditorCommon.GetOrAddComponent<LayoutElement>(stateLabel.gameObject).preferredWidth = 180f;
+
+            Button selectButton = CreateStyledButton(root.transform, "SelectButton", "Select Room", ButtonTone.Primary, -1f, 44f);
+            TMP_Text buttonLabel = selectButton.GetComponentInChildren<TMP_Text>(true);
 
             GameObject unavailableBadge = AppShellEditorCommon.FindOrCreateChild(root.transform, "UnavailableBadge");
-            TMP_Text badgeLabel = AppShellEditorCommon.GetOrAddComponent<TextMeshProUGUI>(unavailableBadge);
+            Image badgeBackground = AppShellEditorCommon.GetOrAddComponent<Image>(unavailableBadge);
+            AppShellEditorCommon.StyleSlicedImage(badgeBackground, AppShellEditorCommon.BadgeSurfaceColor, false);
+            AppShellEditorCommon.ApplyOutline(unavailableBadge, AppShellEditorCommon.WithAlpha(AppShellEditorCommon.AccentColor, 0.34f), new Vector2(1f, -1f));
+            TMP_Text badgeLabel = AppShellEditorCommon.GetOrAddComponent<TextMeshProUGUI>(AppShellEditorCommon.FindOrCreateChild(unavailableBadge.transform, "BadgeLabel"));
             badgeLabel.text = "Unavailable";
-            badgeLabel.fontSize = 16f;
+            badgeLabel.fontSize = 14f;
+            badgeLabel.fontStyle = FontStyles.Bold;
             badgeLabel.alignment = TextAlignmentOptions.Center;
             badgeLabel.color = AppShellEditorCommon.TextColor;
+            AppShellEditorCommon.ConfigureStretchRect(badgeLabel.rectTransform);
             AppShellEditorCommon.ConfigureRect(
                 unavailableBadge.GetComponent<RectTransform>(),
                 new Vector2(1f, 1f),
                 new Vector2(1f, 1f),
-                new Vector2(120f, 28f),
-                new Vector2(-84f, -18f));
+                new Vector2(138f, 32f),
+                new Vector2(-94f, -22f));
             AppShellEditorCommon.GetOrAddComponent<LayoutElement>(unavailableBadge).ignoreLayout = true;
             unavailableBadge.SetActive(false);
 
@@ -501,7 +640,11 @@ namespace VRPublicSpeaking.AppShell.Editor
             AppShellEditorCommon.SetField(cardView, "selectButton", selectButton);
             AppShellEditorCommon.SetField(cardView, "selectionHighlight", selectionHighlight.gameObject);
             AppShellEditorCommon.SetField(cardView, "unavailableBadge", unavailableBadge);
+            AppShellEditorCommon.SetField(cardView, "badgeLabel", badgeLabel);
+            AppShellEditorCommon.SetField(cardView, "badgeBackground", badgeBackground);
             AppShellEditorCommon.SetField(cardView, "stateLabel", stateLabel);
+            AppShellEditorCommon.SetField(cardView, "cardBackground", background);
+            AppShellEditorCommon.SetField(cardView, "buttonLabel", buttonLabel);
 
             return cardView;
         }
@@ -513,6 +656,24 @@ namespace VRPublicSpeaking.AppShell.Editor
             generated.transform.SetSiblingIndex(target.transform.GetSiblingIndex());
             UnityEngine.Object.DestroyImmediate(target);
             return generated;
+        }
+
+        private static Color ResolveButtonColor(ButtonTone tone)
+        {
+            switch (tone)
+            {
+                case ButtonTone.Primary:
+                    return AppShellEditorCommon.AccentColor;
+
+                case ButtonTone.Utility:
+                    return AppShellEditorCommon.UtilitySurfaceColor;
+
+                case ButtonTone.Danger:
+                    return AppShellEditorCommon.DangerColor;
+
+                default:
+                    return AppShellEditorCommon.SecondaryColor;
+            }
         }
     }
 }
