@@ -1,0 +1,38 @@
+# Unity generated
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+*.pidb.meta
+*.pdb.meta
+*.mdb.meta
+
+# Visual Studio / Rider project files
+*.csproj
+*.unityproj
+*.sln
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+.idea/
+ExportedObj/
+.consulo/
+
+# OS
+.DS_Store
+.DS_Store?
+Thumbs.db
+ehthumbs.db
+
+# Vosk model — 3.8 GB, download separately from https://alphacephei.com/vosk/models
+Assets/StreamingAssets/vosk-model-en-us-0.42-gigaspeech/
+Assets/StreamingAssets/vosk-model-en-us-0.42-gigaspeech.meta
+
+# Crash dumps
+*.json.0
+mono_crash.*
