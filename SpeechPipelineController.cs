@@ -236,10 +236,21 @@ namespace SpeechPipeline
         {
             _state = PipelineState.Ready;
 
-            // Son partial transcript varsa final olarak isle
+            // Son partial transcript varsa kelime/transcript bilgisini kaydet
+            // ama WPM hesaplama — pace tracker baslatilmamis olabilir
             if (!string.IsNullOrWhiteSpace(_currentPartial))
             {
-                FinaliseUtterance(_currentPartial);
+                var partialWords = _currentPartial.Split(
+                    new[] { ' ', '\t', '\n' },
+                    System.StringSplitOptions.RemoveEmptyEntries);
+                if (partialWords.Length > 0)
+                {
+                    var partialFillers = _filler.Detect(_currentPartial);
+                    _sessionWords   += partialWords.Length;
+                    _sessionFillers += partialFillers.Count;
+                    _sessionFillerList.AddRange(partialFillers);
+                    _sessionTranscript.Add(_currentPartial);
+                }
                 _currentPartial = null;
             }
 
