@@ -5,16 +5,6 @@ using UnityEngine.InputSystem;
 
 namespace SpeechPipeline
 {
-    /// <summary>
-    /// Attach to any persistent GameObject.
-    /// Set ModelFolder in the Inspector to the StreamingAssets subfolder name.
-    ///
-    /// Flow:
-    ///   Play  → model loads in background, logs ready once done.
-    ///   SPACE → start recording.
-    ///   SPACE → stop, print session summary.
-    ///   SPACE → start a new session.
-    /// </summary>
     [RequireComponent(typeof(AudioSource))]
     [AddComponentMenu("Speech Pipeline/Controller")]
     public sealed class SpeechPipelineController : MonoBehaviour
@@ -44,10 +34,10 @@ namespace SpeechPipeline
         [Range(0.5f, 3f)]
         public float TickInterval   = 1f;
 
+        // ── Selin: Scoring Integration ────────────────────────────────────────
         [Header("Scoring Integration")]
         [Tooltip("Assign the PerformanceScoringEngine component from your scene.")]
         public PerformanceScoringEngine ScoringEngine;
-
         [Tooltip("Assign the SpeechAdapter component from your scene.")]
         public SpeechAdapter SpeechAdapter;
 
@@ -115,7 +105,6 @@ namespace SpeechPipeline
                 yield break;
             }
 
-            // AudioSource is guaranteed by [RequireComponent] — used only for GetSpectrumData
             _spectrumSrc = GetComponent<AudioSource>();
             _capture     = new AudioCaptureBuffer(10, SampleRate);
             _spectrumSrc.clip   = _capture.Clip;
@@ -145,7 +134,6 @@ namespace SpeechPipeline
         {
             if (_stt == null) return;
 
-            // ── Wait for model ────────────────────────────────────────────────
             if (!_stt.IsReady)
             {
                 if (_stt.LoadError != null)
@@ -159,7 +147,6 @@ namespace SpeechPipeline
                 _state = PipelineState.Ready;
             }
 
-            // ── Space key ─────────────────────────────────────────────────────
             if (Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame)
             {
                 switch (_state)
@@ -172,10 +159,8 @@ namespace SpeechPipeline
 
             if (_state != PipelineState.Recording) return;
 
-            // ── Drain STT results ─────────────────────────────────────────────
             DrainSTT();
 
-            // ── Audio chunk timer ─────────────────────────────────────────────
             _chunkTimer += Time.unscaledDeltaTime;
             if (_chunkTimer < ChunkSec) return;
             _chunkTimer = 0f;
@@ -230,7 +215,7 @@ namespace SpeechPipeline
         private void BeginSession()
         {
             _state = PipelineState.Recording;
-            _capture.Poll(); // flush stale audio
+            _capture.Poll();
 
             _sessionStart       = Time.realtimeSinceStartup;
             _sessionSpeaking    = 0f;
@@ -251,7 +236,26 @@ namespace SpeechPipeline
         {
             _state = PipelineState.Ready;
 
-            float avgWpm      = _sessionWpmCount   > 0 ? _sessionWpmSum      / _sessionWpmCount   : 0f;
+            // Son partial transcript varsa final olarak isle
+            if (!string.IsNullOrWhiteSpace(_currentPartial))
+            {
+                FinaliseUtterance(_currentPartial);
+                _currentPartial = null;
+            }
+
+            // STT kuyruğunu son kez bosalt
+            DrainSTT();
+
+            // WPM: utterance bazli ortalama varsa onu kullan,
+            // yoksa session toplam konusma suresinden hesapla
+            float avgWpm;
+            if (_sessionWpmCount > 0)
+                avgWpm = _sessionWpmSum / _sessionWpmCount;
+            else if (_sessionSpeaking > 0f && _sessionWords > 0)
+                avgWpm = (_sessionWords / _sessionSpeaking) * 60f;
+            else
+                avgWpm = 0f;
+
             float avgPitchStd = _sessionPitchCount > 0 ? _sessionPitchStdSum / _sessionPitchCount : 0f;
             float totalSec    = Time.realtimeSinceStartup - _sessionStart;
 
@@ -267,30 +271,24 @@ namespace SpeechPipeline
                 _sessionFillerList,
                 _sessionTranscript);
 
-            // ── Hesaplanan speech değerleri ───────────────────────────────────
-            float totalMinutes  = totalSec / 60f;
-            float fillerPerMin  = totalMinutes > 0f ? _sessionFillers / totalMinutes : 0f;
-            float avgPause      = _sessionPauses > 0 ? _sessionPauseTotal / _sessionPauses : 0f;
-            float toneScore     = NormalizePitchStd(avgPitchStd);
+            // ── Scoring Engine ve SpeechAdapter'a besle ───────────────────────
+            float totalMinutes = totalSec / 60f;
+            float fillerPerMin = totalMinutes > 0f ? _sessionFillers / totalMinutes : 0f;
+            float avgPause     = _sessionPauses > 0 ? _sessionPauseTotal / _sessionPauses : 0f;
+            float toneScore    = NormalizePitchStd(avgPitchStd);
 
-            // ── Feed PerformanceScoringEngine (direkt) ────────────────────────
             if (ScoringEngine != null)
             {
                 ScoringEngine.SetSpeechMetrics(avgWpm, fillerPerMin, avgPause, toneScore);
                 ScoringEngine.CalculateSessionScore();
             }
 
-            // ── Feed SpeechAdapter (Arkadaş 4 entegrasyonu) ──────────────────
             if (SpeechAdapter != null)
             {
                 SpeechAdapter.OnSpeechAnalysisComplete(avgWpm, fillerPerMin, avgPause, toneScore);
             }
         }
 
-        /// <summary>
-        /// Maps pitch std dev (Hz) onto a 0-100 expressive tone score.
-        /// Thresholds match SpeechScorer star bands: &lt;10 Hz monotone, &gt;=55 Hz very expressive.
-        /// </summary>
         private static float NormalizePitchStd(float stdHz)
         {
             if (stdHz <= 10f) return 0f;
