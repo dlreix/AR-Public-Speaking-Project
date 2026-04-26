@@ -593,7 +593,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 358665557}
-  - component: {fileID: 358665556}
   - component: {fileID: 358665555}
   - component: {fileID: 358665558}
   m_Layer: 0
@@ -615,19 +614,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d630bca8ea5c04bf186193c7df9f6f59, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
---- !u!114 &358665556
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 358665554}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 776ea1f5d1db24c37a84774e1c3e0360, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  _speechAdapter: {fileID: 525735678}
 --- !u!4 &358665557
 Transform:
   m_ObjectHideFlags: 0
@@ -1485,7 +1471,7 @@ GameObject:
   - component: {fileID: 1087879716}
   - component: {fileID: 1087879718}
   m_Layer: 0
-  m_Name: EyeContactAdapter
+  m_Name: EyeScoreAdapter
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1503,7 +1489,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 90b2f83f52a5b45d9b28b4a0df662b06, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  eyeTrackingSystem: {fileID: 1087879718}
+  eyeTrackingSystem: {fileID: 330585548}
   scoringEngine: {fileID: 525735676}
   eyeContactRatio: 0
   showDebugLog: 0
