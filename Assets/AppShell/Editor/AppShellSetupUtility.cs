@@ -248,7 +248,7 @@ namespace VRPublicSpeaking.AppShell.Editor
             }
         }
 
-        private static Sprite LoadPreviewSprite(string rawName)
+        internal static Sprite LoadPreviewSprite(string rawName)
         {
             string environmentId = MakeEnvironmentId(rawName);
             string previewFileName;
@@ -268,7 +268,49 @@ namespace VRPublicSpeaking.AppShell.Editor
                     break;
             }
 
-            return AssetDatabase.LoadAssetAtPath<Sprite>($"{PreviewFolderPath}/{previewFileName}");
+            string assetPath = $"{PreviewFolderPath}/{previewFileName}";
+            EnsurePreviewSpriteImport(assetPath);
+            return AssetDatabase.LoadAssetAtPath<Sprite>(assetPath);
+        }
+
+        private static void EnsurePreviewSpriteImport(string assetPath)
+        {
+            TextureImporter importer = AssetImporter.GetAtPath(assetPath) as TextureImporter;
+            if (importer == null)
+            {
+                return;
+            }
+
+            bool changed = false;
+
+            if (importer.textureType != TextureImporterType.Sprite)
+            {
+                importer.textureType = TextureImporterType.Sprite;
+                changed = true;
+            }
+
+            if (importer.spriteImportMode != SpriteImportMode.Single)
+            {
+                importer.spriteImportMode = SpriteImportMode.Single;
+                changed = true;
+            }
+
+            if (importer.mipmapEnabled)
+            {
+                importer.mipmapEnabled = false;
+                changed = true;
+            }
+
+            if (importer.npotScale != TextureImporterNPOTScale.None)
+            {
+                importer.npotScale = TextureImporterNPOTScale.None;
+                changed = true;
+            }
+
+            if (changed)
+            {
+                importer.SaveAndReimport();
+            }
         }
 
         private static bool IsLegacyGeneratedDescription(string description, string displayName)

@@ -446,10 +446,10 @@ namespace VRPublicSpeaking.AppShell.UI
             string baseMessage = message ?? string.Empty;
             if (Keyboard.current == null)
             {
-                return baseMessage;
+                return $"{baseMessage}\n\nVR: hold secondary button for 0.6s to close pause.";
             }
 
-            return $"{baseMessage}\n\nKeys: [Enter/1] Resume  [R/2] Restart  [E/3] End  [H/4] Hub";
+            return $"{baseMessage}\n\nPC: [Enter/1] Resume  [R/2] Restart  [E/3] End  [H/4] Hub\nVR: hold secondary button for 0.6s to close pause.";
         }
 
         private void HandleDesktopOverlayShortcuts()

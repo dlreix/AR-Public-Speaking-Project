@@ -105,7 +105,7 @@ namespace VRPublicSpeaking.AppShell.Editor
                 scene,
                 "WorldSpaceHubCanvas",
                 new Vector2(1800f, 1200f),
-                new Vector3(0f, 1.55f, 2.35f),
+                new Vector3(0f, 1.50f, 2.42f),
                 new Vector3(0.00135f, 0.00135f, 0.00135f));
 
             Transform brandingRoot = AppShellEditorCommon.FindOrCreateChild(hubCanvas.transform, "BrandingRoot").transform;
@@ -304,16 +304,16 @@ namespace VRPublicSpeaking.AppShell.Editor
             Material wallMaterial = AssetDatabase.LoadAssetAtPath<Material>(HubWallMaterialPath);
             Material accentMaterial = AssetDatabase.LoadAssetAtPath<Material>(HubAccentMaterialPath);
             Material chromeMaterial = AssetDatabase.LoadAssetAtPath<Material>(HubChromeMaterialPath);
-            Material backstageFloorMaterial = EnsureColoredBackdropMaterial(HubBackstageFloorMaterialPath, new Color(0.075f, 0.083f, 0.09f, 1f), 0f, 0.42f);
-            Material backstageBlackMaterial = EnsureColoredBackdropMaterial(HubBackstageBlackMaterialPath, new Color(0.028f, 0.032f, 0.039f, 1f), 0f, 0.64f);
-            Material backstageCurtainMaterial = EnsureColoredBackdropMaterial(HubBackstageCurtainMaterialPath, new Color(0.115f, 0.022f, 0.03f, 1f), 0f, 0.58f);
-            Material backstageCurtainShadowMaterial = EnsureColoredBackdropMaterial(HubBackstageCurtainShadowMaterialPath, new Color(0.055f, 0.010f, 0.016f, 1f), 0f, 0.46f);
-            Material backstageCaseMaterial = EnsureColoredBackdropMaterial(HubBackstageCaseMaterialPath, new Color(0.12f, 0.135f, 0.145f, 1f), 0.05f, 0.55f);
+            Material backstageFloorMaterial = EnsureColoredBackdropMaterial(HubBackstageFloorMaterialPath, new Color(0.068f, 0.075f, 0.083f, 1f), 0f, 0.42f);
+            Material backstageBlackMaterial = EnsureColoredBackdropMaterial(HubBackstageBlackMaterialPath, new Color(0.024f, 0.028f, 0.035f, 1f), 0f, 0.66f);
+            Material backstageCurtainMaterial = EnsureColoredBackdropMaterial(HubBackstageCurtainMaterialPath, new Color(0.13f, 0.018f, 0.026f, 1f), 0f, 0.6f);
+            Material backstageCurtainShadowMaterial = EnsureColoredBackdropMaterial(HubBackstageCurtainShadowMaterialPath, new Color(0.052f, 0.008f, 0.014f, 1f), 0f, 0.48f);
+            Material backstageCaseMaterial = EnsureColoredBackdropMaterial(HubBackstageCaseMaterialPath, new Color(0.115f, 0.13f, 0.14f, 1f), 0.06f, 0.58f);
             Material backstageTapeMaterial = EnsureColoredBackdropMaterial(HubBackstageTapeMaterialPath, new Color(0.95f, 0.54f, 0.18f, 1f), 0f, 0.5f);
             Material backstageRunnerMaterial = EnsureColoredBackdropMaterial(HubBackstageRunnerMaterialPath, new Color(0.135f, 0.018f, 0.024f, 1f), 0f, 0.55f);
             Material backstageGlowMaterial = EnsureColoredBackdropMaterial(HubBackstageGlowMaterialPath, new Color(1f, 0.62f, 0.22f, 1f), 0f, 0.72f);
-            Material roomWallMaterial = EnsureColoredBackdropMaterial(HubBackstageWallMaterialPath, new Color(0.105f, 0.118f, 0.13f, 1f), 0f, 0.47f);
-            Material roomCeilingMaterial = EnsureColoredBackdropMaterial(HubBackstageCeilingMaterialPath, new Color(0.045f, 0.05f, 0.058f, 1f), 0f, 0.5f);
+            Material roomWallMaterial = EnsureColoredBackdropMaterial(HubBackstageWallMaterialPath, new Color(0.09f, 0.104f, 0.116f, 1f), 0f, 0.48f);
+            Material roomCeilingMaterial = EnsureColoredBackdropMaterial(HubBackstageCeilingMaterialPath, new Color(0.036f, 0.041f, 0.049f, 1f), 0f, 0.52f);
             Material roomTrimMaterial = EnsureColoredBackdropMaterial(HubBackstageTrimMaterialPath, new Color(0.25f, 0.29f, 0.32f, 1f), 0.12f, 0.5f);
             Material backstageDarkMaterial = backstageBlackMaterial ?? wallMaterial;
             Material backstageStageFloorMaterial = backstageFloorMaterial ?? wallMaterial;
@@ -517,6 +517,33 @@ namespace VRPublicSpeaking.AppShell.Editor
 
             EnsurePrimitiveBackdropChild(
                 backdropRoot.transform,
+                "StageStep",
+                PrimitiveType.Cube,
+                new Vector3(0f, 0.11f, 3.28f),
+                Vector3.zero,
+                new Vector3(4.6f, 0.18f, 0.46f),
+                backstageDarkMaterial);
+
+            EnsurePrimitiveBackdropChild(
+                backdropRoot.transform,
+                "SpeakerMarkTape",
+                PrimitiveType.Cube,
+                new Vector3(0f, 0.052f, 2.62f),
+                new Vector3(0f, 45f, 0f),
+                new Vector3(0.78f, 0.018f, 0.055f),
+                backstageTapeMaterial ?? backstageGlowMaterial);
+
+            EnsurePrimitiveBackdropChild(
+                backdropRoot.transform,
+                "SpeakerMarkTapeCross",
+                PrimitiveType.Cube,
+                new Vector3(0f, 0.054f, 2.62f),
+                new Vector3(0f, -45f, 0f),
+                new Vector3(0.78f, 0.018f, 0.055f),
+                backstageTapeMaterial ?? backstageGlowMaterial);
+
+            EnsurePrimitiveBackdropChild(
+                backdropRoot.transform,
                 "CenterFloorRunner",
                 PrimitiveType.Cube,
                 new Vector3(0f, 0.028f, 1.28f),
@@ -567,6 +594,60 @@ namespace VRPublicSpeaking.AppShell.Editor
                 new Vector3(2.7f, 0.24f, 3.68f),
                 new Vector3(-8f, 0f, 0f),
                 new Vector3(0.36f, 0.16f, 0.20f),
+                backstageGlowMaterial);
+
+            EnsurePrimitiveBackdropChild(
+                backdropRoot.transform,
+                "CeilingTruss_Back",
+                PrimitiveType.Cube,
+                new Vector3(0f, 4.74f, 4.92f),
+                Vector3.zero,
+                new Vector3(8.9f, 0.12f, 0.12f),
+                chromeMaterial ?? roomTrimMaterial);
+
+            EnsurePrimitiveBackdropChild(
+                backdropRoot.transform,
+                "CeilingTruss_Front",
+                PrimitiveType.Cube,
+                new Vector3(0f, 4.74f, 2.08f),
+                Vector3.zero,
+                new Vector3(8.4f, 0.10f, 0.10f),
+                chromeMaterial ?? roomTrimMaterial);
+
+            EnsurePrimitiveBackdropChild(
+                backdropRoot.transform,
+                "CeilingTruss_Left",
+                PrimitiveType.Cube,
+                new Vector3(-4.15f, 4.72f, 3.45f),
+                Vector3.zero,
+                new Vector3(0.10f, 0.10f, 2.82f),
+                chromeMaterial ?? roomTrimMaterial);
+
+            EnsurePrimitiveBackdropChild(
+                backdropRoot.transform,
+                "CeilingTruss_Right",
+                PrimitiveType.Cube,
+                new Vector3(4.15f, 4.72f, 3.45f),
+                Vector3.zero,
+                new Vector3(0.10f, 0.10f, 2.82f),
+                chromeMaterial ?? roomTrimMaterial);
+
+            EnsurePrimitiveBackdropChild(
+                backdropRoot.transform,
+                "WarmCueLight_Left",
+                PrimitiveType.Cylinder,
+                new Vector3(-2.55f, 4.54f, 4.52f),
+                new Vector3(90f, 0f, 0f),
+                new Vector3(0.18f, 0.06f, 0.18f),
+                backstageGlowMaterial);
+
+            EnsurePrimitiveBackdropChild(
+                backdropRoot.transform,
+                "WarmCueLight_Right",
+                PrimitiveType.Cylinder,
+                new Vector3(2.55f, 4.54f, 4.52f),
+                new Vector3(90f, 0f, 0f),
+                new Vector3(0.18f, 0.06f, 0.18f),
                 backstageGlowMaterial);
 
             EnsurePrimitiveBackdropChild(
@@ -733,6 +814,15 @@ namespace VRPublicSpeaking.AppShell.Editor
 
             EnsurePrimitiveBackdropChild(
                 backdropRoot.transform,
+                "CallTimeBoardGlow",
+                PrimitiveType.Cube,
+                new Vector3(-5.69f, 1.88f, 4.30f),
+                new Vector3(0f, 90f, 0f),
+                new Vector3(0.04f, 0.54f, 0.78f),
+                backstageGlowMaterial);
+
+            EnsurePrimitiveBackdropChild(
+                backdropRoot.transform,
                 "ExitDoorPanel",
                 PrimitiveType.Cube,
                 new Vector3(5.78f, 1.35f, 4.55f),
@@ -748,6 +838,51 @@ namespace VRPublicSpeaking.AppShell.Editor
                 new Vector3(0f, 90f, 0f),
                 new Vector3(0.08f, 0.06f, 0.28f),
                 roomTrimMaterial);
+
+            EnsurePrimitiveBackdropChild(
+                backdropRoot.transform,
+                "FoldedStand_Left",
+                PrimitiveType.Cube,
+                new Vector3(-4.38f, 0.78f, 1.42f),
+                new Vector3(0f, 0f, -12f),
+                new Vector3(0.08f, 1.2f, 0.08f),
+                chromeMaterial ?? roomTrimMaterial);
+
+            EnsurePrimitiveBackdropChild(
+                backdropRoot.transform,
+                "FoldedStand_Right",
+                PrimitiveType.Cube,
+                new Vector3(-4.06f, 0.78f, 1.42f),
+                new Vector3(0f, 0f, 12f),
+                new Vector3(0.08f, 1.2f, 0.08f),
+                chromeMaterial ?? roomTrimMaterial);
+
+            EnsurePrimitiveBackdropChild(
+                backdropRoot.transform,
+                "GreenRoomBench",
+                PrimitiveType.Cube,
+                new Vector3(4.18f, 0.56f, 1.08f),
+                new Vector3(0f, -5f, 0f),
+                new Vector3(1.36f, 0.24f, 0.52f),
+                backstageCaseMaterial);
+
+            EnsurePrimitiveBackdropChild(
+                backdropRoot.transform,
+                "GreenRoomBenchLeg_Left",
+                PrimitiveType.Cube,
+                new Vector3(3.72f, 0.28f, 0.94f),
+                new Vector3(0f, -5f, 0f),
+                new Vector3(0.12f, 0.48f, 0.12f),
+                backstageDarkMaterial);
+
+            EnsurePrimitiveBackdropChild(
+                backdropRoot.transform,
+                "GreenRoomBenchLeg_Right",
+                PrimitiveType.Cube,
+                new Vector3(4.62f, 0.28f, 1.22f),
+                new Vector3(0f, -5f, 0f),
+                new Vector3(0.12f, 0.48f, 0.12f),
+                backstageDarkMaterial);
 
             EnsureBackdropSpotlight(
                 backdropRoot.transform,
@@ -1180,8 +1315,8 @@ namespace VRPublicSpeaking.AppShell.Editor
 
             int environmentCount = catalog != null && catalog.Environments != null ? catalog.Environments.Count : 0;
 
-            AppShellEditorUi.CreateTextBlock(panelTransform, "PanelTitle", "Practice Hub", 44f, FontStyles.Bold, TextAlignmentOptions.Left, 56f, AppShellEditorCommon.TextColor);
-            AppShellEditorUi.CreateTextBlock(panelTransform, "PanelSubtitle", "Start a run quickly, compare rooms, and keep support routes close without crowding the shell.", 18f, FontStyles.Normal, TextAlignmentOptions.Left, 40f, AppShellEditorCommon.MutedTextColor);
+            AppShellEditorUi.CreateTextBlock(panelTransform, "PanelTitle", "Main Hub", 44f, FontStyles.Bold, TextAlignmentOptions.Left, 56f, AppShellEditorCommon.TextColor);
+            AppShellEditorUi.CreateTextBlock(panelTransform, "PanelSubtitle", "Backstage entry point for room selection, setup, and safe support actions before a live VR run.", 18f, FontStyles.Normal, TextAlignmentOptions.Left, 40f, AppShellEditorCommon.MutedTextColor);
 
             GameObject dashboardRow = AppShellEditorUi.CreateDashboardRow(panelTransform, "DashboardRow", 22f);
 
@@ -1195,13 +1330,13 @@ namespace VRPublicSpeaking.AppShell.Editor
                 AppShellEditorCommon.HeroAccentColor);
             AppShellEditorCommon.ConfigureLayoutElement(featuredColumn, 620f, 652f);
             AppShellEditorUi.CreateTextBlock(featuredColumn.transform, "SectionTitle", "FEATURED FLOW", 16f, FontStyles.Bold, TextAlignmentOptions.Left, 20f, AppShellEditorCommon.HeroAccentColor);
-            AppShellEditorUi.CreateTextBlock(featuredColumn.transform, "SectionLead", "One strong entry point for the full menu-to-launch flow.", 16f, FontStyles.Normal, TextAlignmentOptions.Left, 34f, AppShellEditorCommon.MutedTextColor);
+            AppShellEditorUi.CreateTextBlock(featuredColumn.transform, "SectionLead", "One guided route keeps setup predictable before the headset run starts.", 16f, FontStyles.Normal, TextAlignmentOptions.Left, 34f, AppShellEditorCommon.MutedTextColor);
 
             GameObject startCard = AppShellEditorUi.CreateFeatureCard(
                 featuredColumn.transform,
                 "StartPracticeCard",
                 "Start Practice",
-                "Move from mode to room to setup with one clean guided path.",
+                "Move from mode to room to setup, then enter the selected environment with the shell ready.",
                 "Primary Run",
                 GetEnvironmentPreviewSprite(catalog, 0),
                 -1f,
@@ -1227,7 +1362,7 @@ namespace VRPublicSpeaking.AppShell.Editor
                 AppShellEditorCommon.AccentColor);
             AppShellEditorCommon.ConfigureLayoutElement(utilityColumn, 254f, 652f);
             AppShellEditorUi.CreateTextBlock(utilityColumn.transform, "UtilityTitle", "QUICK ACCESS", 16f, FontStyles.Bold, TextAlignmentOptions.Left, 20f, AppShellEditorCommon.SoftAccentColor);
-            AppShellEditorUi.CreateTextBlock(utilityColumn.transform, "UtilityLead", "Support actions stay compact so the hero path keeps the focus.", 15f, FontStyles.Normal, TextAlignmentOptions.Left, 40f, AppShellEditorCommon.MutedTextColor);
+            AppShellEditorUi.CreateTextBlock(utilityColumn.transform, "UtilityLead", "Compact controls for setup checks without stealing focus from practice.", 15f, FontStyles.Normal, TextAlignmentOptions.Left, 40f, AppShellEditorCommon.MutedTextColor);
             AppShellEditorUi.CreateSummaryStrip(utilityColumn.transform, "CatalogStrip", "Rooms", environmentCount > 0 ? $"{environmentCount} room(s) visible in shell" : "No rooms listed yet");
             AppShellEditorUi.CreateSummaryStrip(utilityColumn.transform, "FlowStrip", "Launch Path", "Mode -> Room -> Setup -> Launch");
 
@@ -1705,8 +1840,8 @@ namespace VRPublicSpeaking.AppShell.Editor
         {
             AppShellEditorUi.ClearGeneratedChildren(panelTransform);
 
-            AppShellEditorUi.CreateTextBlock(panelTransform, "PanelTitle", "Session Pause", 42f, FontStyles.Bold, TextAlignmentOptions.Left, 54f, AppShellEditorCommon.TextColor);
-            AppShellEditorUi.CreateTextBlock(panelTransform, "PanelSubtitle", "Pause the live run safely, then decide whether to continue, restart, end, or leave the room.", 20f, FontStyles.Normal, TextAlignmentOptions.Left, 56f, AppShellEditorCommon.MutedTextColor);
+            AppShellEditorUi.CreateTextBlock(panelTransform, "PanelTitle", "Session Paused", 42f, FontStyles.Bold, TextAlignmentOptions.Left, 54f, AppShellEditorCommon.TextColor);
+            AppShellEditorUi.CreateTextBlock(panelTransform, "PanelSubtitle", "Timing, gaze tracking, and scoring are frozen. Choose one clear action before returning to the room.", 20f, FontStyles.Normal, TextAlignmentOptions.Left, 56f, AppShellEditorCommon.MutedTextColor);
 
             Transform dashboardRow = AppShellEditorUi.CreateDashboardRow(panelTransform, "PauseDashboardRow", 22f).transform;
 
@@ -1719,14 +1854,14 @@ namespace VRPublicSpeaking.AppShell.Editor
                 12f,
                 AppShellEditorCommon.WarningAccentColor).transform;
 
-            AppShellEditorCommon.ConfigureLayoutElement(summaryCard.gameObject, -1f, 430f);
+            AppShellEditorCommon.ConfigureLayoutElement(summaryCard.gameObject, -1f, 476f);
             AppShellEditorCommon.GetOrAddComponent<LayoutElement>(summaryCard.gameObject).flexibleWidth = 1f;
             AppShellEditorUi.CreateTextBlock(summaryCard, "PauseBadge", "SESSION ON HOLD", 16f, FontStyles.Bold, TextAlignmentOptions.Left, 24f, AppShellEditorCommon.WarningAccentColor);
-            AppShellEditorUi.CreateTextBlock(summaryCard, "PauseLead", "The environment stays visible while timing, tracking, and scoring remain frozen.", 18f, FontStyles.Normal, TextAlignmentOptions.Left, 52f, AppShellEditorCommon.MutedTextColor);
-            TMP_Text pauseStatusLabel = AppShellEditorUi.CreateTextBlock(summaryCard, "PauseStatusLabel", "Resume to continue the same session. Restart or Return To Hub will exit this run safely.", 18f, FontStyles.Normal, TextAlignmentOptions.Left, 86f, AppShellEditorCommon.TextColor);
-            AppShellEditorUi.CreateSummaryStrip(summaryCard, "PauseRuleA", "Session State", "Scoring is paused until you resume.");
-            AppShellEditorUi.CreateSummaryStrip(summaryCard, "PauseRuleB", "Room Context", "The same environment remains loaded in the background.");
-            AppShellEditorUi.CreateSummaryStrip(summaryCard, "PauseRuleC", "Safe Exit", "Restart or Return To Hub cancels this live run without opening results.");
+            AppShellEditorUi.CreateTextBlock(summaryCard, "PauseLead", "The environment stays visible, but the live session loop is intentionally stopped.", 18f, FontStyles.Normal, TextAlignmentOptions.Left, 52f, AppShellEditorCommon.MutedTextColor);
+            TMP_Text pauseStatusLabel = AppShellEditorUi.CreateTextBlock(summaryCard, "PauseStatusLabel", "Resume continues the same run. End Session opens results. Restart or Hub cancels this live run safely.", 18f, FontStyles.Normal, TextAlignmentOptions.Left, 104f, AppShellEditorCommon.TextColor);
+            AppShellEditorUi.CreateSummaryStrip(summaryCard, "PauseRuleA", "Timer", "Elapsed time stays locked while paused.");
+            AppShellEditorUi.CreateSummaryStrip(summaryCard, "PauseRuleB", "Tracking", "Eye and scoring samples are not collected.");
+            AppShellEditorUi.CreateSummaryStrip(summaryCard, "PauseRuleC", "VR Input", "Hold secondary button for 0.6s to toggle pause.");
 
             Transform actionCard = AppShellEditorUi.CreateSectionCard(
                 dashboardRow,
@@ -1737,16 +1872,16 @@ namespace VRPublicSpeaking.AppShell.Editor
                 10f,
                 AppShellEditorCommon.AccentColor).transform;
 
-            AppShellEditorCommon.ConfigureLayoutElement(actionCard.gameObject, 288f, 430f);
+            AppShellEditorCommon.ConfigureLayoutElement(actionCard.gameObject, 320f, 476f);
             AppShellEditorUi.CreateTextBlock(actionCard, "PauseActionTitle", "CONTROLS", 16f, FontStyles.Bold, TextAlignmentOptions.Left, 22f, AppShellEditorCommon.SoftAccentColor);
-            AppShellEditorUi.CreateTextBlock(actionCard, "PauseActionLead", "Use a focused set of actions that keep the live session consistent.", 16f, FontStyles.Normal, TextAlignmentOptions.Left, 52f, AppShellEditorCommon.MutedTextColor);
-            Button resumeButton = AppShellEditorUi.CreateStyledButton(actionCard, "ResumeButton", "Resume", AppShellEditorUi.ButtonTone.Primary, -1f, 50f);
-            AppShellEditorUi.CreateTextBlock(actionCard, "ResumeInfo", "Continue the same session from the paused timestamp.", 15f, FontStyles.Normal, TextAlignmentOptions.Left, 38f, AppShellEditorCommon.MutedTextColor);
-            Button restartButton = AppShellEditorUi.CreateStyledButton(actionCard, "RestartButton", "Restart Session", AppShellEditorUi.ButtonTone.Utility, -1f, 50f);
-            AppShellEditorUi.CreateTextBlock(actionCard, "RestartInfo", "Reload this room and launch the same setup again.", 15f, FontStyles.Normal, TextAlignmentOptions.Left, 38f, AppShellEditorCommon.MutedTextColor);
-            Button endButton = AppShellEditorUi.CreateStyledButton(actionCard, "EndButton", "End Session", AppShellEditorUi.ButtonTone.Danger, -1f, 50f);
-            AppShellEditorUi.CreateTextBlock(actionCard, "EndInfo", "Stop the current run and open the results overlay.", 15f, FontStyles.Normal, TextAlignmentOptions.Left, 38f, AppShellEditorCommon.MutedTextColor);
-            Button hubButton = AppShellEditorUi.CreateStyledButton(actionCard, "HubButton", "Return To Hub", AppShellEditorUi.ButtonTone.Secondary, -1f, 54f);
+            AppShellEditorUi.CreateTextBlock(actionCard, "PauseActionLead", "PC shortcuts: Enter/1 resume, R/2 restart, E/3 end, H/4 hub.", 16f, FontStyles.Normal, TextAlignmentOptions.Left, 58f, AppShellEditorCommon.MutedTextColor);
+            Button resumeButton = AppShellEditorUi.CreateStyledButton(actionCard, "ResumeButton", "Resume", AppShellEditorUi.ButtonTone.Primary, -1f, 54f);
+            AppShellEditorUi.CreateTextBlock(actionCard, "ResumeInfo", "Continue from this paused timestamp.", 15f, FontStyles.Normal, TextAlignmentOptions.Left, 34f, AppShellEditorCommon.MutedTextColor);
+            Button restartButton = AppShellEditorUi.CreateStyledButton(actionCard, "RestartButton", "Restart Session", AppShellEditorUi.ButtonTone.Utility, -1f, 54f);
+            AppShellEditorUi.CreateTextBlock(actionCard, "RestartInfo", "Reload this room with the same setup.", 15f, FontStyles.Normal, TextAlignmentOptions.Left, 34f, AppShellEditorCommon.MutedTextColor);
+            Button endButton = AppShellEditorUi.CreateStyledButton(actionCard, "EndButton", "End Session", AppShellEditorUi.ButtonTone.Danger, -1f, 54f);
+            AppShellEditorUi.CreateTextBlock(actionCard, "EndInfo", "Stop this run and open results.", 15f, FontStyles.Normal, TextAlignmentOptions.Left, 34f, AppShellEditorCommon.MutedTextColor);
+            Button hubButton = AppShellEditorUi.CreateStyledButton(actionCard, "HubButton", "Return To Hub", AppShellEditorUi.ButtonTone.Secondary, -1f, 56f);
 
             AppShellEditorCommon.SetButtonEvent(resumeButton, overlayController.ResumeSession);
             AppShellEditorCommon.SetButtonEvent(restartButton, overlayController.RestartSession);
@@ -1908,7 +2043,7 @@ namespace VRPublicSpeaking.AppShell.Editor
                 overlayRoot.transform,
                 "PauseOverlayPanel",
                 AppPanelType.PauseOverlay,
-                new Vector2(944f, 688f),
+                new Vector2(1000f, 742f),
                 new Vector2(0f, 6f));
             TMP_Text pauseStatusLabel = BuildPauseOverlayPanel(pausePanel.transform, overlayController);
             pausePanel.gameObject.SetActive(false);
@@ -2094,7 +2229,23 @@ namespace VRPublicSpeaking.AppShell.Editor
             }
 
             AppEnvironmentDefinition environment = catalog.Environments[index];
-            return environment != null ? environment.PreviewSprite : null;
+            if (environment == null)
+            {
+                return null;
+            }
+
+            if (environment.PreviewSprite != null)
+            {
+                return environment.PreviewSprite;
+            }
+
+            string previewLookupKey = !string.IsNullOrWhiteSpace(environment.Id)
+                ? environment.Id
+                : !string.IsNullOrWhiteSpace(environment.SceneName)
+                    ? environment.SceneName
+                    : environment.DisplayName;
+
+            return AppShellSetupUtility.LoadPreviewSprite(previewLookupKey);
         }
     }
 }
