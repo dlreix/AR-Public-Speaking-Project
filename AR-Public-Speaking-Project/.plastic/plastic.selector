@@ -1,4 +1,0 @@
-repository "AR-Public-Speaking-Project/AR-Public-Speaking-Project@18968333853680@cloud"
-  path "/"
-    br "/main"
-    co "/main"
