@@ -24,3 +24,8 @@ UpgradeLog.htm
 *.VC.db
 
 sysinfo.txt
+# macOS
+.DS_Store
+
+# VSCode
+.vscode/
