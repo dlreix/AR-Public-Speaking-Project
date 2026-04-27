@@ -43,12 +43,19 @@ public class DashboardController : MonoBehaviour
 
     void Start()
     {
+        if (PerformanceScoringEngine.Instance != null)
+        {
+            PerformanceScoringEngine.Instance.OnScoreCalculated += HandleNewSessionData;
+        }
         RefreshAllUI();
     }
 
     private void OnDestroy()
     {
-       
+        if (PerformanceScoringEngine.Instance != null)
+        {
+            PerformanceScoringEngine.Instance.OnScoreCalculated -= HandleNewSessionData;
+        }
     }
 
     // --- MANUEL SAVE VE TEST FONKSÝYONU ---
@@ -148,14 +155,14 @@ public class DashboardController : MonoBehaviour
         }
         if (performanceDateText != null) performanceDateText.text = data.date;
 
-        // 3. Performance Güncelle (Yeni Detaylý Raporlar)
+       
         if (data.detailedReport != null)
         {
             UpdateDetailedColumns(data.detailedReport, data.eyeContact);
             UpdateAICoachPage(data.detailedReport);
         }
 
-        // 4. History Üst Tarih Güncelle
+     
         if (historyDateText != null) historyDateText.text = data.date;
     }
 
