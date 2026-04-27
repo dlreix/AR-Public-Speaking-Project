@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -27,6 +28,7 @@ namespace VRPublicSpeaking.AppShell.UI
         private AppEnvironmentDefinition environmentDefinition;
         private Action<EnvironmentCardView> onSelected;
         private bool isSelected;
+        private static readonly Dictionary<string, Sprite> GeneratedPreviewSprites = new Dictionary<string, Sprite>();
 
         private static readonly Color DefaultSurfaceColor = new Color(0.11f, 0.15f, 0.21f, 0.98f);
         private static readonly Color SelectedSurfaceColor = new Color(0.14f, 0.20f, 0.31f, 0.99f);
@@ -47,6 +49,8 @@ namespace VRPublicSpeaking.AppShell.UI
 
         private void Awake()
         {
+            AutoResolveIfNeeded();
+
             if (selectButton != null)
             {
                 selectButton.onClick.AddListener(NotifySelected);
@@ -80,10 +84,10 @@ namespace VRPublicSpeaking.AppShell.UI
                 }
                 else
                 {
-                    previewImage.sprite = null;
-                    previewImage.type = Image.Type.Sliced;
+                    previewImage.sprite = GetGeneratedPreviewSprite(definition);
+                    previewImage.type = Image.Type.Simple;
                     previewImage.preserveAspect = false;
-                    previewImage.color = new Color(0.17f, 0.22f, 0.29f, 1f);
+                    previewImage.color = Color.white;
                 }
             }
 
@@ -226,6 +230,158 @@ namespace VRPublicSpeaking.AppShell.UI
             onSelected?.Invoke(this);
         }
 
+        private void AutoResolveIfNeeded()
+        {
+            if (selectButton == null)
+            {
+                selectButton = GetComponentInChildren<Button>(true);
+            }
+
+            if (cardBackground == null)
+            {
+                cardBackground = GetComponent<Image>();
+            }
+
+            Image[] images = GetComponentsInChildren<Image>(true);
+            for (int index = 0; index < images.Length; index++)
+            {
+                Image image = images[index];
+                if (image == null)
+                {
+                    continue;
+                }
+
+                string imageName = image.gameObject.name;
+                if (previewImage == null && ContainsIgnoreCase(imageName, "Preview"))
+                {
+                    previewImage = image;
+                }
+                else if (badgeBackground == null && ContainsIgnoreCase(imageName, "Badge"))
+                {
+                    badgeBackground = image;
+                }
+            }
+
+            TMP_Text[] texts = GetComponentsInChildren<TMP_Text>(true);
+            for (int index = 0; index < texts.Length; index++)
+            {
+                TMP_Text text = texts[index];
+                if (text == null)
+                {
+                    continue;
+                }
+
+                string textName = text.gameObject.name;
+                if (titleLabel == null && ContainsIgnoreCase(textName, "Title"))
+                {
+                    titleLabel = text;
+                }
+                else if (descriptionLabel == null && ContainsIgnoreCase(textName, "Description"))
+                {
+                    descriptionLabel = text;
+                }
+                else if (stateLabel == null && ContainsIgnoreCase(textName, "State"))
+                {
+                    stateLabel = text;
+                }
+                else if (badgeLabel == null && ContainsIgnoreCase(textName, "Badge"))
+                {
+                    badgeLabel = text;
+                }
+                else if (buttonLabel == null && ContainsIgnoreCase(textName, "Button"))
+                {
+                    buttonLabel = text;
+                }
+            }
+        }
+
+        private static Sprite GetGeneratedPreviewSprite(AppEnvironmentDefinition definition)
+        {
+            string key = definition != null && !string.IsNullOrWhiteSpace(definition.Id)
+                ? definition.Id
+                : "fallback";
+
+            if (GeneratedPreviewSprites.TryGetValue(key, out Sprite cachedSprite) && cachedSprite != null)
+            {
+                return cachedSprite;
+            }
+
+            Color topColor;
+            Color bottomColor;
+            Color accentColor;
+            ResolvePreviewPalette(key, out topColor, out bottomColor, out accentColor);
+
+            const int width = 96;
+            const int height = 54;
+            var texture = new Texture2D(width, height, TextureFormat.RGBA32, false)
+            {
+                name = $"GeneratedPreview_{key}",
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Bilinear
+            };
+
+            Color32[] pixels = new Color32[width * height];
+            for (int y = 0; y < height; y++)
+            {
+                float vertical = height <= 1 ? 0f : y / (float)(height - 1);
+                Color rowColor = Color.Lerp(bottomColor, topColor, vertical);
+                for (int x = 0; x < width; x++)
+                {
+                    float stripe = Mathf.Sin((x * 0.18f) + (y * 0.08f)) * 0.5f + 0.5f;
+                    Color pixelColor = Color.Lerp(rowColor, accentColor, stripe * 0.10f);
+
+                    bool floorLine = y < 8 && x > 8 && x < width - 8;
+                    bool stageLine = y > 34 && y < 38 && x > 12 && x < width - 12;
+                    if (floorLine || stageLine)
+                    {
+                        pixelColor = Color.Lerp(pixelColor, accentColor, 0.50f);
+                    }
+
+                    pixels[(y * width) + x] = pixelColor;
+                }
+            }
+
+            texture.SetPixels32(pixels);
+            texture.Apply();
+
+            Sprite sprite = Sprite.Create(
+                texture,
+                new Rect(0f, 0f, width, height),
+                new Vector2(0.5f, 0.5f),
+                100f);
+            sprite.name = $"GeneratedPreviewSprite_{key}";
+            GeneratedPreviewSprites[key] = sprite;
+            return sprite;
+        }
+
+        private static void ResolvePreviewPalette(
+            string key,
+            out Color topColor,
+            out Color bottomColor,
+            out Color accentColor)
+        {
+            string normalized = key ?? string.Empty;
+            if (ContainsIgnoreCase(normalized, "conference"))
+            {
+                topColor = new Color(0.42f, 0.26f, 0.22f, 1f);
+                bottomColor = new Color(0.13f, 0.17f, 0.24f, 1f);
+                accentColor = new Color(0.98f, 0.63f, 0.28f, 1f);
+                return;
+            }
+
+            if (ContainsIgnoreCase(normalized, "meeting"))
+            {
+                topColor = new Color(0.30f, 0.40f, 0.48f, 1f);
+                bottomColor = new Color(0.10f, 0.16f, 0.21f, 1f);
+                accentColor = new Color(0.67f, 0.86f, 1f, 1f);
+                return;
+            }
+
+            topColor = new Color(0.34f, 0.45f, 0.36f, 1f);
+            bottomColor = new Color(0.12f, 0.18f, 0.22f, 1f);
+            accentColor = new Color(0.98f, 0.83f, 0.52f, 1f);
+        }
+
         private string BuildStateText()
         {
             if (environmentDefinition == null)
@@ -292,6 +448,12 @@ namespace VRPublicSpeaking.AppShell.UI
             }
 
             return compact.Substring(0, Math.Max(0, maxLength - 3)).TrimEnd() + "...";
+        }
+
+        private static bool ContainsIgnoreCase(string source, string value)
+        {
+            return !string.IsNullOrWhiteSpace(source) &&
+                source.IndexOf(value, StringComparison.OrdinalIgnoreCase) >= 0;
         }
     }
 }

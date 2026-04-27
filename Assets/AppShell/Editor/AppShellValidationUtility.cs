@@ -175,6 +175,8 @@ namespace VRPublicSpeaking.AppShell.Editor
                 }
             }
 
+            ValidateVrCameraBaseline(scene, "MainHubScene", warnings);
+
             if (appFlowManager == null)
             {
                 return;
@@ -248,6 +250,7 @@ namespace VRPublicSpeaking.AppShell.Editor
                 "ResultsScene is missing ResultsFlowController.",
                 warnings);
             RequireSceneComponent<DashboardAdapter>(scene, "ResultsScene is missing DashboardAdapter.", warnings);
+            ValidateVrCameraBaseline(scene, "ResultsScene", warnings);
 
             ValidateFieldReference(
                 summaryPresenter,
@@ -330,14 +333,12 @@ namespace VRPublicSpeaking.AppShell.Editor
                     scene,
                     $"Environment scene '{sceneName}' is missing ResultsFlowController.",
                     warnings);
-                RequireSceneComponent<MainController>(
-                    scene,
-                    $"Environment scene '{sceneName}' is missing MainController.",
-                    warnings);
                 RequireSceneComponent<PlayerController>(
                     scene,
                     $"Environment scene '{sceneName}' is missing PlayerController.",
                     warnings);
+                ValidateRuntimeBootstrapCoverage(scene, sceneName, installer, warnings);
+                ValidateVrCameraBaseline(scene, $"Environment scene '{sceneName}'", warnings);
 
                 ValidateFieldReference(
                     overlayController,
@@ -421,6 +422,71 @@ namespace VRPublicSpeaking.AppShell.Editor
                     warnings);
 
                 ValidateSpawnPoints(scene, catalog, warnings);
+            }
+        }
+
+        private static void ValidateRuntimeBootstrapCoverage(
+            Scene scene,
+            string sceneName,
+            EnvironmentSceneInstaller installer,
+            List<string> warnings)
+        {
+            bool hasInstallerBootstrap = installer != null;
+
+            if (FindSceneComponent<MainController>(scene) == null && !hasInstallerBootstrap)
+            {
+                warnings.Add(
+                    $"Environment scene '{sceneName}' is missing MainController and has no EnvironmentSceneInstaller to bootstrap it.");
+            }
+
+            if (FindSceneComponent<EyeTrackingSystem>(scene) == null && !hasInstallerBootstrap)
+            {
+                warnings.Add(
+                    $"Environment scene '{sceneName}' is missing EyeTrackingSystem and has no EnvironmentSceneInstaller to bootstrap it.");
+            }
+
+            if (FindSceneComponent<GazeScoringSystem>(scene) == null && !hasInstallerBootstrap)
+            {
+                warnings.Add(
+                    $"Environment scene '{sceneName}' is missing GazeScoringSystem and has no EnvironmentSceneInstaller to bootstrap it.");
+            }
+
+            if (FindSceneComponent<CircleEventSystem>(scene) == null && !hasInstallerBootstrap)
+            {
+                warnings.Add(
+                    $"Environment scene '{sceneName}' is missing CircleEventSystem and has no EnvironmentSceneInstaller to bootstrap it.");
+            }
+        }
+
+        private static void ValidateVrCameraBaseline(Scene scene, string label, List<string> warnings)
+        {
+            Camera camera = FindSceneComponent<Camera>(scene);
+            if (camera == null)
+            {
+                warnings.Add($"{label} has no Camera for desktop or Oculus Rift rendering.");
+                return;
+            }
+
+            bool hasRuntimeBootstrap =
+                FindSceneComponent<EnvironmentSceneInstaller>(scene) != null ||
+                FindSceneComponent<ShellSceneRigController>(scene) != null;
+
+            if (!camera.CompareTag("MainCamera") && !hasRuntimeBootstrap)
+            {
+                warnings.Add($"{label} camera '{camera.name}' is not tagged MainCamera and no shell bootstrap is present to repair it.");
+            }
+
+            bool hasTrackedPoseDriver =
+                FindSceneComponent<UnityEngine.InputSystem.XR.TrackedPoseDriver>(scene) != null;
+            if (!hasTrackedPoseDriver && !hasRuntimeBootstrap)
+            {
+                warnings.Add($"{label} has no TrackedPoseDriver and no shell bootstrap is present for Oculus HMD pose tracking.");
+            }
+
+            bool hasAudioListener = FindSceneComponent<AudioListener>(scene) != null;
+            if (!hasAudioListener && !hasRuntimeBootstrap)
+            {
+                warnings.Add($"{label} has no AudioListener and no shell bootstrap is present to add one.");
             }
         }
 

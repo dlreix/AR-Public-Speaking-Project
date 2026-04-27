@@ -41,7 +41,7 @@ namespace VRPublicSpeaking.AppShell.UI
             {
                 dashboardStatusLabel.text = dashboardAvailable
                     ? "Dashboard entry is ready."
-                    : "Dashboard entry is scaffolded. Connect the adapter when analytics are available.";
+                    : "Dashboard entry is reserved for the final analytics module.";
             }
 
             SetNote(hasResults
@@ -62,7 +62,7 @@ namespace VRPublicSpeaking.AppShell.UI
                 return;
             }
 
-            SetNote("Dashboard is not connected yet. Latest summary is still available here.");
+            SetNote("Dashboard is being connected for the final demo. Latest summary is still available here.");
         }
 
         public void GoBack()

@@ -29,6 +29,13 @@ namespace VRPublicSpeaking.AppShell.UI
             "Session paused. Timing, tracking, and scoring are safely on hold.";
         [SerializeField] private string pauseUnavailableStatusText =
             "Pause is available only while a live session is running.";
+        [SerializeField] private bool applyVrReadabilityDefaults = true;
+        [SerializeField] private Vector3 readableOverlayOffset = new Vector3(0f, -0.10f, 1.08f);
+        [SerializeField] private float pauseMinimumFontSize = 22f;
+        [SerializeField] private float pauseMinimumButtonHeight = 72f;
+        [SerializeField] private float pausePanelReadableScale = 1.18f;
+        [SerializeField] private bool useScreenSpaceOverlayWhenNoXrDevice = true;
+        [SerializeField] private Vector2 desktopOverlayReferenceResolution = new Vector2(1540f, 1040f);
 
         private MainController subscribedMainController;
         private int pausePanelShownFrame = -1;
@@ -37,6 +44,10 @@ namespace VRPublicSpeaking.AppShell.UI
         private GraphicRaycaster overlayRaycaster;
         private EventSystem cachedEventSystem;
         private Canvas overlayCanvas;
+        private Button vrFocusedButton;
+        private Vector3 vrFocusedButtonBaseScale = Vector3.one;
+        private bool readabilityDefaultsApplied;
+        private bool desktopOverlayModeApplied;
 
         private void Awake()
         {
@@ -58,6 +69,7 @@ namespace VRPublicSpeaking.AppShell.UI
 
         private void OnDisable()
         {
+            ClearVrFocusHighlight();
             DetachMainControllerEvents();
         }
 
@@ -76,6 +88,8 @@ namespace VRPublicSpeaking.AppShell.UI
             }
 
             HandleDesktopOverlayPointerFallback();
+            UpdateVrFocusHighlight();
+            HandleVrOverlayPointerFallback();
         }
 
         public void Configure(AppRuntimeState appRuntimeState, MainController controller)
@@ -112,6 +126,7 @@ namespace VRPublicSpeaking.AppShell.UI
             HidePausePanelInternal(updateRuntimeState: true);
             overlayFollower?.SnapToTarget();
             resultsSummaryPresenter.Refresh();
+            BringPanelToFront(resultsPanel);
             resultsPanel.Show();
             ApplyDimmer(resultsDimAlpha);
             resultsPanelShownFrame = Time.frameCount;
@@ -286,6 +301,8 @@ namespace VRPublicSpeaking.AppShell.UI
                     dimmerCanvasGroup = dimmer.GetComponent<CanvasGroup>();
                 }
             }
+
+            ApplyReadableOverlayDefaults();
         }
 
         private void AttachMainControllerEvents()
@@ -350,6 +367,7 @@ namespace VRPublicSpeaking.AppShell.UI
 
             UpdatePauseStatus(pauseStatusText);
             overlayFollower?.SnapToTarget();
+            BringPanelToFront(pausePanel);
             pausePanel.Show();
             ApplyDimmer(pauseDimAlpha);
             pausePanelShownFrame = Time.frameCount;
@@ -405,10 +423,14 @@ namespace VRPublicSpeaking.AppShell.UI
                 overlayCanvas = GetComponent<Canvas>();
             }
 
+            ApplyDesktopPreviewCanvasMode();
+
             if (overlayRaycaster == null)
             {
                 overlayRaycaster = GetComponent<GraphicRaycaster>();
             }
+
+            SyncOverlayEventCamera();
 
             if (cachedEventSystem == null)
             {
@@ -427,10 +449,19 @@ namespace VRPublicSpeaking.AppShell.UI
                 return;
             }
 
-            bool isVisible = alpha > 0.001f;
             dimmerCanvasGroup.alpha = Mathf.Clamp01(alpha);
-            dimmerCanvasGroup.interactable = isVisible;
-            dimmerCanvasGroup.blocksRaycasts = isVisible;
+            // The dimmer is visual-only. If it blocks raycasts, world-space overlay
+            // buttons behind it stop receiving both mouse and tracked-device clicks.
+            dimmerCanvasGroup.interactable = false;
+            dimmerCanvasGroup.blocksRaycasts = false;
+        }
+
+        private static void BringPanelToFront(AppPanelView panel)
+        {
+            if (panel != null)
+            {
+                panel.transform.SetAsLastSibling();
+            }
         }
 
         private void UpdatePauseStatus(string message)
@@ -446,10 +477,233 @@ namespace VRPublicSpeaking.AppShell.UI
             string baseMessage = message ?? string.Empty;
             if (Keyboard.current == null)
             {
-                return $"{baseMessage}\n\nVR: hold secondary button for 0.6s to close pause.";
+                return $"{baseMessage}\n\nVR: look at a button, press trigger/A. Hold secondary for 0.6s to close.";
             }
 
-            return $"{baseMessage}\n\nPC: [Enter/1] Resume  [R/2] Restart  [E/3] End  [H/4] Hub\nVR: hold secondary button for 0.6s to close pause.";
+            return $"{baseMessage}\n\nPC: Enter/1 Resume  R/2 Restart  E/3 End  H/4 Hub\nVR: look at a button, press trigger/A.";
+        }
+
+        private void ApplyReadableOverlayDefaults()
+        {
+            if (!applyVrReadabilityDefaults || readabilityDefaultsApplied)
+            {
+                return;
+            }
+
+            if (overlayFollower != null)
+            {
+                overlayFollower.SetOffset(readableOverlayOffset);
+            }
+
+            CanvasScaler scaler = GetComponent<CanvasScaler>();
+            if (scaler != null)
+            {
+                scaler.dynamicPixelsPerUnit = Mathf.Max(scaler.dynamicPixelsPerUnit, 24f);
+            }
+
+            ApplyPanelReadability(pausePanel, pauseMinimumFontSize, pauseMinimumButtonHeight);
+            ApplyPanelScale(pausePanel, pausePanelReadableScale);
+            ApplyPanelReadability(resultsPanel, 20f, 66f);
+            ApplyResultsPanelCleanup(resultsPanel);
+            readabilityDefaultsApplied = true;
+        }
+
+        private static void ApplyResultsPanelCleanup(AppPanelView panel)
+        {
+            if (panel == null)
+            {
+                return;
+            }
+
+            HideTextObject(panel, "RetryInfo");
+            HideTextObject(panel, "ChangeEnvironmentInfo");
+            HideTextObject(panel, "DashboardInfo");
+
+            SetTextObject(panel, "ResultsActionLead", "Pick the next route.");
+            SetTextObject(panel, "ResultsLead", "Latest run recap. Dashboard can replace this panel later.");
+
+            SetPreferredHeight(panel, "ScoreValue", 82f);
+            SetPreferredHeight(panel, "SummaryValue", 82f);
+            SetPreferredHeight(panel, "MetricsCard", 150f);
+            SetPreferredHeight(panel, "NotesCard", 150f);
+            SetPreferredHeight(panel, "RouteStatusLabel", 92f);
+        }
+
+        private static void HideTextObject(AppPanelView panel, string name)
+        {
+            TMP_Text text = FindPanelText(panel, name);
+            if (text != null)
+            {
+                text.gameObject.SetActive(false);
+            }
+        }
+
+        private static void SetTextObject(AppPanelView panel, string name, string value)
+        {
+            TMP_Text text = FindPanelText(panel, name);
+            if (text != null)
+            {
+                text.text = value;
+            }
+        }
+
+        private static TMP_Text FindPanelText(AppPanelView panel, string name)
+        {
+            if (panel == null || string.IsNullOrWhiteSpace(name))
+            {
+                return null;
+            }
+
+            TMP_Text[] textElements = panel.GetComponentsInChildren<TMP_Text>(true);
+            for (int index = 0; index < textElements.Length; index++)
+            {
+                TMP_Text textElement = textElements[index];
+                if (textElement != null && textElement.gameObject.name == name)
+                {
+                    return textElement;
+                }
+            }
+
+            return null;
+        }
+
+        private static void SetPreferredHeight(AppPanelView panel, string objectName, float height)
+        {
+            if (panel == null || string.IsNullOrWhiteSpace(objectName))
+            {
+                return;
+            }
+
+            Transform[] children = panel.GetComponentsInChildren<Transform>(true);
+            for (int index = 0; index < children.Length; index++)
+            {
+                Transform child = children[index];
+                if (child == null || child.gameObject.name != objectName)
+                {
+                    continue;
+                }
+
+                LayoutElement layoutElement = child.GetComponent<LayoutElement>();
+                if (layoutElement == null)
+                {
+                    layoutElement = child.gameObject.AddComponent<LayoutElement>();
+                }
+
+                layoutElement.minHeight = Mathf.Max(layoutElement.minHeight, height);
+                layoutElement.preferredHeight = Mathf.Max(layoutElement.preferredHeight, height);
+                return;
+            }
+        }
+
+        private void ApplyDesktopPreviewCanvasMode()
+        {
+            if (!useScreenSpaceOverlayWhenNoXrDevice ||
+                desktopOverlayModeApplied ||
+                overlayCanvas == null ||
+                IsXrDeviceActive())
+            {
+                return;
+            }
+
+            overlayCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            overlayCanvas.worldCamera = null;
+
+            transform.localPosition = Vector3.zero;
+            transform.localRotation = Quaternion.identity;
+            transform.localScale = Vector3.one;
+
+            if (overlayFollower != null)
+            {
+                overlayFollower.enabled = false;
+            }
+
+            CanvasScaler scaler = GetComponent<CanvasScaler>();
+            if (scaler != null)
+            {
+                scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+                scaler.referenceResolution = desktopOverlayReferenceResolution;
+                scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+                scaler.matchWidthOrHeight = 0.5f;
+                scaler.referencePixelsPerUnit = 100f;
+                scaler.dynamicPixelsPerUnit = Mathf.Max(scaler.dynamicPixelsPerUnit, 24f);
+            }
+
+            desktopOverlayModeApplied = true;
+        }
+
+        private static bool IsXrDeviceActive()
+        {
+            return UnityEngine.XR.XRSettings.isDeviceActive || HasVrController();
+        }
+
+        private static void ApplyPanelScale(AppPanelView panel, float targetScale)
+        {
+            if (panel == null || targetScale <= 0f)
+            {
+                return;
+            }
+
+            Vector3 currentScale = panel.transform.localScale;
+            float largestAxis = Mathf.Max(currentScale.x, currentScale.y, currentScale.z);
+            if (largestAxis >= targetScale)
+            {
+                return;
+            }
+
+            panel.transform.localScale = Vector3.one * targetScale;
+        }
+
+        private static void ApplyPanelReadability(AppPanelView panel, float minimumFontSize, float minimumButtonHeight)
+        {
+            if (panel == null)
+            {
+                return;
+            }
+
+            TMP_Text[] textElements = panel.GetComponentsInChildren<TMP_Text>(true);
+            for (int index = 0; index < textElements.Length; index++)
+            {
+                TMP_Text textElement = textElements[index];
+                if (textElement == null)
+                {
+                    continue;
+                }
+
+                string textObjectName = textElement.gameObject.name;
+                if (textObjectName == "ResumeInfo" ||
+                    textObjectName == "RestartInfo" ||
+                    textObjectName == "EndInfo")
+                {
+                    textElement.gameObject.SetActive(false);
+                    continue;
+                }
+
+                if (textElement.fontSize >= minimumFontSize)
+                {
+                    continue;
+                }
+
+                textElement.fontSize = minimumFontSize;
+            }
+
+            Button[] buttons = panel.GetComponentsInChildren<Button>(true);
+            for (int index = 0; index < buttons.Length; index++)
+            {
+                Button button = buttons[index];
+                if (button == null)
+                {
+                    continue;
+                }
+
+                LayoutElement layoutElement = button.GetComponent<LayoutElement>();
+                if (layoutElement == null)
+                {
+                    continue;
+                }
+
+                layoutElement.minHeight = Mathf.Max(layoutElement.minHeight, minimumButtonHeight);
+                layoutElement.preferredHeight = Mathf.Max(layoutElement.preferredHeight, minimumButtonHeight);
+            }
         }
 
         private void HandleDesktopOverlayShortcuts()
@@ -536,7 +790,118 @@ namespace VRPublicSpeaking.AppShell.UI
                 return;
             }
 
+            if (TryInvokeButtonByGraphicRaycast(activePanel, screenPosition))
+            {
+                return;
+            }
+
             TryInvokeButtonByRectHit(activePanel, screenPosition);
+        }
+
+        private void HandleVrOverlayPointerFallback()
+        {
+            AppPanelView activePanel = GetActiveInteractivePanel();
+            if (activePanel == null || !WasVrOverlayClickPressedThisFrame())
+            {
+                return;
+            }
+
+            if (IsClickablePanelButton(activePanel, vrFocusedButton))
+            {
+                InvokeOverlayButton(vrFocusedButton);
+                return;
+            }
+
+            Camera eventCamera = ResolveOverlayEventCamera();
+            if (eventCamera == null)
+            {
+                return;
+            }
+
+            float screenWidth = eventCamera.pixelWidth > 0 ? eventCamera.pixelWidth : Screen.width;
+            float screenHeight = eventCamera.pixelHeight > 0 ? eventCamera.pixelHeight : Screen.height;
+            Vector2 screenCenter = new Vector2(screenWidth * 0.5f, screenHeight * 0.5f);
+            TryInvokeButtonByRectHit(activePanel, screenCenter);
+        }
+
+        private void UpdateVrFocusHighlight()
+        {
+            if (!HasVrController())
+            {
+                ClearVrFocusHighlight();
+                return;
+            }
+
+            AppPanelView activePanel = GetActiveInteractivePanel();
+            Camera eventCamera = ResolveOverlayEventCamera();
+            if (activePanel == null || eventCamera == null)
+            {
+                ClearVrFocusHighlight();
+                return;
+            }
+
+            float screenWidth = eventCamera.pixelWidth > 0 ? eventCamera.pixelWidth : Screen.width;
+            float screenHeight = eventCamera.pixelHeight > 0 ? eventCamera.pixelHeight : Screen.height;
+            Vector2 screenCenter = new Vector2(screenWidth * 0.5f, screenHeight * 0.5f);
+
+            if (!TryFindButtonByRectHit(activePanel, screenCenter, eventCamera, out Button focusedButton))
+            {
+                ClearVrFocusHighlight();
+                return;
+            }
+
+            if (focusedButton == vrFocusedButton)
+            {
+                return;
+            }
+
+            ClearVrFocusHighlight();
+            vrFocusedButton = focusedButton;
+            vrFocusedButtonBaseScale = focusedButton.transform.localScale;
+            focusedButton.transform.localScale = vrFocusedButtonBaseScale * 1.055f;
+            cachedEventSystem?.SetSelectedGameObject(focusedButton.gameObject);
+        }
+
+        private void ClearVrFocusHighlight()
+        {
+            if (vrFocusedButton != null)
+            {
+                vrFocusedButton.transform.localScale = vrFocusedButtonBaseScale;
+                if (cachedEventSystem != null && cachedEventSystem.currentSelectedGameObject == vrFocusedButton.gameObject)
+                {
+                    cachedEventSystem.SetSelectedGameObject(null);
+                }
+            }
+
+            vrFocusedButton = null;
+            vrFocusedButtonBaseScale = Vector3.one;
+        }
+
+        private static bool WasVrOverlayClickPressedThisFrame()
+        {
+            return WasControllerButtonPressedThisFrame(UnityEngine.InputSystem.XR.XRController.leftHand, "triggerPressed") ||
+                WasControllerButtonPressedThisFrame(UnityEngine.InputSystem.XR.XRController.rightHand, "triggerPressed") ||
+                WasControllerButtonPressedThisFrame(UnityEngine.InputSystem.XR.XRController.leftHand, "primaryButton") ||
+                WasControllerButtonPressedThisFrame(UnityEngine.InputSystem.XR.XRController.rightHand, "primaryButton");
+        }
+
+        private static bool HasVrController()
+        {
+            return UnityEngine.InputSystem.XR.XRController.leftHand != null ||
+                UnityEngine.InputSystem.XR.XRController.rightHand != null;
+        }
+
+        private static bool WasControllerButtonPressedThisFrame(
+            UnityEngine.InputSystem.XR.XRController controller,
+            string controlName)
+        {
+            if (controller == null || string.IsNullOrWhiteSpace(controlName))
+            {
+                return false;
+            }
+
+            ButtonControl control = controller.TryGetChildControl<ButtonControl>(controlName);
+            return control != null && control.wasPressedThisFrame;
         }
 
         private AppPanelView GetActiveInteractivePanel()
@@ -574,6 +939,41 @@ namespace VRPublicSpeaking.AppShell.UI
             return pressedThisFrame;
         }
 
+        private bool TryInvokeButtonByGraphicRaycast(AppPanelView activePanel, Vector2 screenPosition)
+        {
+            if (activePanel == null || overlayRaycaster == null || cachedEventSystem == null)
+            {
+                return false;
+            }
+
+            var pointerEventData = new PointerEventData(cachedEventSystem)
+            {
+                position = screenPosition,
+                button = PointerEventData.InputButton.Left
+            };
+
+            pointerRaycastResults.Clear();
+            overlayRaycaster.Raycast(pointerEventData, pointerRaycastResults);
+
+            for (int index = 0; index < pointerRaycastResults.Count; index++)
+            {
+                RaycastResult result = pointerRaycastResults[index];
+                Button button = result.gameObject != null
+                    ? result.gameObject.GetComponentInParent<Button>()
+                    : null;
+
+                if (!IsClickablePanelButton(activePanel, button))
+                {
+                    continue;
+                }
+
+                InvokeOverlayButton(button);
+                return true;
+            }
+
+            return false;
+        }
+
         private void TryInvokeButtonByRectHit(AppPanelView activePanel, Vector2 screenPosition)
         {
             if (activePanel == null)
@@ -581,12 +981,30 @@ namespace VRPublicSpeaking.AppShell.UI
                 return;
             }
 
-            Camera eventCamera = overlayCanvas != null ? overlayCanvas.worldCamera : null;
+            Camera eventCamera = ResolveOverlayEventCamera();
+            if (TryFindButtonByRectHit(activePanel, screenPosition, eventCamera, out Button hitButton))
+            {
+                InvokeOverlayButton(hitButton);
+            }
+        }
+
+        private static bool TryFindButtonByRectHit(
+            AppPanelView activePanel,
+            Vector2 screenPosition,
+            Camera eventCamera,
+            out Button hitButton)
+        {
+            hitButton = null;
+            if (activePanel == null)
+            {
+                return false;
+            }
+
             Button[] buttons = activePanel.GetComponentsInChildren<Button>(true);
             for (int index = buttons.Length - 1; index >= 0; index--)
             {
                 Button button = buttons[index];
-                if (button == null || !button.IsActive() || !button.IsInteractable())
+                if (!IsClickablePanelButton(activePanel, button))
                 {
                     continue;
                 }
@@ -602,10 +1020,117 @@ namespace VRPublicSpeaking.AppShell.UI
                     continue;
                 }
 
-                cachedEventSystem?.SetSelectedGameObject(button.gameObject);
-                button.onClick.Invoke();
+                hitButton = button;
+                return true;
+            }
+
+            return false;
+        }
+
+        private Camera ResolveOverlayEventCamera()
+        {
+            if (overlayCanvas == null)
+            {
+                return Camera.main ?? FindFirstObjectByType<Camera>(FindObjectsInactive.Exclude);
+            }
+
+            if (overlayCanvas.renderMode == RenderMode.ScreenSpaceOverlay)
+            {
+                return null;
+            }
+
+            Camera preferredCamera = ResolvePreferredOverlayCamera();
+            if (preferredCamera != null)
+            {
+                if (overlayCanvas.worldCamera != preferredCamera)
+                {
+                    overlayCanvas.worldCamera = preferredCamera;
+                }
+
+                return preferredCamera;
+            }
+
+            return overlayCanvas.worldCamera;
+        }
+
+        private void SyncOverlayEventCamera()
+        {
+            if (overlayCanvas == null || overlayCanvas.renderMode == RenderMode.ScreenSpaceOverlay)
+            {
                 return;
             }
+
+            Camera preferredCamera = ResolvePreferredOverlayCamera();
+            if (preferredCamera != null && overlayCanvas.worldCamera != preferredCamera)
+            {
+                overlayCanvas.worldCamera = preferredCamera;
+            }
+        }
+
+        private Camera ResolvePreferredOverlayCamera()
+        {
+            Camera mainCamera = Camera.main;
+            if (IsUsableEventCamera(mainCamera))
+            {
+                return mainCamera;
+            }
+
+            Camera bestAlignedCamera = null;
+            float bestScore = float.NegativeInfinity;
+            Camera[] cameras = FindObjectsByType<Camera>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            for (int index = 0; index < cameras.Length; index++)
+            {
+                Camera candidate = cameras[index];
+                if (!IsUsableEventCamera(candidate))
+                {
+                    continue;
+                }
+
+                Vector3 toOverlay = transform.position - candidate.transform.position;
+                float distance = toOverlay.magnitude;
+                if (distance < 0.001f)
+                {
+                    continue;
+                }
+
+                float alignment = Vector3.Dot(candidate.transform.forward, toOverlay / distance);
+                float targetTexturePenalty = candidate.targetTexture != null ? 0.35f : 0f;
+                float score = alignment - targetTexturePenalty - (distance * 0.001f);
+                if (score > bestScore)
+                {
+                    bestScore = score;
+                    bestAlignedCamera = candidate;
+                }
+            }
+
+            if (bestAlignedCamera != null)
+            {
+                return bestAlignedCamera;
+            }
+
+            return IsUsableEventCamera(overlayCanvas != null ? overlayCanvas.worldCamera : null)
+                ? overlayCanvas.worldCamera
+                : null;
+        }
+
+        private static bool IsUsableEventCamera(Camera camera)
+        {
+            return camera != null && camera.isActiveAndEnabled && camera.gameObject.activeInHierarchy;
+        }
+
+        private static bool IsClickablePanelButton(AppPanelView activePanel, Button button)
+        {
+            return activePanel != null &&
+                button != null &&
+                button.transform.IsChildOf(activePanel.transform) &&
+                button.IsActive() &&
+                button.IsInteractable();
+        }
+
+        private void InvokeOverlayButton(Button button)
+        {
+            cachedEventSystem?.SetSelectedGameObject(button.gameObject);
+            button.onClick.Invoke();
         }
     }
 }

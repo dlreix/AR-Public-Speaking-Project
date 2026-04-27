@@ -14,6 +14,17 @@ namespace VRPublicSpeaking.AppShell.UI
 
         private bool hasSnappedToTarget;
 
+        public void SetOffset(Vector3 canvasOffset, bool snapImmediately = false)
+        {
+            offset = canvasOffset;
+            hasSnappedToTarget = false;
+
+            if (snapImmediately && isActiveAndEnabled)
+            {
+                SnapToTarget();
+            }
+        }
+
         public void Configure(
             Transform target,
             Vector3 canvasOffset,

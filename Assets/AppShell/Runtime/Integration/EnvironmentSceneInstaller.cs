@@ -41,6 +41,8 @@ namespace VRPublicSpeaking.AppShell.Integration
             }
 
             SessionConfig config = runtimeState.GetSessionConfigCopy();
+            Camera sceneCamera = VrRigRuntimeUtility.EnsureSceneVrReady("[EnvironmentSceneInstaller]");
+            EnsureEnvironmentRuntimeStack(sceneCamera);
 
             playerRigAdapter ??= GetOrAdd<PlayerRigAdapter>();
             trackingAdapter ??= GetOrAdd<TrackingAdapter>();
@@ -81,6 +83,86 @@ namespace VRPublicSpeaking.AppShell.Integration
         {
             T component = GetComponent<T>();
             return component != null ? component : gameObject.AddComponent<T>();
+        }
+
+        private void EnsureEnvironmentRuntimeStack(Camera sceneCamera)
+        {
+            if (sceneCamera == null)
+            {
+                sceneCamera = VrRigRuntimeUtility.ResolveSceneCamera();
+            }
+
+            EyeTrackingSystem eyeTrackingSystem = FindFirstObjectByType<EyeTrackingSystem>(FindObjectsInactive.Include);
+            if (eyeTrackingSystem == null && sceneCamera != null)
+            {
+                eyeTrackingSystem = sceneCamera.gameObject.AddComponent<EyeTrackingSystem>();
+            }
+
+            GazeScoringSystem gazeScoringSystem = FindFirstObjectByType<GazeScoringSystem>(FindObjectsInactive.Include);
+            if (gazeScoringSystem == null)
+            {
+                gazeScoringSystem = gameObject.AddComponent<GazeScoringSystem>();
+            }
+
+            if (gazeScoringSystem != null && gazeScoringSystem.eyeTracking == null)
+            {
+                gazeScoringSystem.eyeTracking = eyeTrackingSystem;
+            }
+
+            GazeEventCoordinator coordinator = FindFirstObjectByType<GazeEventCoordinator>(FindObjectsInactive.Include);
+            if (coordinator == null)
+            {
+                coordinator = gameObject.AddComponent<GazeEventCoordinator>();
+            }
+
+            CircleEventSystem circleEventSystem = FindFirstObjectByType<CircleEventSystem>(FindObjectsInactive.Include);
+            if (circleEventSystem == null)
+            {
+                circleEventSystem = gameObject.AddComponent<CircleEventSystem>();
+            }
+
+            if (circleEventSystem != null)
+            {
+                circleEventSystem.eyeTracking ??= eyeTrackingSystem;
+                circleEventSystem.mainCamera ??= sceneCamera;
+                circleEventSystem.coordinator ??= coordinator;
+            }
+
+            QuickGazeDotSystem quickGazeDotSystem = FindFirstObjectByType<QuickGazeDotSystem>(FindObjectsInactive.Include);
+            if (quickGazeDotSystem != null)
+            {
+                quickGazeDotSystem.eyeTracking ??= eyeTrackingSystem;
+                quickGazeDotSystem.scoring ??= gazeScoringSystem;
+                quickGazeDotSystem.mainCamera ??= sceneCamera;
+                quickGazeDotSystem.coordinator ??= coordinator;
+            }
+
+            MovingGazeDotSystem movingGazeDotSystem = FindFirstObjectByType<MovingGazeDotSystem>(FindObjectsInactive.Include);
+            if (movingGazeDotSystem != null)
+            {
+                movingGazeDotSystem.eyeTracking ??= eyeTrackingSystem;
+                movingGazeDotSystem.scoring ??= gazeScoringSystem;
+                movingGazeDotSystem.mainCamera ??= sceneCamera;
+                movingGazeDotSystem.coordinator ??= coordinator;
+            }
+
+            MainController mainController = FindFirstObjectByType<MainController>(FindObjectsInactive.Include);
+            if (mainController == null)
+            {
+                mainController = gameObject.AddComponent<MainController>();
+            }
+
+            if (mainController != null)
+            {
+                mainController.eyeTracking ??= eyeTrackingSystem;
+                mainController.circleEvent ??= circleEventSystem;
+                mainController.quickGazeDot ??= quickGazeDotSystem;
+                mainController.movingGazeDot ??= movingGazeDotSystem;
+                mainController.eventCoordinator ??= coordinator;
+                mainController.gazeScoringSystem ??= gazeScoringSystem;
+                mainController.playerHead ??= sceneCamera != null ? sceneCamera.transform : null;
+                mainController.mainCamera ??= sceneCamera;
+            }
         }
 
         private void EnsureEventSystemSupport()
@@ -129,9 +211,9 @@ namespace VRPublicSpeaking.AppShell.Integration
 
             GameObject overlayRoot = environmentSessionOverlayController.gameObject;
             Canvas overlayCanvas = overlayRoot.GetComponent<Canvas>();
-            if (overlayCanvas != null && overlayCanvas.worldCamera == null)
+            if (overlayCanvas != null)
             {
-                Camera activeCamera = FindFirstObjectByType<Camera>(FindObjectsInactive.Exclude);
+                Camera activeCamera = ResolvePreferredEventCamera();
                 if (activeCamera != null)
                 {
                     overlayCanvas.worldCamera = activeCamera;
@@ -189,6 +271,31 @@ namespace VRPublicSpeaking.AppShell.Integration
                     graphics[graphicIndex].raycastTarget = false;
                 }
             }
+        }
+
+        private static Camera ResolvePreferredEventCamera()
+        {
+            Camera mainCamera = Camera.main;
+            if (IsUsableEventCamera(mainCamera))
+            {
+                return mainCamera;
+            }
+
+            Camera[] cameras = FindObjectsByType<Camera>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            for (int index = 0; index < cameras.Length; index++)
+            {
+                if (IsUsableEventCamera(cameras[index]))
+                {
+                    return cameras[index];
+                }
+            }
+
+            return null;
+        }
+
+        private static bool IsUsableEventCamera(Camera camera)
+        {
+            return camera != null && camera.isActiveAndEnabled && camera.gameObject.activeInHierarchy;
         }
 
         private static void EnsureDefaultInputSystemUiActions(Component inputModule)

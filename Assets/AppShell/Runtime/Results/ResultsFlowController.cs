@@ -25,7 +25,7 @@ namespace VRPublicSpeaking.AppShell.Results
         private void OnEnable()
         {
             routeInProgress = false;
-            SetStatus("Retry keeps the current setup. Change Environment returns to room selection.");
+            SetStatus("Choose the next route.");
         }
 
         public void RetryLastSession()
@@ -127,7 +127,7 @@ namespace VRPublicSpeaking.AppShell.Results
                 return;
             }
 
-            SetStatus("Dashboard is not connected yet. The results summary remains available.");
+            SetStatus("Dashboard is being connected for the final demo. Your session summary remains available here.");
         }
 
         private bool TryResolveRuntimeState()
@@ -195,7 +195,7 @@ namespace VRPublicSpeaking.AppShell.Results
                 return baseMessage;
             }
 
-            return $"{baseMessage}\n\nKeys: [Enter/R/1] Retry  [C/2] Change Env  [D/3] Dashboard  [H/4] Hub";
+            return $"{baseMessage}\nShortcuts: R Retry | C Room | D Dashboard | H Hub";
         }
     }
 }

@@ -61,10 +61,7 @@ public class ClassroomGenerator : MonoBehaviour
 
     void Start()
     {
-        if (Application.isPlaying)
-        {
-            Generate();
-        }
+        // Scene geometry is serialized for demos; rebuilding at runtime can hitch VR startup.
     }
 
     [ContextMenu("Generate Scene")]
@@ -318,5 +315,4 @@ public class ClassroomGenerator : MonoBehaviour
         lightComponent.shadows = LightShadows.Soft;
     }
 }
-
 

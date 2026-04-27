@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Unity.XR.CoreUtils;
 using UnityEngine;
 using UnityEngine.XR;
+using VRPublicSpeaking.AppShell.Integration;
 using VRPublicSpeaking.AppShell.UI;
 
 namespace VRPublicSpeaking.AppShell.Flow
@@ -92,6 +93,7 @@ namespace VRPublicSpeaking.AppShell.Flow
         public void InitializeNow()
         {
             elapsed = 0f;
+            VrRigRuntimeUtility.EnsureSceneVrReady("[ShellSceneRigController]");
             EnsureBackdropSafety();
             EnsureCanvasFollower();
             ApplyStableRigState();

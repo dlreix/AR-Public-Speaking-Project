@@ -85,15 +85,24 @@ namespace VRPublicSpeaking.AppShell.Editor
         internal static Camera FindSceneCamera(Scene scene)
         {
             Camera[] cameras = UnityEngine.Object.FindObjectsByType<Camera>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            Camera firstSceneCamera = null;
             for (int index = 0; index < cameras.Length; index++)
             {
-                if (cameras[index] != null && cameras[index].gameObject.scene == scene)
+                Camera camera = cameras[index];
+                if (camera == null || camera.gameObject.scene != scene)
                 {
-                    return cameras[index];
+                    continue;
+                }
+
+                firstSceneCamera ??= camera;
+
+                if (camera.CompareTag("MainCamera"))
+                {
+                    return camera;
                 }
             }
 
-            return null;
+            return firstSceneCamera;
         }
 
         internal static GameObject FindOrCreateSceneRoot(Scene scene, string name)

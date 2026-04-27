@@ -81,22 +81,21 @@ namespace VRPublicSpeaking.AppShell.Results
         {
             if (!summary.HasOverallScore)
             {
-                return "<size=52><b>--</b></size>\n<size=22>Awaiting scored session</size>";
+                return "<size=42><b>Latest Run</b></size>\n<size=20>Score pending</size>";
             }
 
             string bandSuffix = string.IsNullOrWhiteSpace(summary.PerformanceBand)
                 ? "Latest overall score"
                 : summary.PerformanceBand;
-            return $"<size=68><b>{summary.TotalScore:0.0}</b></size>\n<size=22>{bandSuffix}</size>";
+            return $"<size=58><b>{summary.TotalScore:0.0}</b></size>\n<size=21>{bandSuffix}</size>";
         }
 
         private static string BuildOverviewText(SessionResultSummary summary, SessionConfig config, string environmentName)
         {
             var builder = new StringBuilder();
             builder.AppendLine($"Environment: {environmentName}");
-            builder.AppendLine($"Mode: {config.PracticeMode}");
-            builder.AppendLine($"Duration: {(summary.DurationSeconds > 0f ? $"{summary.DurationSeconds / 60f:0.#} min" : config.GetDurationDisplay())}");
-            builder.AppendLine($"Filler Words: {summary.FillerWordCount:0}");
+            builder.AppendLine(
+                $"Mode: {config.PracticeMode}  |  Duration: {(summary.DurationSeconds > 0f ? $"{summary.DurationSeconds / 60f:0.#} min" : config.GetDurationDisplay())}  |  Filler: {summary.FillerWordCount:0}");
 
             string focusLine = BuildFocusLine(summary);
             if (!string.IsNullOrWhiteSpace(focusLine))
@@ -110,9 +109,9 @@ namespace VRPublicSpeaking.AppShell.Results
         private static string BuildMetricsText(SessionResultSummary summary)
         {
             var builder = new StringBuilder();
-            builder.AppendLine($"Eye Contact  {FormatMetric(summary.HasEyeContactScore, summary.EyeContactScore)}");
-            builder.AppendLine($"Speech Pace  {FormatMetric(summary.HasSpeechPaceScore, summary.SpeechPaceScore)}");
-            builder.AppendLine($"Posture      {FormatMetric(summary.HasPostureScore, summary.PostureScore)}");
+            builder.AppendLine($"Eye Contact   {FormatMetric(summary.HasEyeContactScore, summary.EyeContactScore)}");
+            builder.AppendLine($"Speech Pace   {FormatMetric(summary.HasSpeechPaceScore, summary.SpeechPaceScore)}");
+            builder.AppendLine($"Posture       {FormatMetric(summary.HasPostureScore, summary.PostureScore)}");
 
             if (!string.IsNullOrWhiteSpace(summary.StrongestArea))
             {

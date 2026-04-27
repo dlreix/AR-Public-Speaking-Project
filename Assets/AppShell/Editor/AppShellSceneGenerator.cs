@@ -6,6 +6,7 @@ using UnityEditor.Events;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using Unity.XR.CoreUtils;
@@ -1151,7 +1152,72 @@ namespace VRPublicSpeaking.AppShell.Editor
             playerController.lookEnabled = true;
             playerController.movementEnabled = true;
 
-            AppShellEditorCommon.MarkDirty(rigRoot, playerController);
+            Camera rigCamera = rigRoot.GetComponentInChildren<Camera>(true);
+            if (rigCamera == null)
+            {
+                GameObject cameraRoot = AppShellEditorCommon.FindOrCreateChild(rigRoot.transform, "Main Camera");
+                rigCamera = AppShellEditorCommon.GetOrAddComponent<Camera>(cameraRoot);
+            }
+
+            rigCamera.tag = "MainCamera";
+            if (rigCamera.GetComponent<AudioListener>() == null &&
+                rigRoot.GetComponentInChildren<AudioListener>(true) == null)
+            {
+                rigCamera.gameObject.AddComponent<AudioListener>();
+            }
+
+            var trackedPoseDriver =
+                AppShellEditorCommon.GetOrAddComponent<UnityEngine.InputSystem.XR.TrackedPoseDriver>(rigCamera.gameObject);
+            trackedPoseDriver.trackingType = UnityEngine.InputSystem.XR.TrackedPoseDriver.TrackingType.RotationAndPosition;
+            trackedPoseDriver.updateType = UnityEngine.InputSystem.XR.TrackedPoseDriver.UpdateType.UpdateAndBeforeRender;
+            trackedPoseDriver.ignoreTrackingState = false;
+
+            if (trackedPoseDriver.positionInput.action == null)
+            {
+                trackedPoseDriver.positionInput = new UnityEngine.InputSystem.InputActionProperty(CreatePoseAction(
+                    "Position",
+                    "Vector3",
+                    "<XRHMD>/centerEyePosition",
+                    "<HandheldARInputDevice>/devicePosition"));
+            }
+
+            if (trackedPoseDriver.rotationInput.action == null)
+            {
+                trackedPoseDriver.rotationInput = new UnityEngine.InputSystem.InputActionProperty(CreatePoseAction(
+                    "Rotation",
+                    "Quaternion",
+                    "<XRHMD>/centerEyeRotation",
+                    "<HandheldARInputDevice>/deviceRotation"));
+            }
+
+            if (trackedPoseDriver.trackingStateInput.action == null)
+            {
+                trackedPoseDriver.trackingStateInput = new UnityEngine.InputSystem.InputActionProperty(CreatePoseAction(
+                    "Tracking State",
+                    "Integer",
+                    "<XRHMD>/trackingState"));
+            }
+
+            AppShellEditorCommon.MarkDirty(rigRoot, playerController, rigCamera, trackedPoseDriver);
+        }
+
+        private static UnityEngine.InputSystem.InputAction CreatePoseAction(
+            string name,
+            string expectedControlType,
+            string primaryBinding,
+            string secondaryBinding = null)
+        {
+            var action = new UnityEngine.InputSystem.InputAction(
+                name,
+                binding: primaryBinding,
+                expectedControlType: expectedControlType);
+
+            if (!string.IsNullOrWhiteSpace(secondaryBinding))
+            {
+                action.AddBinding(secondaryBinding);
+            }
+
+            return action;
         }
 
         private static GameObject FindExistingRig(Scene scene)
@@ -1345,7 +1411,8 @@ namespace VRPublicSpeaking.AppShell.Editor
                 54f,
                 AppShellEditorCommon.HeroSurfaceColor,
                 AppShellEditorCommon.HeroAccentColor);
-            Button startButton = AppShellEditorUi.CreateStyledButton(startCard.transform, "StartPracticeButton", "Open Practice Flow", AppShellEditorUi.ButtonTone.Primary, -1f, 60f);
+            Button startButton = AppShellEditorUi.CreateStyledButton(startCard.transform, "StartPracticeButton", "Start Practice Demo", AppShellEditorUi.ButtonTone.Primary, -1f, 60f);
+            TMP_Text startButtonLabel = startButton.GetComponentInChildren<TMP_Text>(true);
 
             GameObject featuredQuickRow = AppShellEditorUi.CreateDashboardRow(featuredColumn.transform, "FeaturedQuickRow", 14f);
             AppShellEditorCommon.ConfigureLayoutElement(featuredQuickRow, -1f, 132f);
@@ -1377,6 +1444,8 @@ namespace VRPublicSpeaking.AppShell.Editor
             AppShellEditorCommon.SetButtonEvent(resultsButton, presenter.OpenResults);
             AppShellEditorCommon.SetButtonEvent(settingsButton, presenter.OpenSettings);
             AppShellEditorCommon.SetButtonEvent(exitButton, presenter.ExitApplication);
+            AppShellEditorCommon.SetField(presenter, "primaryActionButton", startButton);
+            AppShellEditorCommon.SetField(presenter, "primaryActionLabel", startButtonLabel);
         }
 
         private static void BuildPracticeModePanel(Transform panelTransform, PracticeModePanelPresenter presenter, AppFlowManager appFlowManager)
@@ -1559,6 +1628,8 @@ namespace VRPublicSpeaking.AppShell.Editor
             GameObject summaryCard = AppShellEditorUi.CreateSectionCard(rightColumn.transform, "SummaryCard", AppShellEditorCommon.TileSurfaceColor, 18, 18, 8f, AppShellEditorCommon.AccentColor);
             AppShellEditorUi.CreateTextBlock(summaryCard.transform, "SummaryCardTitle", "CURRENT CONFIG", 15f, FontStyles.Bold, TextAlignmentOptions.Left, 20f, AppShellEditorCommon.SoftAccentColor);
             TMP_Text summaryPreview = AppShellEditorUi.CreateTextBlock(summaryCard.transform, "SummaryPreviewLabel", string.Empty, 17f, FontStyles.Normal, TextAlignmentOptions.Left, 150f, AppShellEditorCommon.TextColor);
+            Button recommendedDemoSetupButton = AppShellEditorUi.CreateStyledButton(summaryCard.transform, "RecommendedDemoSetupButton", "Use Recommended Demo Setup", AppShellEditorUi.ButtonTone.Primary, -1f, 48f);
+            TMP_Text recommendedDemoSetupLabel = recommendedDemoSetupButton.GetComponentInChildren<TMP_Text>(true);
             AppShellEditorUi.CreateSummaryStrip(rightColumn.transform, "SummaryHint", "Safe Integration", "Only shell configuration changes here. Scene logic stays intact.");
             AppShellEditorUi.CreateSummaryStrip(rightColumn.transform, "CapabilityHint", "Visible Systems", "Unhooked integrations can stay visible as disabled choices.");
 
@@ -1580,6 +1651,8 @@ namespace VRPublicSpeaking.AppShell.Editor
             AppShellEditorCommon.SetField(controller, "voiceAnalysisToggle", voiceAnalysisToggle);
             AppShellEditorCommon.SetField(controller, "postureAnalysisToggle", postureAnalysisToggle);
             AppShellEditorCommon.SetField(controller, "summaryPreviewLabel", summaryPreview);
+            AppShellEditorCommon.SetField(controller, "recommendedDemoSetupButton", recommendedDemoSetupButton);
+            AppShellEditorCommon.SetField(controller, "recommendedDemoSetupLabel", recommendedDemoSetupLabel);
         }
 
         private static void BuildReadyPanel(Transform panelTransform, ReadyPanelPresenter presenter)
@@ -1744,8 +1817,8 @@ namespace VRPublicSpeaking.AppShell.Editor
         {
             AppShellEditorUi.ClearGeneratedChildren(panelTransform);
 
-            AppShellEditorUi.CreateTextBlock(panelTransform, "PanelTitle", "Results Summary", 44f, FontStyles.Bold, TextAlignmentOptions.Left, 58f, AppShellEditorCommon.TextColor);
-            AppShellEditorUi.CreateTextBlock(panelTransform, "PanelSubtitle", "Turn the latest run into one clear scorecard first, then branch into the next action.", 20f, FontStyles.Normal, TextAlignmentOptions.Left, 44f, AppShellEditorCommon.MutedTextColor);
+            AppShellEditorUi.CreateTextBlock(panelTransform, "PanelTitle", "Results Summary", 42f, FontStyles.Bold, TextAlignmentOptions.Left, 56f, AppShellEditorCommon.TextColor);
+            AppShellEditorUi.CreateTextBlock(panelTransform, "PanelSubtitle", "Review the latest run, then choose the next route.", 19f, FontStyles.Normal, TextAlignmentOptions.Left, 42f, AppShellEditorCommon.MutedTextColor);
 
             Transform dashboardRow = AppShellEditorUi.CreateDashboardRow(panelTransform, "ResultsDashboardRow", 22f).transform;
 
@@ -1758,18 +1831,20 @@ namespace VRPublicSpeaking.AppShell.Editor
                 10f,
                 AppShellEditorCommon.HeroAccentColor).transform;
 
-            AppShellEditorCommon.ConfigureLayoutElement(summaryCard.gameObject, -1f, 566f);
+            AppShellEditorCommon.ConfigureLayoutElement(summaryCard.gameObject, -1f, 586f);
             AppShellEditorCommon.GetOrAddComponent<LayoutElement>(summaryCard.gameObject).flexibleWidth = 1f;
             AppShellEditorUi.CreateTextBlock(summaryCard, "ResultsTitle", "PERFORMANCE SCORECARD", 16f, FontStyles.Bold, TextAlignmentOptions.Left, 22f, AppShellEditorCommon.HeroAccentColor);
-            AppShellEditorUi.CreateTextBlock(summaryCard, "ResultsLead", "Lead with the top-line score, then keep metrics and notes in shorter blocks.", 16f, FontStyles.Normal, TextAlignmentOptions.Left, 40f, AppShellEditorCommon.MutedTextColor);
-            AppShellEditorUi.CreateTextBlock(summaryCard, "ScoreValue", "--", 44f, FontStyles.Bold, TextAlignmentOptions.Left, 110f, AppShellEditorCommon.TextColor);
-            AppShellEditorUi.CreateTextBlock(summaryCard, "SummaryValue", "No session summary is available yet.", 18f, FontStyles.Normal, TextAlignmentOptions.Left, 110f, AppShellEditorCommon.TextColor);
+            AppShellEditorUi.CreateTextBlock(summaryCard, "ResultsLead", "Latest run recap. Dashboard can replace this panel later.", 17f, FontStyles.Normal, TextAlignmentOptions.Left, 38f, AppShellEditorCommon.MutedTextColor);
+            AppShellEditorUi.CreateTextBlock(summaryCard, "ScoreValue", "--", 40f, FontStyles.Bold, TextAlignmentOptions.Left, 82f, AppShellEditorCommon.TextColor);
+            AppShellEditorUi.CreateTextBlock(summaryCard, "SummaryValue", "No session summary is available yet.", 19f, FontStyles.Normal, TextAlignmentOptions.Left, 82f, AppShellEditorCommon.TextColor);
             GameObject metricsCard = AppShellEditorUi.CreateSectionCard(summaryCard, "MetricsCard", AppShellEditorCommon.UtilitySurfaceColor, 18, 18, 8f, AppShellEditorCommon.WithAlpha(AppShellEditorCommon.AccentColor, 0.78f));
-            AppShellEditorUi.CreateTextBlock(metricsCard.transform, "MetricsTitle", "KEY METRICS", 15f, FontStyles.Bold, TextAlignmentOptions.Left, 20f, AppShellEditorCommon.SoftAccentColor);
-            AppShellEditorUi.CreateTextBlock(metricsCard.transform, "MetricsValue", "Eye Contact  Unavailable\nSpeech Pace  Unavailable\nPosture      Unavailable", 17f, FontStyles.Normal, TextAlignmentOptions.Left, 126f, AppShellEditorCommon.TextColor);
+            AppShellEditorCommon.ConfigureLayoutElement(metricsCard, -1f, 150f);
+            AppShellEditorUi.CreateTextBlock(metricsCard.transform, "MetricsTitle", "KEY METRICS", 17f, FontStyles.Bold, TextAlignmentOptions.Left, 24f, AppShellEditorCommon.SoftAccentColor);
+            AppShellEditorUi.CreateTextBlock(metricsCard.transform, "MetricsValue", "Eye Contact   Unavailable\nSpeech Pace   Unavailable\nPosture       Unavailable", 20f, FontStyles.Normal, TextAlignmentOptions.Left, 96f, AppShellEditorCommon.TextColor);
             GameObject notesCard = AppShellEditorUi.CreateSectionCard(summaryCard, "NotesCard", AppShellEditorCommon.ElevatedSurfaceColor, 18, 18, 8f, AppShellEditorCommon.HeroAccentColor);
-            AppShellEditorUi.CreateTextBlock(notesCard.transform, "RecommendationsSectionTitle", "COACH NOTES", 15f, FontStyles.Bold, TextAlignmentOptions.Left, 20f, AppShellEditorCommon.SoftAccentColor);
-            AppShellEditorUi.CreateTextBlock(notesCard.transform, "RecommendationsValue", "Recommendations will appear after a completed session.", 16f, FontStyles.Normal, TextAlignmentOptions.Left, 110f, AppShellEditorCommon.MutedTextColor);
+            AppShellEditorCommon.ConfigureLayoutElement(notesCard, -1f, 150f);
+            AppShellEditorUi.CreateTextBlock(notesCard.transform, "RecommendationsSectionTitle", "COACH NOTES", 17f, FontStyles.Bold, TextAlignmentOptions.Left, 24f, AppShellEditorCommon.SoftAccentColor);
+            AppShellEditorUi.CreateTextBlock(notesCard.transform, "RecommendationsValue", "Recommendations will appear after a completed session.", 18f, FontStyles.Normal, TextAlignmentOptions.Left, 96f, AppShellEditorCommon.MutedTextColor);
 
             Transform actionCard = AppShellEditorUi.CreateSectionCard(
                 dashboardRow,
@@ -1780,17 +1855,14 @@ namespace VRPublicSpeaking.AppShell.Editor
                 10f,
                 AppShellEditorCommon.AccentColor).transform;
 
-            AppShellEditorCommon.ConfigureLayoutElement(actionCard.gameObject, 304f, 566f);
-            AppShellEditorUi.CreateTextBlock(actionCard, "ResultsActionTitle", "NEXT ROUTE", 16f, FontStyles.Bold, TextAlignmentOptions.Left, 22f, AppShellEditorCommon.SoftAccentColor);
-            AppShellEditorUi.CreateTextBlock(actionCard, "ResultsActionLead", "Keep the session context intact while routing the user forward.", 16f, FontStyles.Normal, TextAlignmentOptions.Left, 34f, AppShellEditorCommon.MutedTextColor);
-            Button retryButton = AppShellEditorUi.CreateStyledButton(actionCard, "RetryButton", "Retry Setup", AppShellEditorUi.ButtonTone.Primary, -1f, 50f);
-            AppShellEditorUi.CreateTextBlock(actionCard, "RetryInfo", "Launch the same setup again.", 15f, FontStyles.Normal, TextAlignmentOptions.Left, 26f, AppShellEditorCommon.MutedTextColor);
-            Button changeEnvironmentButton = AppShellEditorUi.CreateStyledButton(actionCard, "ChangeEnvironmentButton", "Change Environment", AppShellEditorUi.ButtonTone.Utility, -1f, 50f);
-            AppShellEditorUi.CreateTextBlock(actionCard, "ChangeEnvironmentInfo", "Return to room selection with the current config.", 15f, FontStyles.Normal, TextAlignmentOptions.Left, 26f, AppShellEditorCommon.MutedTextColor);
-            Button dashboardButton = AppShellEditorUi.CreateStyledButton(actionCard, "DashboardButton", "Dashboard Entry", AppShellEditorUi.ButtonTone.Utility, -1f, 50f);
-            AppShellEditorUi.CreateTextBlock(actionCard, "DashboardInfo", "Open deeper scoring when that adapter is ready.", 15f, FontStyles.Normal, TextAlignmentOptions.Left, 26f, AppShellEditorCommon.MutedTextColor);
-            Button hubButton = AppShellEditorUi.CreateStyledButton(actionCard, "ReturnToHubButton", "Return To Hub", AppShellEditorUi.ButtonTone.Secondary, -1f, 54f);
-            TMP_Text statusLabel = AppShellEditorUi.CreateTextBlock(actionCard, "RouteStatusLabel", string.Empty, 16f, FontStyles.Italic, TextAlignmentOptions.Left, 82f, AppShellEditorCommon.MutedTextColor);
+            AppShellEditorCommon.ConfigureLayoutElement(actionCard.gameObject, 392f, 586f);
+            AppShellEditorUi.CreateTextBlock(actionCard, "ResultsActionTitle", "NEXT ROUTE", 18f, FontStyles.Bold, TextAlignmentOptions.Left, 24f, AppShellEditorCommon.SoftAccentColor);
+            AppShellEditorUi.CreateTextBlock(actionCard, "ResultsActionLead", "Pick the next route.", 18f, FontStyles.Normal, TextAlignmentOptions.Left, 38f, AppShellEditorCommon.MutedTextColor);
+            Button retryButton = AppShellEditorUi.CreateStyledButton(actionCard, "RetryButton", "Retry Setup", AppShellEditorUi.ButtonTone.Primary, -1f, 66f);
+            Button changeEnvironmentButton = AppShellEditorUi.CreateStyledButton(actionCard, "ChangeEnvironmentButton", "Change Environment", AppShellEditorUi.ButtonTone.Utility, -1f, 66f);
+            Button dashboardButton = AppShellEditorUi.CreateStyledButton(actionCard, "DashboardButton", "Dashboard Entry", AppShellEditorUi.ButtonTone.Utility, -1f, 66f);
+            Button hubButton = AppShellEditorUi.CreateStyledButton(actionCard, "ReturnToHubButton", "Return To Hub", AppShellEditorUi.ButtonTone.Secondary, -1f, 66f);
+            TMP_Text statusLabel = AppShellEditorUi.CreateTextBlock(actionCard, "RouteStatusLabel", string.Empty, 17f, FontStyles.Italic, TextAlignmentOptions.Left, 92f, AppShellEditorCommon.MutedTextColor);
 
             AppShellEditorCommon.SetField(flowController, "dashboardAdapter", dashboardAdapter);
             AppShellEditorCommon.SetField(flowController, "statusLabel", statusLabel);
@@ -1840,8 +1912,8 @@ namespace VRPublicSpeaking.AppShell.Editor
         {
             AppShellEditorUi.ClearGeneratedChildren(panelTransform);
 
-            AppShellEditorUi.CreateTextBlock(panelTransform, "PanelTitle", "Session Paused", 42f, FontStyles.Bold, TextAlignmentOptions.Left, 54f, AppShellEditorCommon.TextColor);
-            AppShellEditorUi.CreateTextBlock(panelTransform, "PanelSubtitle", "Timing, gaze tracking, and scoring are frozen. Choose one clear action before returning to the room.", 20f, FontStyles.Normal, TextAlignmentOptions.Left, 56f, AppShellEditorCommon.MutedTextColor);
+            AppShellEditorUi.CreateTextBlock(panelTransform, "PanelTitle", "Session Paused", 46f, FontStyles.Bold, TextAlignmentOptions.Left, 58f, AppShellEditorCommon.TextColor);
+            AppShellEditorUi.CreateTextBlock(panelTransform, "PanelSubtitle", "Live timing, gaze tracking, and scoring are frozen until you resume.", 22f, FontStyles.Normal, TextAlignmentOptions.Left, 58f, AppShellEditorCommon.MutedTextColor);
 
             Transform dashboardRow = AppShellEditorUi.CreateDashboardRow(panelTransform, "PauseDashboardRow", 22f).transform;
 
@@ -1856,9 +1928,9 @@ namespace VRPublicSpeaking.AppShell.Editor
 
             AppShellEditorCommon.ConfigureLayoutElement(summaryCard.gameObject, -1f, 476f);
             AppShellEditorCommon.GetOrAddComponent<LayoutElement>(summaryCard.gameObject).flexibleWidth = 1f;
-            AppShellEditorUi.CreateTextBlock(summaryCard, "PauseBadge", "SESSION ON HOLD", 16f, FontStyles.Bold, TextAlignmentOptions.Left, 24f, AppShellEditorCommon.WarningAccentColor);
-            AppShellEditorUi.CreateTextBlock(summaryCard, "PauseLead", "The environment stays visible, but the live session loop is intentionally stopped.", 18f, FontStyles.Normal, TextAlignmentOptions.Left, 52f, AppShellEditorCommon.MutedTextColor);
-            TMP_Text pauseStatusLabel = AppShellEditorUi.CreateTextBlock(summaryCard, "PauseStatusLabel", "Resume continues the same run. End Session opens results. Restart or Hub cancels this live run safely.", 18f, FontStyles.Normal, TextAlignmentOptions.Left, 104f, AppShellEditorCommon.TextColor);
+            AppShellEditorUi.CreateTextBlock(summaryCard, "PauseBadge", "SESSION ON HOLD", 18f, FontStyles.Bold, TextAlignmentOptions.Left, 26f, AppShellEditorCommon.WarningAccentColor);
+            AppShellEditorUi.CreateTextBlock(summaryCard, "PauseLead", "The room remains loaded. Resume, restart, end, or return safely.", 20f, FontStyles.Normal, TextAlignmentOptions.Left, 56f, AppShellEditorCommon.MutedTextColor);
+            TMP_Text pauseStatusLabel = AppShellEditorUi.CreateTextBlock(summaryCard, "PauseStatusLabel", "Paused. Timer, tracking, and scoring are on hold.", 21f, FontStyles.Normal, TextAlignmentOptions.Left, 116f, AppShellEditorCommon.TextColor);
             AppShellEditorUi.CreateSummaryStrip(summaryCard, "PauseRuleA", "Timer", "Elapsed time stays locked while paused.");
             AppShellEditorUi.CreateSummaryStrip(summaryCard, "PauseRuleB", "Tracking", "Eye and scoring samples are not collected.");
             AppShellEditorUi.CreateSummaryStrip(summaryCard, "PauseRuleC", "VR Input", "Hold secondary button for 0.6s to toggle pause.");
@@ -1872,16 +1944,13 @@ namespace VRPublicSpeaking.AppShell.Editor
                 10f,
                 AppShellEditorCommon.AccentColor).transform;
 
-            AppShellEditorCommon.ConfigureLayoutElement(actionCard.gameObject, 320f, 476f);
-            AppShellEditorUi.CreateTextBlock(actionCard, "PauseActionTitle", "CONTROLS", 16f, FontStyles.Bold, TextAlignmentOptions.Left, 22f, AppShellEditorCommon.SoftAccentColor);
-            AppShellEditorUi.CreateTextBlock(actionCard, "PauseActionLead", "PC shortcuts: Enter/1 resume, R/2 restart, E/3 end, H/4 hub.", 16f, FontStyles.Normal, TextAlignmentOptions.Left, 58f, AppShellEditorCommon.MutedTextColor);
-            Button resumeButton = AppShellEditorUi.CreateStyledButton(actionCard, "ResumeButton", "Resume", AppShellEditorUi.ButtonTone.Primary, -1f, 54f);
-            AppShellEditorUi.CreateTextBlock(actionCard, "ResumeInfo", "Continue from this paused timestamp.", 15f, FontStyles.Normal, TextAlignmentOptions.Left, 34f, AppShellEditorCommon.MutedTextColor);
-            Button restartButton = AppShellEditorUi.CreateStyledButton(actionCard, "RestartButton", "Restart Session", AppShellEditorUi.ButtonTone.Utility, -1f, 54f);
-            AppShellEditorUi.CreateTextBlock(actionCard, "RestartInfo", "Reload this room with the same setup.", 15f, FontStyles.Normal, TextAlignmentOptions.Left, 34f, AppShellEditorCommon.MutedTextColor);
-            Button endButton = AppShellEditorUi.CreateStyledButton(actionCard, "EndButton", "End Session", AppShellEditorUi.ButtonTone.Danger, -1f, 54f);
-            AppShellEditorUi.CreateTextBlock(actionCard, "EndInfo", "Stop this run and open results.", 15f, FontStyles.Normal, TextAlignmentOptions.Left, 34f, AppShellEditorCommon.MutedTextColor);
-            Button hubButton = AppShellEditorUi.CreateStyledButton(actionCard, "HubButton", "Return To Hub", AppShellEditorUi.ButtonTone.Secondary, -1f, 56f);
+            AppShellEditorCommon.ConfigureLayoutElement(actionCard.gameObject, 400f, 476f);
+            AppShellEditorUi.CreateTextBlock(actionCard, "PauseActionTitle", "CONTROLS", 18f, FontStyles.Bold, TextAlignmentOptions.Left, 24f, AppShellEditorCommon.SoftAccentColor);
+            AppShellEditorUi.CreateTextBlock(actionCard, "PauseActionLead", "VR: look and press trigger/A.\nPC shortcuts also work.", 18f, FontStyles.Normal, TextAlignmentOptions.Left, 78f, AppShellEditorCommon.MutedTextColor);
+            Button resumeButton = AppShellEditorUi.CreateStyledButton(actionCard, "ResumeButton", "Resume", AppShellEditorUi.ButtonTone.Primary, -1f, 72f);
+            Button restartButton = AppShellEditorUi.CreateStyledButton(actionCard, "RestartButton", "Restart Session", AppShellEditorUi.ButtonTone.Utility, -1f, 72f);
+            Button endButton = AppShellEditorUi.CreateStyledButton(actionCard, "EndButton", "End Session", AppShellEditorUi.ButtonTone.Danger, -1f, 72f);
+            Button hubButton = AppShellEditorUi.CreateStyledButton(actionCard, "HubButton", "Return To Hub", AppShellEditorUi.ButtonTone.Secondary, -1f, 72f);
 
             AppShellEditorCommon.SetButtonEvent(resumeButton, overlayController.ResumeSession);
             AppShellEditorCommon.SetButtonEvent(restartButton, overlayController.RestartSession);
@@ -1960,7 +2029,7 @@ namespace VRPublicSpeaking.AppShell.Editor
             overlayCanvas.worldCamera = AppShellEditorCommon.FindSceneCamera(scene);
 
             CanvasScaler overlayScaler = AppShellEditorCommon.GetOrAddComponent<CanvasScaler>(overlayRoot);
-            overlayScaler.dynamicPixelsPerUnit = 12f;
+            overlayScaler.dynamicPixelsPerUnit = 24f;
             overlayScaler.referencePixelsPerUnit = 100f;
 
             AppShellEditorCommon.GetOrAddComponent<GraphicRaycaster>(overlayRoot);
@@ -2043,7 +2112,7 @@ namespace VRPublicSpeaking.AppShell.Editor
                 overlayRoot.transform,
                 "PauseOverlayPanel",
                 AppPanelType.PauseOverlay,
-                new Vector2(1000f, 742f),
+                new Vector2(1180f, 820f),
                 new Vector2(0f, 6f));
             TMP_Text pauseStatusLabel = BuildPauseOverlayPanel(pausePanel.transform, overlayController);
             pausePanel.gameObject.SetActive(false);
@@ -2052,7 +2121,7 @@ namespace VRPublicSpeaking.AppShell.Editor
                 overlayRoot.transform,
                 "ResultsOverlayPanel",
                 AppPanelType.ResultsSummary,
-                new Vector2(980f, 790f),
+                new Vector2(1060f, 850f),
                 new Vector2(0f, -8f));
             ResultsSummaryPresenter resultsPresenter = AppShellEditorCommon.GetOrAddComponent<ResultsSummaryPresenter>(resultsPanel.gameObject);
             ResultsFlowController resultsFlowController = AppShellEditorCommon.GetOrAddComponent<ResultsFlowController>(resultsPanel.gameObject);
@@ -2068,7 +2137,7 @@ namespace VRPublicSpeaking.AppShell.Editor
             AppShellEditorCommon.SetField(hudPresenter, "warningFollower", warningFollower);
             AppShellEditorCommon.SetField(hudPresenter, "warningLabel", warningLabel);
             AppShellEditorCommon.SetField(hudPresenter, "inactiveStatusText", "Waiting for session start");
-            AppShellEditorCommon.SetField(overlayFollower, "offset", new Vector3(0f, -0.16f, 1.58f));
+            AppShellEditorCommon.SetField(overlayFollower, "offset", new Vector3(0f, -0.10f, 1.08f));
             AppShellEditorCommon.SetField(overlayFollower, "yawOnly", false);
             AppShellEditorCommon.SetField(overlayFollower, "positionLerpSpeed", 0f);
             AppShellEditorCommon.SetField(overlayFollower, "rotationLerpSpeed", 0f);

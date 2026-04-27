@@ -33,7 +33,7 @@ public class MeetingRoomGenerator : MonoBehaviour
                      matScreen, matBeam;
 
     void OnValidate() { if (generateNow) { generateNow = false; Generate(); } }
-    void Start()      { if (Application.isPlaying) Generate(); }
+    void Start()      { /* Scene geometry is serialized; do not rebuild during VR runtime. */ }
 
     [ContextMenu("Generate Scene")]
     public void Generate()

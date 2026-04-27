@@ -22,6 +22,9 @@ namespace VRPublicSpeaking.AppShell.UI
         [SerializeField] private Color warningTextColor = new Color(0.98f, 0.74f, 0.39f, 1f);
         [SerializeField] private Color warningBackgroundColor = new Color(0.08f, 0.11f, 0.15f, 0.92f);
         [SerializeField] private Vector3 warningFollowOffset = new Vector3(0f, -0.12f, 0.92f);
+        [SerializeField] private Vector2 desktopWarningAnchoredPosition = new Vector2(0f, -135f);
+        [SerializeField] private Vector2 desktopWarningSize = new Vector2(540f, 90f);
+        [SerializeField] private float desktopWarningFontSize = 16f;
 
         private bool warningVisible;
 
@@ -167,10 +170,16 @@ namespace VRPublicSpeaking.AppShell.UI
                 warningRoot = warningRootObject.GetComponent<RectTransform>();
             }
 
+            bool useScreenSpacePlacement = IsUnderScreenSpaceCanvas();
+            Vector2 warningSize = useScreenSpacePlacement ? desktopWarningSize : new Vector2(420f, 78f);
+
             warningRoot.anchorMin = new Vector2(0.5f, 0.5f);
             warningRoot.anchorMax = new Vector2(0.5f, 0.5f);
             warningRoot.pivot = new Vector2(0.5f, 0.5f);
-            warningRoot.sizeDelta = new Vector2(420f, 78f);
+            warningRoot.sizeDelta = warningSize;
+            warningRoot.anchoredPosition = useScreenSpacePlacement ? desktopWarningAnchoredPosition : Vector2.zero;
+            warningRoot.localRotation = Quaternion.identity;
+            warningRoot.localScale = Vector3.one;
             warningRoot.SetAsLastSibling();
 
             warningCanvasGroup ??= warningRoot.GetComponent<CanvasGroup>();
@@ -197,8 +206,12 @@ namespace VRPublicSpeaking.AppShell.UI
                 warningFollower = warningRoot.gameObject.AddComponent<WorldSpaceCanvasFollower>();
             }
 
-            warningFollower.Configure(null, warningFollowOffset, false, true, 14f, 16f);
-            warningFollower.SetFollowContinuously(true);
+            warningFollower.enabled = !useScreenSpacePlacement;
+            if (!useScreenSpacePlacement)
+            {
+                warningFollower.Configure(null, warningFollowOffset, false, true, 14f, 16f);
+                warningFollower.SetFollowContinuously(true);
+            }
 
             if (warningLabel != null && warningLabel.transform.parent == transform)
             {
@@ -221,8 +234,11 @@ namespace VRPublicSpeaking.AppShell.UI
                 warningLabel = labelObject.AddComponent<TextMeshProUGUI>();
             }
 
-            ConfigureHudLabel(warningLabel, new Vector2(380f, 58f), Vector2.zero);
-            warningLabel.fontSize = 13f;
+            ConfigureHudLabel(
+                warningLabel,
+                useScreenSpacePlacement ? new Vector2(500f, 66f) : new Vector2(380f, 58f),
+                Vector2.zero);
+            warningLabel.fontSize = useScreenSpacePlacement ? desktopWarningFontSize : 13f;
             warningLabel.alignment = TextAlignmentOptions.Center;
             warningLabel.textWrappingMode = TextWrappingModes.Normal;
             warningLabel.overflowMode = TextOverflowModes.Ellipsis;
@@ -243,7 +259,10 @@ namespace VRPublicSpeaking.AppShell.UI
             if (isVisible && !warningVisible)
             {
                 warningRoot.gameObject.SetActive(true);
-                warningFollower?.SnapToTarget();
+                if (warningFollower != null && warningFollower.enabled)
+                {
+                    warningFollower.SnapToTarget();
+                }
             }
             else if (!isVisible)
             {
@@ -256,6 +275,18 @@ namespace VRPublicSpeaking.AppShell.UI
             }
 
             warningVisible = isVisible;
+        }
+
+        private bool IsUnderScreenSpaceCanvas()
+        {
+            Canvas parentCanvas = GetComponentInParent<Canvas>();
+            if (parentCanvas == null)
+            {
+                return false;
+            }
+
+            Canvas rootCanvas = parentCanvas.rootCanvas != null ? parentCanvas.rootCanvas : parentCanvas;
+            return rootCanvas.renderMode != RenderMode.WorldSpace;
         }
 
         private static void ConfigureHudLabel(TMP_Text label, Vector2 size, Vector2 anchoredPosition)
