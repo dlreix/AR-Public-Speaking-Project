@@ -1,3 +1,4 @@
+/*
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -399,6 +400,188 @@ namespace SpeechPipeline
             if (_pause != null) _pause.OnPauseDetected -= HandlePause;
             _stt?.Dispose();
             _capture?.Dispose();
+         }
+    }
+}
+*/
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.InputSystem;
+
+[RequireComponent(typeof(AudioSource))]
+[AddComponentMenu("Speech Pipeline/Controller")]
+public sealed class SpeechPipelineController : MonoBehaviour
+{
+    // -- INSPECTOR AYARLARI --
+    [Header("STT")]
+    public string ModelFolder = "vosk-model-en-us-0.42-gigaspeech";
+    public int SampleRate = 16000;
+
+    [Header("Pause Detection")]
+    [Range(0f, 0.1f)] public float NoiseFloor = 0.015f;
+    [Range(0.3f, 5f)] public float PauseThreshold = 1.5f;
+
+    [Header("Pitch Analysis")]
+    public int SpectrumSize = 1024;
+    [Range(60f, 150f)] public float MinPitchHz = 70f;
+    [Range(300f, 800f)] public float MaxPitchHz = 500f;
+
+    [Header("Live Display")]
+    [Range(0.5f, 3f)] public float TickInterval = 1f;
+
+    [Header("Scoring Integration")]
+    public PerformanceScoringEngine ScoringEngine;
+    public SpeechAdapter SpeechAdapter;
+
+    // -- STATE & SUBSYSTEMS --
+    private enum PipelineState { Loading, Ready, Recording }
+    private PipelineState _state = PipelineState.Loading;
+
+    private AudioCaptureBuffer _capture;
+    private VoskSTTEngine _stt;
+    private RMSPauseDetector _pause;
+    private PitchDetector _pitch;
+    private PaceTracker _pace;
+    private FillerDetector _filler;
+    private AudioSource _spectrumSrc;
+
+    // -- ACCUMULATORS --
+    private float _speakingTimer, _tickTimer, _lastPitchHz, _lastRMS, _chunkTimer;
+    private bool _wasSpeaking, _modelReadyLogged;
+    private string _currentPartial;
+    private int _uttPauseCount, _uttRmsCount;
+    private float _uttLastPause, _uttRmsSum, _uttRmsMax;
+    private float _sessionStart, _sessionSpeaking, _sessionPauseTotal, _sessionWpmSum, _sessionPitchStdSum;
+    private int _sessionPauses, _sessionWords, _sessionFillers, _sessionWpmCount, _sessionPitchCount;
+    private List<string> _sessionFillerList = new List<string>();
+    private List<string> _sessionTranscript = new List<string>();
+    private const float ChunkSec = 0.1f;
+
+    private IEnumerator Start()
+    {
+        yield return Application.RequestUserAuthorization(UserAuthorization.Microphone);
+        _spectrumSrc = GetComponent<AudioSource>();
+        _capture = new AudioCaptureBuffer(10, SampleRate);
+        _spectrumSrc.clip = _capture.Clip;
+        _spectrumSrc.mute = true;
+        _spectrumSrc.loop = true;
+        _spectrumSrc.Play();
+
+        _pause = new RMSPauseDetector { NoiseFloor = NoiseFloor, PauseThreshold = PauseThreshold };
+        _pause.OnPauseDetected += HandlePause;
+        _pitch = new PitchDetector(_spectrumSrc, SpectrumSize) { MinHz = MinPitchHz, MaxHz = MaxPitchHz };
+        _pace = new PaceTracker();
+        _filler = new FillerDetector();
+
+        string modelPath = System.IO.Path.Combine(Application.streamingAssetsPath, ModelFolder);
+        ConsoleDisplay.LoadingModel();
+        _stt = new VoskSTTEngine(modelPath, SampleRate);
+    }
+
+    private void Update()
+    {
+        if (_stt == null || !_stt.IsReady) return;
+        if (!_modelReadyLogged) { _modelReadyLogged = true; ConsoleDisplay.ModelReady(); _state = PipelineState.Ready; }
+
+        if (Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame)
+        {
+            if (_state == PipelineState.Ready) BeginSession();
+            else if (_state == PipelineState.Recording) EndSession();
+            return;
+        }
+
+        if (_state != PipelineState.Recording) return;
+        DrainSTT();
+
+        _chunkTimer += Time.unscaledDeltaTime;
+        if (_chunkTimer < ChunkSec) return;
+        _chunkTimer = 0f;
+
+        float[] chunk = _capture.Poll();
+        if (chunk == null || chunk.Length == 0) return;
+
+        float chunkDur = (float)chunk.Length / SampleRate;
+        bool voiced = _pause.ProcessChunk(chunk, chunkDur);
+        _lastRMS = _pause.CurrentRMS;
+        _uttRmsSum += _lastRMS; _uttRmsCount++;
+        if (_lastRMS > _uttRmsMax) _uttRmsMax = _lastRMS;
+
+        if (voiced)
+        {
+            _lastPitchHz = _pitch.AnalyzeFrame();
+            _stt.EnqueueAudio(chunk);
+            if (!_wasSpeaking) { _wasSpeaking = true; _pace.StartUtterance(); _tickTimer = 0; _speakingTimer = 0; }
+            _speakingTimer += chunkDur; _sessionSpeaking += chunkDur; _tickTimer += chunkDur;
+            if (_tickTimer >= TickInterval) { _tickTimer -= TickInterval; ConsoleDisplay.LiveTick(_speakingTimer, _lastPitchHz, _lastRMS, _currentPartial); }
+        }
+        else if (_wasSpeaking) { _wasSpeaking = false; _speakingTimer = 0; _tickTimer = 0; }
+    }
+
+    private void BeginSession()
+    {
+        _state = PipelineState.Recording; _capture.Poll(); _sessionStart = Time.realtimeSinceStartup;
+        _sessionSpeaking = 0; _sessionPauses = 0; _sessionPauseTotal = 0; _sessionWords = 0; _sessionFillers = 0;
+        _sessionFillerList.Clear(); _sessionTranscript.Clear(); _sessionWpmSum = 0; _sessionWpmCount = 0;
+        _sessionPitchStdSum = 0; _sessionPitchCount = 0;
+        ResetUtteranceAccumulators(); ConsoleDisplay.RecordingStarted();
+    }
+
+    private void EndSession()
+    {
+        _state = PipelineState.Ready;
+        if (!string.IsNullOrWhiteSpace(_currentPartial))
+        {
+            var pWords = _currentPartial.Split(new[] { ' ', '\t', '\n' }, System.StringSplitOptions.RemoveEmptyEntries);
+            if (pWords.Length > 0) { _sessionWords += pWords.Length; _sessionTranscript.Add(_currentPartial); }
+        }
+        DrainSTT();
+
+        float avgWpm = _sessionWpmCount > 0 ? _sessionWpmSum / _sessionWpmCount : (_sessionSpeaking > 0 ? (_sessionWords / _sessionSpeaking) * 60f : 0);
+        float avgPitchStd = _sessionPitchCount > 0 ? _sessionPitchStdSum / _sessionPitchCount : 0f;
+        float totalSec = Time.realtimeSinceStartup - _sessionStart;
+
+        // VERİLERİ GÖNDER VE DASHBOARD'U AÇ
+        float totalMin = totalSec / 60f;
+        float fillerPerMin = totalMin > 0 ? _sessionFillers / totalMin : 0;
+        float avgPause = _sessionPauses > 0 ? _sessionPauseTotal / _sessionPauses : 0;
+        float toneScore = NormalizePitchStd(avgPitchStd);
+
+        if (ScoringEngine != null)
+        {
+            ScoringEngine.SetSpeechMetrics(avgWpm, fillerPerMin, avgPause, toneScore);
+            ScoringEngine.CalculateSessionScore();
+
+            var dashboard = FindObjectOfType<DashboardController>(true);
+            if (dashboard != null) dashboard.OpenDashboardAfterSession(ScoringEngine.GetFeedbackReport());
+        }
+
+        if (SpeechAdapter != null) SpeechAdapter.OnSpeechAnalysisComplete(avgWpm, fillerPerMin, avgPause, toneScore);
+        ResetUtteranceAccumulators();
+    }
+
+    private void DrainSTT()
+    {
+        while (_stt.TryDequeueResult(out object res))
+        {
+            if (res is VoskSTTEngine.PartialResult p) { _currentPartial = p.Text; }
+            else if (res is VoskSTTEngine.FinalResult f) { _currentPartial = null; if (!string.IsNullOrWhiteSpace(f.Text)) FinaliseUtterance(f.Text); }
         }
     }
+
+    private void FinaliseUtterance(string text)
+    {
+        var words = text.Split(new[] { ' ', '\t', '\n' }, System.StringSplitOptions.RemoveEmptyEntries);
+        var (wpm, dur) = _pace.StopUtterance(words.Length);
+        var (avg, sd, mn, mx) = _pitch.FlushStats();
+        _sessionWords += words.Length; _sessionTranscript.Add(text);
+        if (wpm > 0) { _sessionWpmSum += wpm; _sessionWpmCount++; }
+        if (sd > 0) { _sessionPitchStdSum += sd; _sessionPitchCount++; }
+        ResetUtteranceAccumulators();
+    }
+
+    private void HandlePause(float duration) { _uttLastPause = duration; _uttPauseCount++; _sessionPauses++; _sessionPauseTotal += duration; }
+    private void ResetUtteranceAccumulators() { _uttPauseCount = 0; _uttLastPause = 0; _uttRmsSum = 0; _uttRmsMax = 0; _uttRmsCount = 0; _currentPartial = null; _wasSpeaking = false; }
+    private float NormalizePitchStd(float stdHz) => Mathf.Clamp((stdHz - 10f) / (55f - 10f) * 100f, 0, 100);
+    private void OnDestroy() { if (_pause != null) _pause.OnPauseDetected -= HandlePause; _stt?.Dispose(); _capture?.Dispose(); }
 }

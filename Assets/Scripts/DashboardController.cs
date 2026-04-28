@@ -58,6 +58,31 @@ public class DashboardController : MonoBehaviour
         }
     }
 
+    public void FinishAndSaveSession_TEST()
+    {
+        // Eski rastgele kodlarýn burada durabilir, sadece test butonuna baðlarsýn.
+    }
+
+    // --- GERÇEK AÇILIÞ FONKSÝYONU ---
+    public void OpenDashboardAfterSession(FeedbackReport report)
+    {
+        if (report == null) return;
+
+        // 1. Paneli Görünür Yap
+        gameObject.SetActive(true);
+
+        // 2. Gelen gerçek raporu DataManager'a kaydet
+        if (DataManager.Instance != null)
+        {
+            DataManager.Instance.SaveSession(report);
+        }
+
+        // 3. Ekrandaki tüm grafikleri ve metinleri güncelle
+        RefreshAllUI();
+
+        Debug.Log("Dashboard gerçek VR verileriyle açýldý!");
+    }
+    /*
     // --- MANUEL SAVE VE TEST FONKSÝYONU ---
     public void FinishAndSaveSession()
     {
@@ -69,7 +94,7 @@ public class DashboardController : MonoBehaviour
             float randomPause = Random.Range(0.2f, 2.5f);
             float randomTone = Random.Range(40f, 100f);
 
-            float randomEyeRatio = Random.Range(0.3f, 1.0f); // 0 ile 1 arasý oran
+            float randomEyeRatio = Random.Range(0.3f, 1.0f); 
 
             float randomSlouch = Random.Range(0f, 5f);
             float randomSway = Random.Range(0f, 40f);
@@ -102,7 +127,7 @@ public class DashboardController : MonoBehaviour
         {
             Debug.LogError("PerformanceScoringEngine sahnede bulunamadý! Lütfen sahnede olduðundan emin ol.");
         }
-    }
+    } */
 
 
     // --- ENGINE'DEN GELEN VERÝYÝ YAKALAMA ---
@@ -137,7 +162,7 @@ public class DashboardController : MonoBehaviour
         if (overviewScoreText != null) overviewScoreText.text = data.overallScore.ToString("F0");
         if (overviewDateText != null) overviewDateText.text = data.date;
 
-        // 2. Performance Güncelle (Eski Bar Dizileri)
+        // 2. Performance Güncelle 
         if (performanceBars != null)
         {
             for (int i = 0; i < performanceBars.Length; i++)
@@ -222,7 +247,7 @@ public class DashboardController : MonoBehaviour
         return summary != null ? summary.message : "Analysis complete.";
     }
 
-    // --- GEÇMÝÞ KARTLARINI TAZELEME (ESKÝ KODUN BÝREBÝR AYNISI) ---
+    // --- GEÇMÝÞ KARTLARINI TAZELEME ---
     public void RefreshHistoryCards()
     {
         if (DataManager.Instance == null || cardScores == null || cardDates == null) return;
@@ -244,7 +269,7 @@ public class DashboardController : MonoBehaviour
         }
     }
 
-    // --- GRAFÝK GÜNCELLEME (ESKÝ KODUN BÝREBÝR AYNISI) ---
+    // --- GRAFÝK GÜNCELLEME ---
     public void UpdateChart()
     {
         if (DataManager.Instance == null || chartLine == null) return;
@@ -280,7 +305,7 @@ public class DashboardController : MonoBehaviour
             DataManager.Instance.DeleteAllData();
             if (chartLine != null) chartLine.positionCount = 0;
 
-            // DÜZELTME: Etiketleri boþaltmak yerine s1'den s9'a kadar diz
+            
             if (chartLabels != null)
             {
                 for (int i = 0; i < chartLabels.Length; i++)

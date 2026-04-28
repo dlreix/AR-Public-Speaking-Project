@@ -91,8 +91,8 @@ public class PerformanceScoringEngine : MonoBehaviour
     public TextMeshProUGUI weakestText;
     public TextMeshProUGUI feedbackSummaryText;
 
-    //[Header("Eye Tracking (Gelismis)")]
-    //public GazeScoringSystem gazeScoringSystem;
+    [Header("Eye Tracking (Gelismis)")]
+    public GazeScoringSystem gazeScoringSystem;
 
     [Header("Input Metrics")]
     public SpeechMetrics speechMetrics = new SpeechMetrics();
@@ -252,8 +252,7 @@ public class PerformanceScoringEngine : MonoBehaviour
 
     // ---  Hesaplama Fonksiyonlarý ---
     private float CalculateSpeechScore() { return ClampScore((wpmWeight * NormalizeWpm(speechMetrics.wpm)) + (fillerWeight * NormalizeInverse(speechMetrics.fillerWordsPerMinute, idealFillerPerMin, maxFillerPerMin)) + (pauseWeight * NormalizePauseDuration(speechMetrics.averagePauseDuration)) + (toneWeight * ClampScore(speechMetrics.toneVariationScore))); }
-    private float CalculateEyeScore() { //if (gazeScoringSystem != null) return ClampScore(gazeScoringSystem.GazeScore);
-                                        return ClampScore(eyeMetrics.eyeContactRatio * 100f); }
+    private float CalculateEyeScore() { if (gazeScoringSystem != null) return ClampScore(gazeScoringSystem.GazeScore); return ClampScore(eyeMetrics.eyeContactRatio * 100f); }
     private float CalculatePostureScore() { return ClampScore(100f - (slouchPenalty * postureMetrics.slouchEventsPerMinute) - (swayPenalty * postureMetrics.swayDurationPercent) - (crossedArmsPenalty * postureMetrics.crossedArmsPercent)); }
     private float NormalizeWpm(float wpm) { if (wpm >= idealWpmMin && wpm <= idealWpmMax) return 100f; if (wpm < idealWpmMin) { if (wpm <= minAcceptableWpm) return 0f; return Mathf.InverseLerp(minAcceptableWpm, idealWpmMin, wpm) * 100f; } if (wpm >= maxAcceptableWpm) return 0f; return (1f - Mathf.InverseLerp(idealWpmMax, maxAcceptableWpm, wpm)) * 100f; }
     private float NormalizePauseDuration(float pause) { if (pause >= idealPauseMin && pause <= idealPauseMax) return 100f; if (pause < idealPauseMin) { if (pause <= minAcceptablePause) return 0f; return Mathf.InverseLerp(minAcceptablePause, idealPauseMin, pause) * 100f; } if (pause >= maxAcceptablePause) return 0f; return (1f - Mathf.InverseLerp(idealPauseMax, maxAcceptablePause, pause)) * 100f; }
