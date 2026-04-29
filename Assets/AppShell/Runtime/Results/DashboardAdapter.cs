@@ -2,13 +2,19 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using UnityEngine;
+using UnityEngine.SceneManagement;
+using VRPublicSpeaking.AppShell.Flow;
 
 namespace VRPublicSpeaking.AppShell.Results
 {
     public class DashboardAdapter : MonoBehaviour
     {
+        private const string DefaultDashboardSceneName = "Overview";
+
         [SerializeField] private MonoBehaviour dashboardController;
         [SerializeField] private GameObject dashboardRoot;
+        [SerializeField] private string dashboardSceneName = DefaultDashboardSceneName;
+        [SerializeField] private string dashboardLoadingMessage = "Opening dashboard...";
         [SerializeField] private string openMessage = "Open";
         [SerializeField] private string[] alternateOpenMessages =
         {
@@ -18,7 +24,9 @@ namespace VRPublicSpeaking.AppShell.Results
         };
         [SerializeField] private bool activateControllerGameObject = true;
 
-        public bool IsAvailable => dashboardRoot != null || HasControllerEntryPoint();
+        public bool IsAvailable => dashboardRoot != null ||
+            HasControllerEntryPoint() ||
+            CanOpenDashboardScene();
 
         public void OpenDashboard()
         {
@@ -47,6 +55,11 @@ namespace VRPublicSpeaking.AppShell.Results
                 {
                     opened = true;
                 }
+            }
+
+            if (!opened)
+            {
+                opened = TryOpenDashboardScene();
             }
 
             if (!opened)
@@ -108,6 +121,47 @@ namespace VRPublicSpeaking.AppShell.Results
             }
 
             return false;
+        }
+
+        private bool TryOpenDashboardScene()
+        {
+            string sceneName = ResolveDashboardSceneName();
+            if (string.IsNullOrWhiteSpace(sceneName))
+            {
+                return false;
+            }
+
+            if (!Application.CanStreamedLevelBeLoaded(sceneName))
+            {
+                Debug.LogWarning($"[DashboardAdapter] Dashboard scene '{sceneName}' is not in the build settings.");
+                return false;
+            }
+
+            TransitionManager transitionManager = TransitionManager.Instance;
+            if (transitionManager != null)
+            {
+                transitionManager.LoadScene(sceneName, dashboardLoadingMessage);
+            }
+            else
+            {
+                SceneManager.LoadScene(sceneName);
+            }
+
+            return true;
+        }
+
+        private bool CanOpenDashboardScene()
+        {
+            string sceneName = ResolveDashboardSceneName();
+            return !string.IsNullOrWhiteSpace(sceneName) &&
+                Application.CanStreamedLevelBeLoaded(sceneName);
+        }
+
+        private string ResolveDashboardSceneName()
+        {
+            return string.IsNullOrWhiteSpace(dashboardSceneName)
+                ? DefaultDashboardSceneName
+                : dashboardSceneName.Trim();
         }
 
         private IEnumerable<string> EnumerateOpenMessages()

@@ -930,11 +930,13 @@ namespace VRPublicSpeaking.AppShell.UI
                 pressedThisFrame = true;
             }
 
+#if ENABLE_LEGACY_INPUT_MANAGER
             if (Input.mousePresent && Input.GetMouseButtonDown(0))
             {
                 screenPosition = Input.mousePosition;
                 pressedThisFrame = true;
             }
+#endif
 
             return pressedThisFrame;
         }

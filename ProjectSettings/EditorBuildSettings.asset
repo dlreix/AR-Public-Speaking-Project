@@ -12,6 +12,9 @@ EditorBuildSettings:
     path: Assets/Scenes/ResultsScene.unity
     guid: e6905d699d3eba8429396a8d78003dc2
   - enabled: 1
+    path: Assets/Scenes/Overview.unity
+    guid: 0c03d9c5950023648839507caa08097b
+  - enabled: 1
     path: Assets/Scenes/Scene_Classroom.unity
     guid: eb6bf3f83ee131643b9e59034f707bb7
   - enabled: 1

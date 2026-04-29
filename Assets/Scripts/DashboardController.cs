@@ -3,6 +3,8 @@ using UnityEngine.UI;
 using TMPro;
 using System.Collections.Generic;
 using System.Text;
+using VRPublicSpeaking.AppShell.Core;
+using VRPublicSpeaking.AppShell.Data;
 
 public class DashboardController : MonoBehaviour
 {
@@ -43,6 +45,9 @@ public class DashboardController : MonoBehaviour
 
     void Start()
     {
+        EnsureDataManager();
+        ImportLatestAppShellResult();
+
         if (PerformanceScoringEngine.Instance != null)
         {
             PerformanceScoringEngine.Instance.OnScoreCalculated += HandleNewSessionData;
@@ -129,6 +134,28 @@ public class DashboardController : MonoBehaviour
     }
 
     // --- TÜM SAYFALARI GÜNCELLEYEN ANA FONKSÝYON ---
+    private void EnsureDataManager()
+    {
+        if (DataManager.Instance != null)
+        {
+            return;
+        }
+
+        GameObject dataManagerRoot = new GameObject("DataManager_Auto");
+        dataManagerRoot.AddComponent<DataManager>();
+    }
+
+    private void ImportLatestAppShellResult()
+    {
+        if (DataManager.Instance == null || !AppRuntimeState.HasInstance)
+        {
+            return;
+        }
+
+        SessionResultSummary latestSummary = AppRuntimeState.Instance.GetLastSessionResultCopy();
+        DataManager.Instance.SaveSession(latestSummary);
+    }
+
     public void DisplaySession(SessionData data)
     {
         if (data == null) return;
