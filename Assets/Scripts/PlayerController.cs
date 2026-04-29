@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.XR;
+using VRPublicSpeaking.AppShell.Core;
 
 /// <summary>
 /// VR-first player controller.
@@ -38,6 +39,8 @@ public class PlayerController : MonoBehaviour
 
     private CharacterController cc;
     private Camera cam;
+    private MainController mainController;
+    private AppRuntimeState appRuntimeState;
     private float rotX = 0f;
     private float verticalVelocity = 0f;
     private float xrCheckTimer = 0f;
@@ -51,6 +54,7 @@ public class PlayerController : MonoBehaviour
         EnsureCharacterController();
         EnsureCamera();
         CaptureInitialCameraPose();
+        ResolveRuntimeReferences();
 
         xrCheckTimer = Mathf.Max(0f, xrStartupCheckDuration);
         RefreshMode(forceApply: true);
@@ -77,6 +81,8 @@ public class PlayerController : MonoBehaviour
 
     void Update()
     {
+        ResolveRuntimeReferences();
+
         if (ShouldContinueXRStartupCheck())
         {
             xrCheckTimer -= Time.deltaTime;
@@ -86,6 +92,11 @@ public class PlayerController : MonoBehaviour
         switch (currentMode)
         {
             case ControlMode.DesktopTesting:
+                if (ShouldKeepDesktopCursorUnlocked())
+                {
+                    SetCursorLocked(false);
+                }
+
                 HandleDesktopCursorToggle();
                 HandleDesktopLook();
                 HandleDesktopMove();
@@ -142,7 +153,7 @@ public class PlayerController : MonoBehaviour
             return;
         }
 
-        if (FindObjectsOfType<AudioListener>().Length == 0)
+        if (FindObjectsByType<AudioListener>(FindObjectsSortMode.None).Length == 0)
         {
             cameraObject.AddComponent<AudioListener>();
         }
@@ -275,7 +286,7 @@ public class PlayerController : MonoBehaviour
             case ControlMode.DesktopTesting:
                 rotX = 0f;
                 PositionCameraForDesktopTesting();
-                SetCursorLocked(true);
+                SetCursorLocked(!ShouldKeepDesktopCursorUnlocked());
                 break;
 
             case ControlMode.Idle:
@@ -312,6 +323,16 @@ public class PlayerController : MonoBehaviour
 
     void HandleDesktopCursorToggle()
     {
+        if (ShouldKeepDesktopCursorUnlocked())
+        {
+            return;
+        }
+
+        if (ShouldReserveEscapeForSessionUi())
+        {
+            return;
+        }
+
         if (!GetEscapePressed())
         {
             return;
@@ -333,6 +354,11 @@ public class PlayerController : MonoBehaviour
 
     void HandleDesktopLook()
     {
+        if (ShouldKeepDesktopCursorUnlocked())
+        {
+            return;
+        }
+
         if (!lookEnabled)
         {
             return;
@@ -366,6 +392,12 @@ public class PlayerController : MonoBehaviour
 
     void HandleDesktopMove()
     {
+        if (ShouldKeepDesktopCursorUnlocked())
+        {
+            ApplyMotion(Vector3.zero);
+            return;
+        }
+
         if (!movementEnabled)
         {
             ApplyMotion(Vector3.zero);
@@ -416,5 +448,60 @@ public class PlayerController : MonoBehaviour
         Vector3 motion = horizontalVelocity;
         motion.y = verticalVelocity;
         cc.Move(motion * Time.deltaTime);
+    }
+
+    void ResolveRuntimeReferences()
+    {
+        if (mainController == null)
+        {
+            mainController = FindFirstObjectByType<MainController>(FindObjectsInactive.Include);
+        }
+
+        if (appRuntimeState == null && AppRuntimeState.HasInstance)
+        {
+            appRuntimeState = AppRuntimeState.Instance;
+        }
+    }
+
+    bool ShouldKeepDesktopCursorUnlocked()
+    {
+        if (currentMode != ControlMode.DesktopTesting)
+        {
+            return false;
+        }
+
+        if (mainController != null && (mainController.IsSessionPaused || mainController.IsInReview))
+        {
+            return true;
+        }
+
+        if (appRuntimeState == null)
+        {
+            return false;
+        }
+
+        var runtime = appRuntimeState.CurrentRuntimeState;
+        return runtime != null && (runtime.PauseMenuVisible || runtime.ResultsOverlayVisible);
+    }
+
+    bool ShouldReserveEscapeForSessionUi()
+    {
+        if (currentMode != ControlMode.DesktopTesting)
+        {
+            return false;
+        }
+
+        if (mainController != null && (mainController.IsSessionRunning || mainController.IsSessionPaused))
+        {
+            return true;
+        }
+
+        if (appRuntimeState == null)
+        {
+            return false;
+        }
+
+        var runtime = appRuntimeState.CurrentRuntimeState;
+        return runtime != null && (runtime.PauseMenuVisible || runtime.ResultsOverlayVisible);
     }
 }

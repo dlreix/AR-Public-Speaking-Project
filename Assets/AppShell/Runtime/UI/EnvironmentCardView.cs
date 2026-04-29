@@ -1,0 +1,459 @@
+using System;
+using System.Collections.Generic;
+using TMPro;
+using UnityEngine;
+using UnityEngine.UI;
+using VRPublicSpeaking.AppShell.Data;
+
+namespace VRPublicSpeaking.AppShell.UI
+{
+    public class EnvironmentCardView : MonoBehaviour
+    {
+        private const string DefaultMissingBadgeText = "Missing";
+        private const string DefaultUnavailableBadgeText = "Unavailable";
+        private const string DefaultMisconfiguredBadgeText = "Needs Setup";
+
+        [SerializeField] private TMP_Text titleLabel;
+        [SerializeField] private TMP_Text descriptionLabel;
+        [SerializeField] private Image previewImage;
+        [SerializeField] private Button selectButton;
+        [SerializeField] private GameObject selectionHighlight;
+        [SerializeField] private GameObject unavailableBadge;
+        [SerializeField] private TMP_Text badgeLabel;
+        [SerializeField] private Image badgeBackground;
+        [SerializeField] private TMP_Text stateLabel;
+        [SerializeField] private Image cardBackground;
+        [SerializeField] private TMP_Text buttonLabel;
+
+        private AppEnvironmentDefinition environmentDefinition;
+        private Action<EnvironmentCardView> onSelected;
+        private bool isSelected;
+        private static readonly Dictionary<string, Sprite> GeneratedPreviewSprites = new Dictionary<string, Sprite>();
+
+        private static readonly Color DefaultSurfaceColor = new Color(0.11f, 0.15f, 0.21f, 0.98f);
+        private static readonly Color SelectedSurfaceColor = new Color(0.14f, 0.20f, 0.31f, 0.99f);
+        private static readonly Color DisabledSurfaceColor = new Color(0.10f, 0.12f, 0.16f, 0.96f);
+        private static readonly Color WarningSurfaceColor = new Color(0.24f, 0.18f, 0.14f, 0.98f);
+        private static readonly Color ReadyAccentColor = new Color(0.72f, 0.84f, 0.96f, 1f);
+        private static readonly Color SelectedAccentColor = new Color(0.32f, 0.72f, 1f, 1f);
+        private static readonly Color WarningAccentColor = new Color(0.98f, 0.74f, 0.39f, 1f);
+        private static readonly Color DisabledAccentColor = new Color(0.53f, 0.59f, 0.66f, 1f);
+        private static readonly Color BadgeReadyColor = new Color(0.17f, 0.23f, 0.32f, 0.98f);
+        private static readonly Color BadgeWarningColor = new Color(0.34f, 0.23f, 0.14f, 0.98f);
+        private static readonly Color BadgeDisabledColor = new Color(0.18f, 0.19f, 0.23f, 0.98f);
+        private static readonly Color PrimaryButtonColor = new Color(0.21f, 0.63f, 0.96f, 1f);
+        private static readonly Color SuccessButtonColor = new Color(0.31f, 0.67f, 0.56f, 1f);
+        private static readonly Color DisabledButtonColor = new Color(0.20f, 0.24f, 0.30f, 0.98f);
+
+        public AppEnvironmentDefinition EnvironmentDefinition => environmentDefinition;
+
+        private void Awake()
+        {
+            AutoResolveIfNeeded();
+
+            if (selectButton != null)
+            {
+                selectButton.onClick.AddListener(NotifySelected);
+            }
+        }
+
+        public void Bind(AppEnvironmentDefinition definition, bool selected, Action<EnvironmentCardView> selectionCallback)
+        {
+            environmentDefinition = definition;
+            onSelected = selectionCallback;
+            isSelected = selected;
+
+            if (titleLabel != null)
+            {
+                titleLabel.text = definition?.DisplayName ?? "Unassigned";
+            }
+
+            if (descriptionLabel != null)
+            {
+                descriptionLabel.text = BuildDescription(definition);
+            }
+
+            if (previewImage != null)
+            {
+                if (definition?.PreviewSprite != null)
+                {
+                    previewImage.sprite = definition.PreviewSprite;
+                    previewImage.type = Image.Type.Simple;
+                    previewImage.preserveAspect = true;
+                    previewImage.color = Color.white;
+                }
+                else
+                {
+                    previewImage.sprite = GetGeneratedPreviewSprite(definition);
+                    previewImage.type = Image.Type.Simple;
+                    previewImage.preserveAspect = false;
+                    previewImage.color = Color.white;
+                }
+            }
+
+            RefreshVisualState();
+        }
+
+        public void SetSelected(bool selected)
+        {
+            isSelected = selected;
+
+            RefreshVisualState();
+        }
+
+        public void SetInteractable(bool interactable)
+        {
+            if (selectButton != null)
+            {
+                selectButton.interactable = interactable;
+            }
+        }
+
+        private void RefreshVisualState()
+        {
+            string badgeText = string.Empty;
+            string buttonText = "Select Room";
+            bool showBadge = false;
+            bool interactable = false;
+            Color stateColor = ReadyAccentColor;
+            Color surfaceColor = DefaultSurfaceColor;
+            Color badgeColor = BadgeReadyColor;
+            Color buttonColor = DisabledButtonColor;
+
+            if (selectionHighlight != null)
+            {
+                selectionHighlight.SetActive(isSelected && environmentDefinition != null && environmentDefinition.IsSelectable);
+            }
+
+            if (environmentDefinition == null)
+            {
+                showBadge = true;
+                badgeText = DefaultMissingBadgeText;
+                buttonText = DefaultMissingBadgeText;
+                stateColor = DisabledAccentColor;
+                surfaceColor = DisabledSurfaceColor;
+                badgeColor = BadgeDisabledColor;
+            }
+            else if (!environmentDefinition.Available)
+            {
+                showBadge = true;
+                badgeText = string.IsNullOrWhiteSpace(environmentDefinition.AvailabilityReason)
+                    ? DefaultUnavailableBadgeText
+                    : environmentDefinition.AvailabilityReason;
+                buttonText = DefaultUnavailableBadgeText;
+                stateColor = DisabledAccentColor;
+                surfaceColor = DisabledSurfaceColor;
+                badgeColor = BadgeDisabledColor;
+            }
+            else if (environmentDefinition.IsMisconfigured)
+            {
+                showBadge = true;
+                badgeText = DefaultMisconfiguredBadgeText;
+                buttonText = DefaultMisconfiguredBadgeText;
+                stateColor = WarningAccentColor;
+                surfaceColor = WarningSurfaceColor;
+                badgeColor = BadgeWarningColor;
+            }
+            else
+            {
+                interactable = true;
+                stateColor = isSelected ? SelectedAccentColor : ReadyAccentColor;
+                surfaceColor = isSelected ? SelectedSurfaceColor : DefaultSurfaceColor;
+                badgeColor = BadgeReadyColor;
+                buttonColor = isSelected ? SuccessButtonColor : PrimaryButtonColor;
+                buttonText = isSelected ? "Selected" : "Select Room";
+            }
+
+            if (stateLabel != null)
+            {
+                stateLabel.text = BuildStateText();
+                stateLabel.color = stateColor;
+            }
+
+            if (cardBackground != null)
+            {
+                cardBackground.color = surfaceColor;
+            }
+
+            if (badgeLabel != null)
+            {
+                badgeLabel.text = badgeText;
+                badgeLabel.color = showBadge && environmentDefinition != null && environmentDefinition.IsMisconfigured
+                    ? new Color(1f, 0.93f, 0.85f, 1f)
+                    : Color.white;
+            }
+
+            if (badgeBackground != null)
+            {
+                badgeBackground.color = badgeColor;
+            }
+
+            if (selectButton != null)
+            {
+                selectButton.interactable = interactable;
+
+                if (buttonLabel != null)
+                {
+                    buttonLabel.text = buttonText;
+                    buttonLabel.color = Color.white;
+                }
+
+                Image buttonImage = selectButton.targetGraphic as Image;
+                if (buttonImage != null)
+                {
+                    buttonImage.color = interactable ? buttonColor : DisabledButtonColor;
+                }
+
+                ColorBlock colors = selectButton.colors;
+                colors.normalColor = Color.white;
+                colors.highlightedColor = new Color(0.94f, 0.94f, 0.94f, 1f);
+                colors.pressedColor = new Color(0.86f, 0.86f, 0.86f, 1f);
+                colors.selectedColor = Color.white;
+                colors.disabledColor = new Color(0.72f, 0.72f, 0.72f, 1f);
+                colors.fadeDuration = 0.08f;
+                selectButton.colors = colors;
+
+                if (!interactable && buttonLabel != null)
+                {
+                    buttonLabel.color = new Color(0.84f, 0.87f, 0.92f, 1f);
+                }
+            }
+
+            if (unavailableBadge != null)
+            {
+                unavailableBadge.SetActive(showBadge);
+            }
+        }
+
+        private void NotifySelected()
+        {
+            onSelected?.Invoke(this);
+        }
+
+        private void AutoResolveIfNeeded()
+        {
+            if (selectButton == null)
+            {
+                selectButton = GetComponentInChildren<Button>(true);
+            }
+
+            if (cardBackground == null)
+            {
+                cardBackground = GetComponent<Image>();
+            }
+
+            Image[] images = GetComponentsInChildren<Image>(true);
+            for (int index = 0; index < images.Length; index++)
+            {
+                Image image = images[index];
+                if (image == null)
+                {
+                    continue;
+                }
+
+                string imageName = image.gameObject.name;
+                if (previewImage == null && ContainsIgnoreCase(imageName, "Preview"))
+                {
+                    previewImage = image;
+                }
+                else if (badgeBackground == null && ContainsIgnoreCase(imageName, "Badge"))
+                {
+                    badgeBackground = image;
+                }
+            }
+
+            TMP_Text[] texts = GetComponentsInChildren<TMP_Text>(true);
+            for (int index = 0; index < texts.Length; index++)
+            {
+                TMP_Text text = texts[index];
+                if (text == null)
+                {
+                    continue;
+                }
+
+                string textName = text.gameObject.name;
+                if (titleLabel == null && ContainsIgnoreCase(textName, "Title"))
+                {
+                    titleLabel = text;
+                }
+                else if (descriptionLabel == null && ContainsIgnoreCase(textName, "Description"))
+                {
+                    descriptionLabel = text;
+                }
+                else if (stateLabel == null && ContainsIgnoreCase(textName, "State"))
+                {
+                    stateLabel = text;
+                }
+                else if (badgeLabel == null && ContainsIgnoreCase(textName, "Badge"))
+                {
+                    badgeLabel = text;
+                }
+                else if (buttonLabel == null && ContainsIgnoreCase(textName, "Button"))
+                {
+                    buttonLabel = text;
+                }
+            }
+        }
+
+        private static Sprite GetGeneratedPreviewSprite(AppEnvironmentDefinition definition)
+        {
+            string key = definition != null && !string.IsNullOrWhiteSpace(definition.Id)
+                ? definition.Id
+                : "fallback";
+
+            if (GeneratedPreviewSprites.TryGetValue(key, out Sprite cachedSprite) && cachedSprite != null)
+            {
+                return cachedSprite;
+            }
+
+            Color topColor;
+            Color bottomColor;
+            Color accentColor;
+            ResolvePreviewPalette(key, out topColor, out bottomColor, out accentColor);
+
+            const int width = 96;
+            const int height = 54;
+            var texture = new Texture2D(width, height, TextureFormat.RGBA32, false)
+            {
+                name = $"GeneratedPreview_{key}",
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Bilinear
+            };
+
+            Color32[] pixels = new Color32[width * height];
+            for (int y = 0; y < height; y++)
+            {
+                float vertical = height <= 1 ? 0f : y / (float)(height - 1);
+                Color rowColor = Color.Lerp(bottomColor, topColor, vertical);
+                for (int x = 0; x < width; x++)
+                {
+                    float stripe = Mathf.Sin((x * 0.18f) + (y * 0.08f)) * 0.5f + 0.5f;
+                    Color pixelColor = Color.Lerp(rowColor, accentColor, stripe * 0.10f);
+
+                    bool floorLine = y < 8 && x > 8 && x < width - 8;
+                    bool stageLine = y > 34 && y < 38 && x > 12 && x < width - 12;
+                    if (floorLine || stageLine)
+                    {
+                        pixelColor = Color.Lerp(pixelColor, accentColor, 0.50f);
+                    }
+
+                    pixels[(y * width) + x] = pixelColor;
+                }
+            }
+
+            texture.SetPixels32(pixels);
+            texture.Apply();
+
+            Sprite sprite = Sprite.Create(
+                texture,
+                new Rect(0f, 0f, width, height),
+                new Vector2(0.5f, 0.5f),
+                100f);
+            sprite.name = $"GeneratedPreviewSprite_{key}";
+            GeneratedPreviewSprites[key] = sprite;
+            return sprite;
+        }
+
+        private static void ResolvePreviewPalette(
+            string key,
+            out Color topColor,
+            out Color bottomColor,
+            out Color accentColor)
+        {
+            string normalized = key ?? string.Empty;
+            if (ContainsIgnoreCase(normalized, "conference"))
+            {
+                topColor = new Color(0.42f, 0.26f, 0.22f, 1f);
+                bottomColor = new Color(0.13f, 0.17f, 0.24f, 1f);
+                accentColor = new Color(0.98f, 0.63f, 0.28f, 1f);
+                return;
+            }
+
+            if (ContainsIgnoreCase(normalized, "meeting"))
+            {
+                topColor = new Color(0.30f, 0.40f, 0.48f, 1f);
+                bottomColor = new Color(0.10f, 0.16f, 0.21f, 1f);
+                accentColor = new Color(0.67f, 0.86f, 1f, 1f);
+                return;
+            }
+
+            topColor = new Color(0.34f, 0.45f, 0.36f, 1f);
+            bottomColor = new Color(0.12f, 0.18f, 0.22f, 1f);
+            accentColor = new Color(0.98f, 0.83f, 0.52f, 1f);
+        }
+
+        private string BuildStateText()
+        {
+            if (environmentDefinition == null)
+            {
+                return "Missing";
+            }
+
+            if (!environmentDefinition.Available)
+            {
+                return "Unavailable";
+            }
+
+            if (environmentDefinition.IsMisconfigured)
+            {
+                return "Needs Setup";
+            }
+
+            return isSelected ? "Selected" : "Ready";
+        }
+
+        private static string BuildDescription(AppEnvironmentDefinition definition)
+        {
+            if (definition == null)
+            {
+                return string.Empty;
+            }
+
+            string primary = CompactLine(definition.Description, 72);
+            string secondary = !string.IsNullOrWhiteSpace(definition.RecommendedModeLabel)
+                ? $"Mode: {CompactLine(definition.RecommendedModeLabel, 28)}"
+                : (!string.IsNullOrWhiteSpace(definition.AudienceHint)
+                    ? $"Audience: {CompactLine(definition.AudienceHint, 28)}"
+                    : string.Empty);
+
+            if (string.IsNullOrWhiteSpace(primary))
+            {
+                return secondary;
+            }
+
+            if (string.IsNullOrWhiteSpace(secondary))
+            {
+                return primary;
+            }
+
+            return $"{primary}\n{secondary}";
+        }
+
+        private static string CompactLine(string value, int maxLength)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return string.Empty;
+            }
+
+            string compact = value.Replace("\r", " ").Replace("\n", " ").Trim();
+            while (compact.Contains("  ", StringComparison.Ordinal))
+            {
+                compact = compact.Replace("  ", " ", StringComparison.Ordinal);
+            }
+
+            if (compact.Length <= maxLength)
+            {
+                return compact;
+            }
+
+            return compact.Substring(0, Math.Max(0, maxLength - 3)).TrimEnd() + "...";
+        }
+
+        private static bool ContainsIgnoreCase(string source, string value)
+        {
+            return !string.IsNullOrWhiteSpace(source) &&
+                source.IndexOf(value, StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+    }
+}

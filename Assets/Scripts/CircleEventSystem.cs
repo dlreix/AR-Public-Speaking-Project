@@ -101,8 +101,7 @@ public class CircleEventSystem : MonoBehaviour, IGazeEvent
 
     void Awake()
     {
-        if (mainCamera != null)
-            camTransform = mainCamera.transform;
+        ResolveCameraTransform();
         Debug.Log("[CircleEventSystem] Initialized. Spawn points: " + (spawnPoints != null ? spawnPoints.Length.ToString() : "0"));
     }
 
@@ -152,7 +151,8 @@ public class CircleEventSystem : MonoBehaviour, IGazeEvent
         if (coordinator != null) coordinator.ForceAcquire(this);
 
         eventActive = true;
-        eyeTracking.SetPaused(true);
+        if (eyeTracking != null)
+            eyeTracking.SetPaused(TrackingPauseSource.CircleEvent, true);
         nextSpawnTimer = 1f;
         Debug.Log("[CircleEventSystem] Event started. First circle spawns in 1s.");
     }
@@ -167,7 +167,8 @@ public class CircleEventSystem : MonoBehaviour, IGazeEvent
             currentCircle = null;
         }
 
-        eyeTracking.SetPaused(false);
+        if (eyeTracking != null)
+            eyeTracking.SetPaused(TrackingPauseSource.CircleEvent, false);
         coordinator?.Release(this);
         Debug.Log("[CircleEventSystem] Event stopped.");
     }
@@ -200,7 +201,8 @@ public class CircleEventSystem : MonoBehaviour, IGazeEvent
             fillDuration, canvasScale, bgSize,
             fillRingSize, outerGlowSize, colliderSize,
             OnCircleComplete,
-            standardShader, spritesDefaultShader, particlesUnlitShader
+            standardShader, spritesDefaultShader, particlesUnlitShader,
+            camTransform
         );
 
         Debug.Log("[CircleEventSystem] Circle spawned at spawn point #" + index + " — fill duration: " + fillDuration + "s");
@@ -208,6 +210,9 @@ public class CircleEventSystem : MonoBehaviour, IGazeEvent
 
     void CheckGazeOnCircle()
     {
+        if (!ResolveCameraTransform())
+            return;
+
         Ray ray = new Ray(camTransform.position, camTransform.forward);
         RaycastHit hit;
 
@@ -236,6 +241,19 @@ public class CircleEventSystem : MonoBehaviour, IGazeEvent
         int layer = 0;
         while (val > 1) { val >>= 1; layer++; }
         return layer;
+    }
+
+    bool ResolveCameraTransform()
+    {
+        if (mainCamera == null)
+            mainCamera = Camera.main;
+
+        if (mainCamera != null)
+        {
+            camTransform = mainCamera.transform;
+        }
+
+        return camTransform != null;
     }
 }
 
@@ -279,11 +297,12 @@ public class CircleTarget : MonoBehaviour
     public void Setup(float fill, float scale, float bg,
                       float ring, float glow, float colRadius,
                       System.Action callback,
-                      Shader standardShader, Shader spritesDefaultShader, Shader particlesUnlitShader)
+                      Shader standardShader, Shader spritesDefaultShader, Shader particlesUnlitShader,
+                      Transform cameraTransform = null)
     {
         fillDuration = fill;
         onCompleted = callback;
-        camTransform = Camera.main.transform;
+        camTransform = cameraTransform != null ? cameraTransform : Camera.main != null ? Camera.main.transform : null;
 
         // Shader referanslarını sakla
         _standardShader       = standardShader;
@@ -308,6 +327,8 @@ public class CircleTarget : MonoBehaviour
     void Update()
     {
         if (isCompleted) return;
+        if (!TryResolveRuntimeReferences())
+            return;
 
         // Ring her zaman kameraya baksın
         ringLine.transform.LookAt(camTransform);
@@ -357,12 +378,27 @@ public class CircleTarget : MonoBehaviour
     {
         isCompleted = true;
 
-        sphereObj.SetActive(false);
-        ringLine.gameObject.SetActive(false);
+        if (sphereObj != null)
+            sphereObj.SetActive(false);
 
-        burstVFX.Play();
+        if (ringLine != null)
+            ringLine.gameObject.SetActive(false);
+
+        if (burstVFX != null)
+            burstVFX.Play();
         onCompleted?.Invoke();
         Destroy(gameObject, 2f);
+    }
+
+    bool TryResolveRuntimeReferences()
+    {
+        if (ringLine == null || sphereObj == null || sphereMat == null)
+            return false;
+
+        if (camTransform == null && Camera.main != null)
+            camTransform = Camera.main.transform;
+
+        return camTransform != null;
     }
 
     // ──────────────────────────────────────────────
