@@ -1,5 +1,6 @@
 using TMPro;
 using UnityEngine;
+using System;
 using System.Collections.Generic;
 
 [System.Serializable]
@@ -90,9 +91,12 @@ public class FeedbackReport
 }
 
 public class PerformanceScoringEngine : MonoBehaviour
-{ 
+{
+    public static PerformanceScoringEngine Instance { get; private set; }
+    public event Action<FeedbackReport> OnScoreCalculated;
+
     //  UI
-   
+
     [Header("UI — Skor Metinleri")]
     public TextMeshProUGUI finalScoreText;
     public TextMeshProUGUI speechScoreText;
@@ -121,8 +125,8 @@ public class PerformanceScoringEngine : MonoBehaviour
     public string strongestArea;
     public string weakestArea;
 
-    
-    //  weights 
+
+    //  weights
 
     [Header("Speech Score Weights")]
     [Range(0f, 1f)] public float wpmWeight    = 0.35f;
@@ -135,7 +139,7 @@ public class PerformanceScoringEngine : MonoBehaviour
     [Range(0f, 1f)] public float eyeFinalWeight     = 0.35f;
     [Range(0f, 1f)] public float postureFinalWeight = 0.25f;
 
-    
+
     [Header("WPM Target Range")]
     public float idealWpmMin = 120f;    public float idealWpmMax = 160f;
     public float minAcceptableWpm = 80f; public float maxAcceptableWpm = 220f;
@@ -153,9 +157,9 @@ public class PerformanceScoringEngine : MonoBehaviour
     public float crossedArmsPenalty = 0.4f;
 
     [Header("Feedback Thresholds")]
-   
+
     [Range(50f, 90f)] public float strengthThreshold      = 75f;
-   
+
     [Range(20f, 60f)] public float majorWeaknessThreshold = 50f;
 
     [Header("Auto Recalculate")]
@@ -163,7 +167,23 @@ public class PerformanceScoringEngine : MonoBehaviour
 
     private FeedbackReport lastReport;
 
-    private void Start()   { CalculateSessionScore(); }
+    private void Awake()
+    {
+        if (Instance == null || Instance == this)
+        {
+            Instance = this;
+        }
+    }
+
+    private void OnDestroy()
+    {
+        if (Instance == this)
+        {
+            Instance = null;
+        }
+    }
+
+    private void Start() { CalculateSessionScore(false); }
 
     private void Update()
     {
@@ -173,6 +193,11 @@ public class PerformanceScoringEngine : MonoBehaviour
 
     [ContextMenu("Calculate Session Score")]
     public void CalculateSessionScore()
+    {
+        CalculateSessionScore(true);
+    }
+
+    private void CalculateSessionScore(bool notifyListeners)
     {
         scoreBreakdown.speechScore  = CalculateSpeechScore();
         scoreBreakdown.eyeScore     = CalculateEyeScore();
@@ -190,6 +215,10 @@ public class PerformanceScoringEngine : MonoBehaviour
         lastReport = BuildFeedbackReport();
 
         UpdateUI();
+        if (notifyListeners)
+        {
+            OnScoreCalculated?.Invoke(lastReport);
+        }
 
         Debug.Log(
             $"[PerformanceScoringEngine] Speech={scoreBreakdown.speechScore:F1} " +
