@@ -16,6 +16,26 @@ public class SpeechAdapter : MonoBehaviour
     [Header("References")]
     [SerializeField] private PerformanceScoringEngine scoringEngine;
 
+    private void Awake()
+    {
+        AutoWireIfNeeded();
+    }
+
+    public void SetScoringEngine(PerformanceScoringEngine engine)
+    {
+        scoringEngine = engine;
+    }
+
+    public bool AutoWireIfNeeded()
+    {
+        if (scoringEngine == null)
+        {
+            scoringEngine = FindFirstObjectByType<PerformanceScoringEngine>(FindObjectsInactive.Include);
+        }
+
+        return scoringEngine != null;
+    }
+
     /// <summary>
     /// Arkadaş 4'ün ReportGenerator.cs bu metodu çağırır.
     /// Parametreler:
@@ -27,6 +47,8 @@ public class SpeechAdapter : MonoBehaviour
     public void OnSpeechAnalysisComplete(float wpm, float fillerPerMin,
                                           float avgPause, float toneScore)
     {
+        AutoWireIfNeeded();
+
         if (scoringEngine == null)
         {
             Debug.LogWarning("[SpeechAdapter] Scoring Engine bağlı değil!");

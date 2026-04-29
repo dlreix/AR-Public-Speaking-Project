@@ -2,6 +2,7 @@ using System;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using UnityEngine;
+using SpeechPipeline;
 using VRPublicSpeaking.AppShell.Core;
 using VRPublicSpeaking.AppShell.Data;
 using VRPublicSpeaking.AppShell.UI;
@@ -17,6 +18,8 @@ namespace VRPublicSpeaking.AppShell.Integration
         [SerializeField] private PlayerRigAdapter playerRigAdapter;
         [SerializeField] private TrackingAdapter trackingAdapter;
         [SerializeField] private ScoringAdapter scoringAdapter;
+        [SerializeField] private SpeechAdapter speechAdapter;
+        [SerializeField] private SpeechPipelineController speechPipelineController;
         [SerializeField] private ExistingSceneFlowAdapter existingSceneFlowAdapter;
         [SerializeField] private EnvironmentSessionOverlayController environmentSessionOverlayController;
         [SerializeField] private bool installOnStart = true;
@@ -60,6 +63,7 @@ namespace VRPublicSpeaking.AppShell.Integration
             bool movedToSpawn = playerRigAdapter.TryMoveToSpawn(config.SelectedSpawnPointName);
             trackingAdapter.Apply(config);
             scoringAdapter.AutoWireIfNeeded();
+            EnsureSpeechSystem(config);
             existingSceneFlowAdapter.AutoWireIfNeeded();
             existingSceneFlowAdapter.Configure(runtimeState, config);
             environmentSessionOverlayController?.Configure(
@@ -86,6 +90,34 @@ namespace VRPublicSpeaking.AppShell.Integration
         {
             T component = GetComponent<T>();
             return component != null ? component : gameObject.AddComponent<T>();
+        }
+
+        private void EnsureSpeechSystem(SessionConfig config)
+        {
+            if (config == null || !config.VoiceAnalysisEnabled)
+            {
+                return;
+            }
+
+            speechAdapter ??= FindFirstObjectByType<SpeechAdapter>(FindObjectsInactive.Include);
+            if (speechAdapter == null)
+            {
+                speechAdapter = GetComponent<SpeechAdapter>() ?? gameObject.AddComponent<SpeechAdapter>();
+            }
+
+            PerformanceScoringEngine scoringEngine =
+                FindFirstObjectByType<PerformanceScoringEngine>(FindObjectsInactive.Include);
+            speechAdapter.SetScoringEngine(scoringEngine);
+
+            speechPipelineController ??= FindFirstObjectByType<SpeechPipelineController>(FindObjectsInactive.Include);
+            if (speechPipelineController == null)
+            {
+                GameObject speechRoot = new GameObject("SpeechPipeline_Auto");
+                speechPipelineController = speechRoot.AddComponent<SpeechPipelineController>();
+            }
+
+            speechPipelineController.SpeechAdapter = speechAdapter;
+            speechPipelineController.ScoringEngine = scoringEngine;
         }
 
         private void EnsureEnvironmentRuntimeStack(Camera sceneCamera)
