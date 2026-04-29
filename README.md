@@ -418,3 +418,30 @@ Use this mapping:
 | Show post-session data | `ResultsSummaryPresenter` or dashboard module |
 
 The safest approach is to connect modules through small adapters and keep the shell responsible only for navigation, setup state, pause/results display, and demo flow.
+
+---
+
+# Proje Mimarisi ve Sistem Entegrasyon Raporu (Turkish)
+
+Bu bölüm, projede yer alan modüllerin, sahnelerin ve kod yapılarının nasıl çalıştığını takım üyelerine özetlemek amacıyla eklenmiştir. Proje "Modüler ve Gevşek Bağlı (Loosely Coupled)" bir mimariyle inşa edilmiş olup, her sistemin kendi işini bağımsız yaptığı ve "Adapter" scriptleri üzerinden haberleştiği modern bir yapıya sahiptir.
+
+## 1. Genel Mimari Özeti
+
+1. **App Shell:** Kullanıcının ana menüde (Dashboard) ayarları yaptığı, eğitim sahnelerini başlatan, oturum durumunu yöneten ve HUD (gözlük içi uyarı) çizen temel sistem.
+2. **Audience Simulation:** Salonda oturan seyircilerin davranışlarını, tepkilerini ve animasyonlarını otonom olarak yöneten sistem (Arda'nın modülü).
+3. **Speech Pipeline:** Çevrimdışı (offline) Vosk kütüphanesini kullanarak sesi metne çeviren, konuşma hızını (WPM) ve dolgu kelimelerini hesaplayan motor.
+4. **Performance Scoring:** Göz teması, duruş (posture) ve ses analizi sonuçlarını birleştirip 100 üzerinden nihai skor ve geri bildirim raporu üreten puanlama motoru.
+
+## 2. Temel Çalışma Mantıkları
+
+*   **Dinamik Kurulum (Runtime Injection):** `EnvironmentSceneInstaller.cs` sayesinde sahnede eksik olan tüm sistemler (Puanlama motoru, Seyirci, Ses adaptörü) kod ile anında yaratılıp eklenir. Sahnelerde manuel obje kalabalığına gerek yoktur.
+*   **Seyirci Sistemi:** `AudienceSpawner.cs` sahnedeki bank veya koltukları bulur ve seyircileri otomatik yerleştirir. Kullanıcının skoruna (Örn: düşük konuşma hızı) göre seyircilerin sıkılma animasyonları dinamik tetiklenir.
+*   **Ses Analizi (Vosk):** Ses analizi 40 MB'lık (vosk-model-small) model üzerinden tamamen RAM üzerinde çevrimdışı işlenir. İnternet gerektirmez ve ses dosyası kaydetmez.
+*   **Göz Takibi ve Etkileşim:** `MainController.cs` gözlüğün nereye baktığını takip eder. Çakışan arayüzleri başlangıçta temizler (Auto-Cleanup).
+*   **Prosedürel Sahneler:** Sınıf ve Konferans salonları `ClassroomGenerator.cs` gibi scriptlerle tek butona basılarak geometrik olarak baştan yaratılır.
+
+## 3. Takım İçin Geliştirme Notları
+
+1.  **Vosk Dil Modeli:** Ses motoru `Assets/StreamingAssets/vosk-model-small-en-us-0.15` (veya ilgili TR modeli) üzerinden çalışır. Repoyu indiren kişilerin modeli internetten indirip zipten çıkararak tam bu isimle klasöre atması şarttır (Büyük dosyalar GitHub'da barındırılmaz).
+2.  **Sistem Çökmez:** Sahnelerden yanlışlıkla obje silseniz bile sistem çökmez; `EnvironmentSceneInstaller` başlatıldığı anda tüm altyapıyı kodla yeniden inşa eder.
+3.  **UI Çakışmaları:** Eski test Canvas'ları sahnede bulunursa otomatik silinir. Yeni panelleri doğrudan `AppShell` sisteminin "Overlay" yapısına bağlamalısınız.
