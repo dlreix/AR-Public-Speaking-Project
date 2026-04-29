@@ -107,6 +107,13 @@ namespace VRPublicSpeaking.AppShell.Integration
 
             PerformanceScoringEngine scoringEngine =
                 FindFirstObjectByType<PerformanceScoringEngine>(FindObjectsInactive.Include);
+            
+            if (scoringEngine == null)
+            {
+                GameObject scoringRoot = new GameObject("PerformanceScoringEngine_Auto");
+                scoringEngine = scoringRoot.AddComponent<PerformanceScoringEngine>();
+            }
+
             speechAdapter.SetScoringEngine(scoringEngine);
 
             speechPipelineController ??= FindFirstObjectByType<SpeechPipelineController>(FindObjectsInactive.Include);

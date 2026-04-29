@@ -23,7 +23,7 @@ namespace VRPublicSpeaking.AppShell.Data
         [SerializeField] private bool eyeTrackingEnabled = true;
         [SerializeField] private bool gazeScoringEnabled = true;
         [SerializeField] private bool performanceScoringEnabled = true;
-        [SerializeField] private bool voiceAnalysisEnabled = false;
+        [SerializeField] private bool voiceAnalysisEnabled = true;
         [SerializeField] private bool postureAnalysisEnabled = false;
         [SerializeField] private FeedbackLevel feedbackLevel = FeedbackLevel.Standard;
         [SerializeField] private bool autoStartOnSceneLoad = true;
@@ -221,7 +221,7 @@ namespace VRPublicSpeaking.AppShell.Data
             eyeTrackingEnabled = true;
             gazeScoringEnabled = true;
             performanceScoringEnabled = true;
-            voiceAnalysisEnabled = false;
+            voiceAnalysisEnabled = true;
             postureAnalysisEnabled = false;
             feedbackLevel = FeedbackLevel.Standard;
             autoStartOnSceneLoad = true;

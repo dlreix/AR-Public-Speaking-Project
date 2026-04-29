@@ -254,7 +254,7 @@ namespace VRPublicSpeaking.AppShell.UI
             SetToggleWithoutNotify(eyeTrackingToggle, true);
             SetToggleWithoutNotify(gazeScoringToggle, true);
             SetToggleWithoutNotify(performanceScoringToggle, true);
-            SetToggleWithoutNotify(voiceAnalysisToggle, false);
+            SetToggleWithoutNotify(voiceAnalysisToggle, true);
             SetToggleWithoutNotify(postureAnalysisToggle, false);
 
             PushCurrentUIToRuntime();

@@ -66,6 +66,11 @@ public class MainController : MonoBehaviour
     private float stareFadeTimer;
     private float headFadeTimer;
 
+    private string currentHeadWarningMsg = "";
+    private float currentHeadWarningAlpha = 0f;
+    private string currentStareWarningMsg = "";
+    private float currentStareWarningAlpha = 0f;
+
     private bool xrPrimaryWasPressed;
     private bool xrSecondaryWasPressed;
     private bool xrGripWasPressed;
@@ -102,13 +107,17 @@ public class MainController : MonoBehaviour
             return false;
         }
 
-        if (TryGetActiveWarningState(headWarningText, out message, out alpha))
+        if (currentHeadWarningAlpha > 0.01f)
         {
+            message = currentHeadWarningMsg;
+            alpha = currentHeadWarningAlpha;
             return true;
         }
 
-        if (TryGetActiveWarningState(stareWarningText, out message, out alpha))
+        if (currentStareWarningAlpha > 0.01f)
         {
+            message = currentStareWarningMsg;
+            alpha = currentStareWarningAlpha;
             return true;
         }
 
@@ -117,6 +126,17 @@ public class MainController : MonoBehaviour
 
     void Start()
     {
+        // Eski (Legacy) Canvas objesi sahnede kalmışsa ve App Shell arayüzü ile çakışıyorsa onu otomatik yok et.
+        if (statusText != null)
+        {
+            Canvas legacyCanvas = statusText.GetComponentInParent<Canvas>();
+            if (legacyCanvas != null && legacyCanvas.name == "Canvas")
+            {
+                Debug.Log("[MainController] Auto-destroying legacy Canvas to prevent App Shell UI overlap.");
+                Destroy(legacyCanvas.gameObject);
+            }
+        }
+
         List<InputDevice> headDevices = new List<InputDevice>();
         InputDevices.GetDevicesWithCharacteristics(InputDeviceCharacteristics.HeadMounted, headDevices);
         isVRMode = headDevices.Count > 0;
@@ -502,42 +522,53 @@ public class MainController : MonoBehaviour
         if (eyeTracking == null)
             return;
 
-        UpdateFadingWarning(
-            stareWarningText,
+        UpdateVirtualWarning(
             eyeTracking.IsStareWarning,
             "Çok uzun süredir aynı yere bakıyorsun!",
-            ref stareFadeTimer, 1f);
+            ref stareFadeTimer, 1f, ref currentStareWarningMsg, ref currentStareWarningAlpha, stareWarningText);
 
-        UpdateFadingWarning(
-            headWarningText,
+        UpdateVirtualWarning(
             eyeTracking.IsHeadWarning,
             "Kafanı çok hızlı çeviriyorsun!\nDaha sakin ve akıcı hareketler yap.",
-            ref headFadeTimer, 1.5f);
+            ref headFadeTimer, 1.5f, ref currentHeadWarningMsg, ref currentHeadWarningAlpha, headWarningText);
     }
 
-    void UpdateFadingWarning(Text textElement, bool isActive, string message, ref float fadeTimer, float fadeDelay)
+    void UpdateVirtualWarning(bool isActive, string message, ref float fadeTimer, float fadeDelay, ref string currentMsg, ref float currentAlpha, Text legacyText)
     {
-        if (textElement == null) return;
-
         if (isActive)
         {
-            textElement.gameObject.SetActive(true);
-            textElement.text = message;
-            Color c = textElement.color;
-            c.a = 1f;
-            textElement.color = c;
+            currentMsg = message;
+            currentAlpha = 1f;
             fadeTimer = 0f;
+            if (legacyText != null)
+            {
+                legacyText.gameObject.SetActive(true);
+                legacyText.text = message;
+                Color c = legacyText.color;
+                c.a = 1f;
+                legacyText.color = c;
+            }
         }
-        else if (textElement.gameObject.activeSelf)
+        else if (currentAlpha > 0f)
         {
             fadeTimer += Time.deltaTime;
             if (fadeTimer > fadeDelay)
             {
-                Color c = textElement.color;
-                c.a -= Time.deltaTime;
-                textElement.color = c;
-                if (c.a <= 0f)
-                    textElement.gameObject.SetActive(false);
+                currentAlpha -= Time.deltaTime;
+                if (currentAlpha <= 0f)
+                {
+                    currentAlpha = 0f;
+                    currentMsg = "";
+                }
+                
+                if (legacyText != null && legacyText.gameObject.activeSelf)
+                {
+                    Color c = legacyText.color;
+                    c.a = currentAlpha;
+                    legacyText.color = c;
+                    if (currentAlpha <= 0f)
+                        legacyText.gameObject.SetActive(false);
+                }
             }
         }
     }
@@ -574,30 +605,7 @@ public class MainController : MonoBehaviour
         if (t != null) t.gameObject.SetActive(active);
     }
 
-    static bool TryGetActiveWarningState(Text textElement, out string message, out float alpha)
-    {
-        message = string.Empty;
-        alpha = 0f;
 
-        if (textElement == null || !textElement.gameObject.activeSelf)
-        {
-            return false;
-        }
-
-        if (string.IsNullOrWhiteSpace(textElement.text))
-        {
-            return false;
-        }
-
-        alpha = textElement.color.a;
-        if (alpha <= 0.01f)
-        {
-            return false;
-        }
-
-        message = textElement.text;
-        return true;
-    }
 
     float GetCurrentElapsedSessionTime()
     {

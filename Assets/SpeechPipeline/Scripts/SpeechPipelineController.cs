@@ -24,7 +24,7 @@ namespace SpeechPipeline
 
         [Header("STT")]
         [Tooltip("Subfolder name inside StreamingAssets")]
-        public string ModelFolder   = "vosk-model-en-us-0.42-gigaspeech";
+        public string ModelFolder   = "vosk-model-small-en-us-0.15";
         public int    SampleRate    = 16000;
 
         [Header("Pause Detection")]

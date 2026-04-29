@@ -29,3 +29,6 @@ sysinfo.txt
 
 # VSCode
 .vscode/
+
+# Speech Models (Do not push 1.8GB files to GitHub)
+Assets/StreamingAssets/vosk-model*
