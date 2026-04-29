@@ -688,6 +688,8 @@ MonoBehaviour:
   reviewInfoText: {fileID: 1492976291}
   mouseSensitivity: 2
   lockCursor: 1
+  allowRuntimeInput: 1
+  allowAutomaticReview: 1
 --- !u!4 &389982917
 Transform:
   m_ObjectHideFlags: 0

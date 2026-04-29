@@ -53749,6 +53749,9 @@ MonoBehaviour:
   voiceAnalysisToggle: {fileID: 725649427}
   postureAnalysisToggle: {fileID: 118890216}
   summaryPreviewLabel: {fileID: 1727839622}
+  recommendedDemoSetupButton: {fileID: 0}
+  recommendedDemoSetupLabel: {fileID: 0}
+  createRecommendedDemoSetupButton: 1
 --- !u!114 &1839046821
 MonoBehaviour:
   m_ObjectHideFlags: 0

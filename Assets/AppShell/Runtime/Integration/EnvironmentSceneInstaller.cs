@@ -5,6 +5,9 @@ using UnityEngine;
 using VRPublicSpeaking.AppShell.Core;
 using VRPublicSpeaking.AppShell.Data;
 using VRPublicSpeaking.AppShell.UI;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 namespace VRPublicSpeaking.AppShell.Integration
 {
@@ -162,6 +165,52 @@ namespace VRPublicSpeaking.AppShell.Integration
                 mainController.gazeScoringSystem ??= gazeScoringSystem;
                 mainController.playerHead ??= sceneCamera != null ? sceneCamera.transform : null;
                 mainController.mainCamera ??= sceneCamera;
+                
+                EnsureMainControllerUIReferences(mainController);
+            }
+
+            EnsureAudienceSystem();
+        }
+
+        private void EnsureAudienceSystem()
+        {
+            // 1. Adapter var mi?
+            AudienceIntegrationAdapter adapter = FindFirstObjectByType<AudienceIntegrationAdapter>(FindObjectsInactive.Include);
+            if (adapter == null)
+            {
+                adapter = gameObject.AddComponent<AudienceIntegrationAdapter>();
+            }
+
+            // 2. Sahnede Arda'nin sistemi var mi?
+            AudienceBehaviorController audienceController = FindFirstObjectByType<AudienceBehaviorController>(FindObjectsInactive.Include);
+            
+            if (audienceController == null)
+            {
+                // Prefab basmak kameralari ve UI'yi bozdugu icin, sadece motorlari (scriptleri) yeni temiz bir objeye ekliyoruz.
+                GameObject audienceRoot = new GameObject("AudienceSystem_Auto");
+                audienceController = audienceRoot.AddComponent<AudienceBehaviorController>();
+                AudienceReactionEngine reactionEngine = audienceRoot.AddComponent<AudienceReactionEngine>();
+                AudienceSpawner spawner = audienceRoot.AddComponent<AudienceSpawner>();
+                
+                audienceController.reactionEngine = reactionEngine;
+                spawner.controller = audienceController;
+
+#if UNITY_EDITOR
+                // Spawner'a karakter prefab'larini kodla ata (Editor ici garantili calismasi icin)
+                spawner.audiencePrefabs = new System.Collections.Generic.List<GameObject>();
+                GameObject p1 = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/AudienceSimulation_Arda/Models/Ch07_nonPBR.prefab");
+                GameObject p2 = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/AudienceSimulation_Arda/Models/Ch33_nonPBR.prefab");
+                GameObject p3 = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/AudienceSimulation_Arda/Models/Remy - T Pose.prefab");
+                if(p1 != null) spawner.audiencePrefabs.Add(p1);
+                if(p2 != null) spawner.audiencePrefabs.Add(p2);
+                if(p3 != null) spawner.audiencePrefabs.Add(p3);
+#endif
+                Debug.Log("[EnvironmentSceneInstaller] Temiz Audience Sistemi (Sadece Scriptler) sahneye uretildi!");
+            }
+
+            if (adapter != null && audienceController != null)
+            {
+                adapter.behaviorController = audienceController;
             }
         }
 
@@ -308,6 +357,38 @@ namespace VRPublicSpeaking.AppShell.Integration
             Type inputSystemUiInputModuleType = inputModule.GetType();
             var assignDefaultActionsMethod = inputSystemUiInputModuleType.GetMethod("AssignDefaultActions", Type.EmptyTypes);
             assignDefaultActionsMethod?.Invoke(inputModule, null);
+        }
+
+        private void EnsureMainControllerUIReferences(MainController mc)
+        {
+            if (mc == null) return;
+            
+            // Eğer referanslar tamsa hiç arama yapma
+            if (mc.stareWarningText != null && mc.headWarningText != null && mc.statusText != null && mc.timerText != null)
+                return;
+                
+            UnityEngine.UI.Text[] allTexts = FindObjectsByType<UnityEngine.UI.Text>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            foreach (var t in allTexts)
+            {
+                string n = t.gameObject.name.ToLower();
+                
+                if (mc.stareWarningText == null && n.Contains("starewarning"))
+                    mc.stareWarningText = t;
+                    
+                if (mc.headWarningText == null && n.Contains("headwarning"))
+                    mc.headWarningText = t;
+                    
+                if (mc.statusText == null && n.Contains("status") && !n.Contains("inactive") && !n.Contains("pause"))
+                    mc.statusText = t;
+                    
+                if (mc.timerText == null && n.Contains("timer"))
+                    mc.timerText = t;
+                    
+                if (mc.reviewInfoText == null && n.Contains("review"))
+                    mc.reviewInfoText = t;
+            }
+            
+            Debug.Log("[EnvironmentSceneInstaller] UI referanslari (Fallback) kontrol edildi ve baglandi.");
         }
     }
 }

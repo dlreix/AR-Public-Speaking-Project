@@ -3327,6 +3327,13 @@ MonoBehaviour:
   resultsDimAlpha: 0.56
   pauseStatusText: Session paused. Timing, tracking, and scoring are safely on hold.
   pauseUnavailableStatusText: Pause is available only while a live session is running.
+  applyVrReadabilityDefaults: 1
+  readableOverlayOffset: {x: 0, y: -0.1, z: 1.08}
+  pauseMinimumFontSize: 22
+  pauseMinimumButtonHeight: 72
+  pausePanelReadableScale: 1.18
+  useScreenSpaceOverlayWhenNoXrDevice: 1
+  desktopOverlayReferenceResolution: {x: 1540, y: 1040}
 --- !u!224 &477327372
 RectTransform:
   m_ObjectHideFlags: 0
@@ -3408,7 +3415,7 @@ MonoBehaviour:
   m_FallbackScreenDPI: 96
   m_DefaultSpriteDPI: 96
   m_DynamicPixelsPerUnit: 12
-  m_PresetInfoIsWorld: 0
+  m_PresetInfoIsWorld: 1
 --- !u!223 &477327376
 Canvas:
   m_ObjectHideFlags: 0
@@ -4802,11 +4809,22 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::VRPublicSpeaking.AppShell.UI.InSessionHudPresenter
   runtimeState: {fileID: 0}
+  mainController: {fileID: 0}
   canvasGroup: {fileID: 703754267}
   timerLabel: {fileID: 1113345787}
   statusLabel: {fileID: 1223639028}
+  warningRoot: {fileID: 0}
+  warningCanvasGroup: {fileID: 0}
+  warningFollower: {fileID: 0}
+  warningLabel: {fileID: 0}
   hideWhenSessionInactive: 1
   inactiveStatusText: Waiting for session start
+  warningTextColor: {r: 0.98, g: 0.74, b: 0.39, a: 1}
+  warningBackgroundColor: {r: 0.08, g: 0.11, b: 0.15, a: 0.92}
+  warningFollowOffset: {x: 0, y: -0.12, z: 0.92}
+  desktopWarningAnchoredPosition: {x: 0, y: -135}
+  desktopWarningSize: {x: 540, y: 90}
+  desktopWarningFontSize: 16
 --- !u!1 &714252273
 GameObject:
   m_ObjectHideFlags: 0
@@ -41859,6 +41877,16 @@ MonoBehaviour:
   - {fileID: 8325576670929657883}
   - {fileID: 8801596959925375800}
   playerController: {fileID: 0}
+  blockDuringXrRuntime: 1
+  logViewChanges: 1
+  enableVrSelfView: 1
+  vrMonitorLocalPosition: {x: 0.34, y: -0.08, z: 0.82}
+  vrMonitorLocalEulerAngles: {x: -6, y: -18, z: 0}
+  vrMonitorSize: {x: 420, y: 250}
+  vrMonitorScale: 0.001
+  vrRenderTextureWidth: 1280
+  vrRenderTextureHeight: 720
+  showVrMonitorHint: 1
 --- !u!33 &4303123431513796304
 MeshFilter:
   m_ObjectHideFlags: 0
