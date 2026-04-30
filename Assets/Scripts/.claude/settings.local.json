@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs grep:*)",
+      "Bash(grep -E \"\\\\.cs$|total\")",
+      "Bash(awk -F'guid: ' '{print $2}')",
+      "Bash(awk -F',' '{print $1}')"
+    ]
+  }
+}

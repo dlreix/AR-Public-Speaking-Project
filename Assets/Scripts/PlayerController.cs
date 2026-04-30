@@ -103,6 +103,12 @@ public class PlayerController : MonoBehaviour
                 break;
 
             case ControlMode.XRRuntime:
+                // XRIT (DynamicMoveProvider + GravityProvider) owns all locomotion in XR mode.
+                // Do not call ApplyMotion here — two systems writing to the same
+                // CharacterController in the same frame causes broken movement and
+                // the "CharacterController.Move called on inactive controller" error.
+                break;
+
             case ControlMode.Idle:
                 ApplyMotion(Vector3.zero);
                 break;
@@ -438,6 +444,12 @@ public class PlayerController : MonoBehaviour
 
     void ApplyMotion(Vector3 horizontalVelocity)
     {
+        if (!CanMoveCharacterController())
+        {
+            verticalVelocity = 0f;
+            return;
+        }
+
         if (cc.isGrounded && verticalVelocity < 0f)
         {
             verticalVelocity = -2f;
@@ -448,6 +460,11 @@ public class PlayerController : MonoBehaviour
         Vector3 motion = horizontalVelocity;
         motion.y = verticalVelocity;
         cc.Move(motion * Time.deltaTime);
+    }
+
+    bool CanMoveCharacterController()
+    {
+        return cc != null && cc.enabled && cc.gameObject.activeInHierarchy;
     }
 
     void ResolveRuntimeReferences()
