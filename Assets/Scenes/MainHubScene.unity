@@ -28960,8 +28960,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::VRPublicSpeaking.AppShell.Results.DashboardAdapter
   dashboardController: {fileID: 0}
   dashboardRoot: {fileID: 0}
-  dashboardSceneName: Overview
-  dashboardLoadingMessage: Opening dashboard...
   openMessage: Open
   alternateOpenMessages:
   - OpenDashboard
@@ -30101,8 +30099,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::VRPublicSpeaking.AppShell.Results.DashboardAdapter
   dashboardController: {fileID: 0}
   dashboardRoot: {fileID: 0}
-  dashboardSceneName: Overview
-  dashboardLoadingMessage: Opening dashboard...
   openMessage: Open
   alternateOpenMessages:
   - OpenDashboard
@@ -40059,7 +40055,7 @@ MonoBehaviour:
   m_FallbackScreenDPI: 96
   m_DefaultSpriteDPI: 96
   m_DynamicPixelsPerUnit: 16
-  m_PresetInfoIsWorld: 1
+  m_PresetInfoIsWorld: 0
 --- !u!223 &1334137175
 Canvas:
   m_ObjectHideFlags: 0

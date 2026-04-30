@@ -444,9 +444,8 @@ public class PlayerController : MonoBehaviour
 
     void ApplyMotion(Vector3 horizontalVelocity)
     {
-        if (!CanMoveCharacterController())
+        if (cc == null || !cc.enabled || !gameObject.activeInHierarchy)
         {
-            verticalVelocity = 0f;
             return;
         }
 
@@ -460,11 +459,6 @@ public class PlayerController : MonoBehaviour
         Vector3 motion = horizontalVelocity;
         motion.y = verticalVelocity;
         cc.Move(motion * Time.deltaTime);
-    }
-
-    bool CanMoveCharacterController()
-    {
-        return cc != null && cc.enabled && cc.gameObject.activeInHierarchy;
     }
 
     void ResolveRuntimeReferences()

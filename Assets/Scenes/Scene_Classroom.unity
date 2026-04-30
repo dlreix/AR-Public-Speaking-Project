@@ -5953,6 +5953,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::VRPublicSpeaking.AppShell.Results.DashboardAdapter
   dashboardController: {fileID: 0}
   dashboardRoot: {fileID: 0}
+  dashboardSceneName: Overview
+  dashboardLoadingMessage: Opening dashboard...
   openMessage: Open
   alternateOpenMessages:
   - OpenDashboard
@@ -11644,7 +11646,7 @@ GameObject:
   - component: {fileID: 382241259}
   - component: {fileID: 382241258}
   - component: {fileID: 382241257}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Body_L0
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -17750,6 +17752,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::VRPublicSpeaking.AppShell.Integration.ExistingSceneFlowAdapter
   mainController: {fileID: 0}
   scoringAdapter: {fileID: 638237676}
+  speechPipelineController: {fileID: 0}
   environmentSessionOverlayController: {fileID: 633899308}
   routeAfterSessionEnd: 1
   autoStartDelay: 0.35
@@ -17770,6 +17773,8 @@ MonoBehaviour:
   playerRigAdapter: {fileID: 638237675}
   trackingAdapter: {fileID: 638237677}
   scoringAdapter: {fileID: 638237676}
+  speechAdapter: {fileID: 0}
+  speechPipelineController: {fileID: 0}
   existingSceneFlowAdapter: {fileID: 638237678}
   environmentSessionOverlayController: {fileID: 633899308}
   installOnStart: 1
