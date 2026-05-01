@@ -26,9 +26,13 @@ namespace VRPublicSpeaking.AppShell.Flow
         [SerializeField] private float menuFollowPositionSpeed = 14f;
         [SerializeField] private float menuFollowRotationSpeed = 14f;
         [SerializeField] private bool keepHubRigStationary = true;
-        [SerializeField] private float hubCameraYOffset = 1.62f;
+        [SerializeField] private float hubCameraYOffset = 1.36f;
         [SerializeField] private string mainHubSceneName = "MainHubScene";
         [SerializeField] private string resultsSceneName = string.Empty;
+        [SerializeField] private bool useWalkableTutorialHub = true;
+        [SerializeField] private bool installTutorialPanels = true;
+
+        private MainHubTutorialController tutorialController;
 
         private void Start()
         {
@@ -51,6 +55,7 @@ namespace VRPublicSpeaking.AppShell.Flow
 
             OpenRequestedStartupPanel();
             ConfigureShellSceneRigController();
+            ConfigureTutorialHub();
         }
 
         public void OpenHomePanel()
@@ -200,17 +205,41 @@ namespace VRPublicSpeaking.AppShell.Flow
                 shellSceneRigController = gameObject.AddComponent<ShellSceneRigController>();
             }
 
+            bool keepCanvasInView = useWalkableTutorialHub ? false : keepMenuFixedToView;
+            bool keepRigLocked = useWalkableTutorialHub ? false : keepHubRigStationary;
+
             shellSceneRigController.Configure(
                 canvas,
                 "MainHubBackdrop",
-                keepMenuFixedToView,
+                keepCanvasInView,
                 fixedCanvasOffset,
                 menuFollowPositionSpeed,
                 menuFollowRotationSpeed,
-                keepHubRigStationary,
+                keepRigLocked,
                 hubCameraYOffset,
                 XROrigin.TrackingOriginMode.Device);
             shellSceneRigController.InitializeNow();
+        }
+
+        private void ConfigureTutorialHub()
+        {
+            if (!useWalkableTutorialHub || !installTutorialPanels)
+            {
+                return;
+            }
+
+            Canvas canvas = ResolveHubCanvas();
+            if (tutorialController == null)
+            {
+                tutorialController = GetComponent<MainHubTutorialController>();
+            }
+
+            if (tutorialController == null)
+            {
+                tutorialController = gameObject.AddComponent<MainHubTutorialController>();
+            }
+
+            tutorialController.Configure(canvas);
         }
 
         private Canvas ResolveHubCanvas()

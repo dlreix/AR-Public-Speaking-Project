@@ -47476,8 +47476,8 @@ RectTransform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1553963584}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 2.35}
-  m_LocalScale: {x: 0.00135, y: 0.00135, z: 0.00135}
+  m_LocalPosition: {x: 0, y: 0, z: 5.72}
+  m_LocalScale: {x: 0.0041, y: 0.0041, z: 0.0041}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 226215927}
@@ -47486,7 +47486,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: 1.55}
+  m_AnchoredPosition: {x: 0, y: 2.95}
   m_SizeDelta: {x: 1800, y: 1200}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1553963586
@@ -59424,13 +59424,15 @@ MonoBehaviour:
   shellSceneRigController: {fileID: 2013776755}
   worldSpaceHubCanvas: {fileID: 0}
   fixedCanvasOffset: {x: 0, y: -0.12, z: 2.1}
-  keepMenuFixedToView: 1
+  keepMenuFixedToView: 0
   menuFollowPositionSpeed: 14
   menuFollowRotationSpeed: 14
-  keepHubRigStationary: 1
-  hubCameraYOffset: 1.62
+  keepHubRigStationary: 0
+  hubCameraYOffset: 1.36
   mainHubSceneName: MainHubScene
   resultsSceneName: ResultsScene
+  useWalkableTutorialHub: 1
+  installTutorialPanels: 1
 --- !u!224 &2013776754
 RectTransform:
   m_ObjectHideFlags: 0
@@ -59465,15 +59467,19 @@ MonoBehaviour:
   xrOrigin: {fileID: 0}
   shellCanvas: {fileID: 1553963589}
   backdropRootName: MainHubBackdrop
-  keepCanvasFixedToView: 1
-  headLockedCanvas: 1
+  keepCanvasFixedToView: 0
+  headLockedCanvas: 0
   shellCanvasOffset: {x: 0, y: -0.12, z: 2.1}
   menuFollowPositionSpeed: 14
   menuFollowRotationSpeed: 14
-  keepRigStationary: 1
+  keepRigStationary: 0
   requestedTrackingOriginMode: 1
-  cameraYOffset: 1.62
+  cameraYOffset: 1.36
   stabilizationDuration: 0
+  useFloorTrackingWhenXrRunning: 1
+  keepUnlockedRigGravityDisabled: 1
+  floorTrackingFallbackDelay: 0.5
+  floorTrackingMinimumHeadHeight: 0.35
 --- !u!1 &2014260155
 GameObject:
   m_ObjectHideFlags: 0

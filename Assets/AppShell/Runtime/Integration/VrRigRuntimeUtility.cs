@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using Unity.XR.CoreUtils;
 
 namespace VRPublicSpeaking.AppShell.Integration
 {
@@ -17,6 +18,7 @@ namespace VRPublicSpeaking.AppShell.Integration
             EnsureMainCameraTag(camera);
             EnsureAudioListener(camera.gameObject);
             EnsureTrackedPoseDriver(camera);
+            EnsureHeightSafety(camera);
             return camera;
         }
 
@@ -83,7 +85,9 @@ namespace VRPublicSpeaking.AppShell.Integration
                 trackedPoseDriver = camera.gameObject.AddComponent<UnityEngine.InputSystem.XR.TrackedPoseDriver>();
             }
 
-            trackedPoseDriver.trackingType = UnityEngine.InputSystem.XR.TrackedPoseDriver.TrackingType.RotationAndPosition;
+            trackedPoseDriver.trackingType = ResolveXrOrigin(camera) != null
+                ? UnityEngine.InputSystem.XR.TrackedPoseDriver.TrackingType.RotationAndPosition
+                : UnityEngine.InputSystem.XR.TrackedPoseDriver.TrackingType.RotationOnly;
             trackedPoseDriver.updateType = UnityEngine.InputSystem.XR.TrackedPoseDriver.UpdateType.UpdateAndBeforeRender;
             trackedPoseDriver.ignoreTrackingState = false;
 
@@ -127,6 +131,33 @@ namespace VRPublicSpeaking.AppShell.Integration
             }
 
             return action;
+        }
+
+        private static void EnsureHeightSafety(Camera camera)
+        {
+            if (camera == null)
+            {
+                return;
+            }
+
+            XROrigin xrOrigin = ResolveXrOrigin(camera);
+
+            GameObject safetyHost = xrOrigin != null ? xrOrigin.gameObject : camera.gameObject;
+            VrRigHeightSafety safety = safetyHost.GetComponent<VrRigHeightSafety>();
+            if (safety == null)
+            {
+                safety = safetyHost.AddComponent<VrRigHeightSafety>();
+            }
+
+            safety.Configure(camera, xrOrigin);
+        }
+
+        private static XROrigin ResolveXrOrigin(Camera camera)
+        {
+            XROrigin xrOrigin = camera != null ? camera.GetComponentInParent<XROrigin>(true) : null;
+            return xrOrigin != null
+                ? xrOrigin
+                : Object.FindFirstObjectByType<XROrigin>(FindObjectsInactive.Include);
         }
 
         private static string BuildMessage(string context, string message)
