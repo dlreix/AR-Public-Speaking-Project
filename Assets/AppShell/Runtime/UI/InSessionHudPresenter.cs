@@ -182,7 +182,10 @@ namespace VRPublicSpeaking.AppShell.UI
             warningRoot.localScale = Vector3.one;
             warningRoot.SetAsLastSibling();
 
-            warningCanvasGroup ??= warningRoot.GetComponent<CanvasGroup>();
+            if (warningCanvasGroup == null)
+            {
+                warningCanvasGroup = warningRoot.GetComponent<CanvasGroup>();
+            }
             if (warningCanvasGroup == null)
             {
                 warningCanvasGroup = warningRoot.gameObject.AddComponent<CanvasGroup>();
@@ -200,7 +203,10 @@ namespace VRPublicSpeaking.AppShell.UI
             background.color = warningBackgroundColor;
             background.raycastTarget = false;
 
-            warningFollower ??= warningRoot.GetComponent<WorldSpaceCanvasFollower>();
+            if (warningFollower == null)
+            {
+                warningFollower = warningRoot.GetComponent<WorldSpaceCanvasFollower>();
+            }
             if (warningFollower == null)
             {
                 warningFollower = warningRoot.gameObject.AddComponent<WorldSpaceCanvasFollower>();

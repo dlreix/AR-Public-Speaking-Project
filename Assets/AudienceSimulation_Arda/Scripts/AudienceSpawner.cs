@@ -77,6 +77,17 @@ public class AudienceSpawner : MonoBehaviour
 
         EnsureControllerReferences();
 
+        // Load prefabs if list is empty
+        if (audiencePrefabs == null || audiencePrefabs.Count == 0)
+        {
+            audiencePrefabs = LoadCharacterPrefabs();
+            if (audiencePrefabs.Count == 0)
+            {
+                Debug.LogError("[AudienceSpawner] No audience prefabs assigned!");
+                return;
+            }
+        }
+
         // Find seats
         List<GameObject> allSeats = FindAllSeats();
         if (allSeats.Count == 0)
@@ -91,17 +102,6 @@ public class AudienceSpawner : MonoBehaviour
         {
             int j = Random.Range(0, i + 1);
             var tmp = allSeats[i]; allSeats[i] = allSeats[j]; allSeats[j] = tmp;
-        }
-
-        // Load prefabs if list is empty
-        if (audiencePrefabs == null || audiencePrefabs.Count == 0)
-        {
-            audiencePrefabs = LoadCharacterPrefabs();
-            if (audiencePrefabs.Count == 0)
-            {
-                Debug.LogError("[AudienceSpawner] No audience prefabs assigned!");
-                return;
-            }
         }
 
         int maxToSpawn = Mathf.Min(GetAudienceCount(), allSeats.Count);
@@ -237,8 +237,37 @@ public class AudienceSpawner : MonoBehaviour
                     int idx = Random.Range(0, audiencePrefabs.Count);
                     GameObject member = Instantiate(audiencePrefabs[idx], pos, Quaternion.Euler(0, 180, 0));
 
+                    Animator anim = member.GetComponent<Animator>();
+                    if (anim == null) anim = member.AddComponent<Animator>();
+                    anim.applyRootMotion = false;
+                    anim.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+                    
+                    if (sharedAnimatorController != null)
+                        anim.runtimeAnimatorController = sharedAnimatorController;
+
+                    var procAnim = member.GetComponent<ProceduralAudienceAnimator>();
+                    if (procAnim == null) procAnim = member.AddComponent<ProceduralAudienceAnimator>();
+                    procAnim.enabled = true;
+
                     AudienceMember am = member.GetComponent<AudienceMember>();
                     if (am == null) am = member.AddComponent<AudienceMember>();
+                    am.enabled = true;
+
+                    switch (controller.currentStressLevel)
+                    {
+                        case StressLevel.Easy:
+                            am.personalWpmTolerance = Random.Range(-30f, -5f);
+                            am.personalEyeContactTolerance = Random.Range(-0.2f, -0.05f);
+                            break;
+                        case StressLevel.Medium:
+                            am.personalWpmTolerance = Random.Range(-10f, 10f);
+                            am.personalEyeContactTolerance = Random.Range(-0.08f, 0.08f);
+                            break;
+                        case StressLevel.Hard:
+                            am.personalWpmTolerance = Random.Range(10f, 40f);
+                            am.personalEyeContactTolerance = Random.Range(0.1f, 0.3f);
+                            break;
+                    }
 
                     controller.audienceMembers.Add(am);
                     spawned++;

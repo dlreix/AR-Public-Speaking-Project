@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -17,19 +18,49 @@ namespace VRPublicSpeaking.AppShell.Flow
         [SerializeField] private Vector3 hubCanvasScale = new Vector3(0.0041f, 0.0041f, 0.0041f);
         [SerializeField] private float panelScale = 0.0038f;
 
+        [Header("Enhanced Tutorial Systems")]
+        [SerializeField] private bool enableProgressTracking = true;
+        [SerializeField] private bool enablePanelAnimations = true;
+        [SerializeField] private bool enableAmbientLighting = true;
+        [SerializeField] private bool enableWelcomePanel = true;
+        [SerializeField] private bool enableProgressHud = false;
+        [SerializeField] private bool enableFloorGuides = true;
+        [SerializeField] private bool enableCompletionCelebration = true;
+        [SerializeField] private bool enableSequentialReveal = true;
+
+        [Header("Sequential Tutorial Mode")]
+        [Tooltip("When enabled, tutorial panels appear one at a time in front of the user after the welcome screen.")]
+        [SerializeField] private bool enableSequentialMode = true;
+        [SerializeField] private float sequentialStartDelay = 1.5f;
+
         private const string TutorialRootName = "TutorialWallPanels";
         private const string TutorialSetDressingRootName = "TutorialSetDressing";
         private const string LegacyTutorialGuideRootName = "TutorialFloorGuides";
         private bool installed;
 
-        private static readonly Color PanelColor = new Color(0.025f, 0.036f, 0.052f, 0.94f);
-        private static readonly Color HeaderColor = new Color(1f, 0.64f, 0.24f, 1f);
-        private static readonly Color BodyColor = new Color(0.88f, 0.93f, 0.98f, 1f);
-        private static readonly Color MutedColor = new Color(0.48f, 0.62f, 0.76f, 1f);
-        private static readonly Color BackplateColor = new Color(0.018f, 0.027f, 0.04f, 1f);
-        private static readonly Color RugColor = new Color(0.055f, 0.016f, 0.026f, 1f);
-        private static readonly Color TrimColor = new Color(0.95f, 0.54f, 0.18f, 1f);
-        private static readonly Color MarkerColor = new Color(0.08f, 0.12f, 0.16f, 1f);
+        private TutorialProgressTracker progressTracker;
+        private TutorialAmbientLighting ambientLighting;
+        private TutorialWelcomePanel welcomePanel;
+        private TutorialProgressHud progressHud;
+        private TutorialFloorGuideSystem floorGuideSystem;
+        private TutorialCompletionCelebration completionCelebration;
+        private TutorialSequentialPresenter sequentialPresenter;
+        private readonly List<TutorialPanelAnimator> panelAnimators = new List<TutorialPanelAnimator>();
+        private readonly Dictionary<string, TutorialPanelAnimator> animatorsByName = new Dictionary<string, TutorialPanelAnimator>();
+        private readonly List<Vector3> panelPositions = new List<Vector3>();
+        private readonly List<string> panelNames = new List<string>();
+        private int panelCreationIndex;
+        private int totalPanelCount = 4;
+        private bool celebrationTriggered;
+
+        private static readonly Color PanelColor = new Color(0.015f, 0.02f, 0.035f, 0.88f);
+        private static readonly Color HeaderColor = new Color(0.12f, 0.78f, 0.96f, 1f);
+        private static readonly Color BodyColor = new Color(0.92f, 0.95f, 0.98f, 1f);
+        private static readonly Color MutedColor = new Color(0.55f, 0.65f, 0.75f, 0.8f);
+        private static readonly Color BackplateColor = new Color(0.01f, 0.015f, 0.025f, 1f);
+        private static readonly Color RugColor = new Color(0.015f, 0.03f, 0.05f, 1f);
+        private static readonly Color TrimColor = new Color(0.12f, 0.78f, 0.96f, 1f);
+        private static readonly Color MarkerColor = new Color(0.04f, 0.06f, 0.08f, 1f);
 
         private void Start()
         {
@@ -55,6 +86,9 @@ namespace VRPublicSpeaking.AppShell.Flow
                 installed = true;
                 return;
             }
+
+            // Initialize subsystems before creating panels
+            InitializeSubsystems();
 
             Transform root = new GameObject(TutorialRootName).transform;
             root.SetParent(transform, false);
@@ -96,6 +130,287 @@ namespace VRPublicSpeaking.AppShell.Flow
                 new Vector3(0f, 180f, 0f));
 
             installed = true;
+
+            // Finalize subsystems after all panels are created
+            FinalizeSubsystems();
+
+            // Setup sequential mode if enabled
+            if (enableSequentialMode)
+            {
+                SetupSequentialPresentation();
+            }
+        }
+
+        private void SetupSequentialPresentation()
+        {
+            sequentialPresenter = GetComponent<TutorialSequentialPresenter>();
+            if (sequentialPresenter == null)
+                sequentialPresenter = gameObject.AddComponent<TutorialSequentialPresenter>();
+
+            // Register slides with the sequential presenter
+            sequentialPresenter.AddSlide(
+                "Movement & UI",
+                "◆  Left stick: move around the hub\n◆  Right stick: turn your view\n◆  Aim the controller ray at a menu item\n◆  Trigger: select buttons and cards",
+                "Walk to the wall menu when you are ready to start.",
+                "🎮");
+
+            sequentialPresenter.AddSlide(
+                "Session Controls",
+                "◆  A / X: start or stop the active session\n◆  B / Y tap: toggle debug guidance\n◆  B / Y hold: pause or resume during a session\n◆  Grip: trigger the circle event while recording",
+                "These controls apply after you launch a practice room.",
+                "🎯");
+
+            sequentialPresenter.AddSlide(
+                "Desktop Testing",
+                "◆  WASD: move\n◆  Mouse: look around\n◆  R: start or stop\n◆  D: debug mode\n◆  Esc: pause\n◆  C or left click: circle event",
+                "Use this when checking the flow without a headset.",
+                "💻");
+
+            sequentialPresenter.AddSlide(
+                "Practice Flow",
+                "1. Choose Practice Mode\n2. Pick a room\n3. Review setup\n4. Start Session\n5. Read Results and recommendations",
+                "The wall menu stays available as your main launch board.",
+                "📋");
+
+            // Wire events
+            sequentialPresenter.AllSlidesCompleted += OnSequentialCompleted;
+            sequentialPresenter.TutorialSkipped += OnSequentialSkipped;
+            sequentialPresenter.SlideShown += OnSequentialSlideShown;
+
+            // Start after welcome panel delay
+            float startDelay = enableWelcomePanel ? sequentialStartDelay + 12f : sequentialStartDelay;
+            // If welcome panel is enabled, wait for it to dismiss first
+            if (enableWelcomePanel && welcomePanel != null)
+            {
+                StartCoroutine(StartSequentialAfterWelcome());
+            }
+            else
+            {
+                sequentialPresenter.StartPresentationDelayed(startDelay);
+            }
+        }
+
+        private System.Collections.IEnumerator StartSequentialAfterWelcome()
+        {
+            // Wait until welcome panel is no longer showing
+            while (welcomePanel != null && welcomePanel.IsShowing)
+            {
+                yield return null;
+            }
+
+            yield return new WaitForSeconds(sequentialStartDelay);
+            if (sequentialPresenter != null)
+            {
+                sequentialPresenter.StartPresentation();
+            }
+        }
+
+        private void OnSequentialCompleted()
+        {
+            Debug.Log("[Tutorial] Sequential presentation completed!");
+            if (enableCompletionCelebration && completionCelebration != null && !celebrationTriggered)
+            {
+                celebrationTriggered = true;
+                completionCelebration.PlayCelebration();
+            }
+        }
+
+        private void OnSequentialSkipped()
+        {
+            Debug.Log("[Tutorial] Sequential presentation skipped by user.");
+        }
+
+        private void OnSequentialSlideShown(int slideIndex)
+        {
+            Debug.Log($"[Tutorial] Showing slide {slideIndex + 1}/{sequentialPresenter.TotalSlides}");
+
+            // Update progress HUD if available
+            if (progressHud != null && sequentialPresenter != null)
+            {
+                progressHud.UpdateProgress(
+                    slideIndex + 1,
+                    sequentialPresenter.TotalSlides,
+                    (float)(slideIndex + 1) / sequentialPresenter.TotalSlides);
+            }
+        }
+
+        private void InitializeSubsystems()
+        {
+            panelCreationIndex = 0;
+
+            if (enableProgressTracking)
+            {
+                progressTracker = GetComponent<TutorialProgressTracker>();
+                if (progressTracker == null)
+                    progressTracker = gameObject.AddComponent<TutorialProgressTracker>();
+
+                progressTracker.PanelFirstVisited += OnPanelFirstVisited;
+                progressTracker.PanelCompleted += OnPanelCompleted;
+                progressTracker.OverallProgressChanged += OnOverallProgressChanged;
+            }
+
+            if (enableAmbientLighting)
+            {
+                ambientLighting = GetComponent<TutorialAmbientLighting>();
+                if (ambientLighting == null)
+                    ambientLighting = gameObject.AddComponent<TutorialAmbientLighting>();
+                ambientLighting.Initialize();
+            }
+
+            if (enableWelcomePanel)
+            {
+                welcomePanel = GetComponent<TutorialWelcomePanel>();
+                if (welcomePanel == null)
+                    welcomePanel = gameObject.AddComponent<TutorialWelcomePanel>();
+                welcomePanel.Show();
+            }
+
+            if (enableFloorGuides)
+            {
+                floorGuideSystem = GetComponent<TutorialFloorGuideSystem>();
+                if (floorGuideSystem == null)
+                    floorGuideSystem = gameObject.AddComponent<TutorialFloorGuideSystem>();
+                floorGuideSystem.Initialize();
+            }
+
+            if (enableCompletionCelebration)
+            {
+                completionCelebration = GetComponent<TutorialCompletionCelebration>();
+                if (completionCelebration == null)
+                    completionCelebration = gameObject.AddComponent<TutorialCompletionCelebration>();
+            }
+        }
+
+        private void FinalizeSubsystems()
+        {
+            if (enableProgressHud)
+            {
+                progressHud = GetComponent<TutorialProgressHud>();
+                if (progressHud == null)
+                    progressHud = gameObject.AddComponent<TutorialProgressHud>();
+                progressHud.Initialize(progressTracker != null ? progressTracker.TotalPanels : panelAnimators.Count);
+            }
+
+            // Create floor guide paths between panels
+            if (enableFloorGuides && floorGuideSystem != null && panelPositions.Count > 1)
+            {
+                // Paths connecting adjacent panels in visit order
+                for (int i = 0; i < panelPositions.Count - 1; i++)
+                {
+                    Vector3 start = panelPositions[i];
+                    Vector3 end = panelPositions[i + 1];
+                    floorGuideSystem.CreatePathSegment("Path_" + i, start, end);
+                }
+
+                // Station markers at each panel location
+                for (int i = 0; i < panelPositions.Count; i++)
+                {
+                    floorGuideSystem.CreateStationMarker(panelNames[i], panelPositions[i], i);
+                }
+
+                // Close the loop: last panel back to the start area
+                floorGuideSystem.CreatePathSegment("Path_Return",
+                    panelPositions[panelPositions.Count - 1],
+                    new Vector3(0f, 0f, 3.5f));
+            }
+
+            // Trigger reveal animations
+            if (enablePanelAnimations)
+            {
+                if (enableSequentialReveal)
+                {
+                    // Sequential reveal with staggered delays
+                    for (int i = 0; i < panelAnimators.Count; i++)
+                    {
+                        TutorialPanelAnimator animator = panelAnimators[i];
+                        float delay = i * 0.35f;
+                        StartCoroutine(DelayedReveal(animator, delay));
+                    }
+                }
+                else
+                {
+                    foreach (var animator in panelAnimators)
+                    {
+                        animator.TriggerReveal();
+                    }
+                }
+            }
+        }
+
+        private System.Collections.IEnumerator DelayedReveal(TutorialPanelAnimator animator, float delay)
+        {
+            yield return new WaitForSeconds(delay);
+            animator.TriggerReveal();
+        }
+
+        private void Update()
+        {
+            if (!installed || progressTracker == null) return;
+
+            // Update proximity state on each animator
+            foreach (var kvp in animatorsByName)
+            {
+                bool inRange = progressTracker.IsPanelInRange(kvp.Key);
+                float dwellProgress = progressTracker.GetPanelDwellProgress(kvp.Key);
+                kvp.Value.SetProximity(inRange, dwellProgress);
+            }
+        }
+
+        private void OnPanelFirstVisited(string panelId)
+        {
+            Debug.Log($"[Tutorial] Panel visited: {panelId}");
+        }
+
+        private void OnPanelCompleted(string panelId)
+        {
+            Debug.Log($"[Tutorial] Panel completed: {panelId}");
+            if (animatorsByName.TryGetValue(panelId, out var animator))
+            {
+                animator.MarkCompleted();
+            }
+
+            // Mark floor guide station as completed
+            if (enableFloorGuides && floorGuideSystem != null)
+            {
+                int stationIndex = panelNames.IndexOf(panelId);
+                if (stationIndex >= 0)
+                {
+                    floorGuideSystem.MarkStationCompleted(stationIndex);
+                }
+            }
+
+            UpdateProgressHud();
+        }
+
+        private void OnOverallProgressChanged(float progress)
+        {
+            UpdateProgressHud();
+
+            // Dismiss welcome panel once user starts exploring
+            if (progress > 0f && welcomePanel != null && welcomePanel.IsShowing)
+            {
+                welcomePanel.Dismiss();
+            }
+
+            // Trigger celebration when all panels completed
+            if (progress >= 1f && !celebrationTriggered)
+            {
+                celebrationTriggered = true;
+                if (enableCompletionCelebration && completionCelebration != null)
+                {
+                    completionCelebration.PlayCelebration();
+                    Debug.Log("[Tutorial] All panels completed! Celebration triggered.");
+                }
+            }
+        }
+
+        private void UpdateProgressHud()
+        {
+            if (progressHud == null || progressTracker == null) return;
+            progressHud.UpdateProgress(
+                progressTracker.GetCompletedCount(),
+                progressTracker.TotalPanels,
+                progressTracker.OverallProgress);
         }
 
         private void ApplyTutorialSpaceLayout()
@@ -228,7 +543,14 @@ namespace VRPublicSpeaking.AppShell.Flow
             Vector3 position,
             Vector3 eulerAngles)
         {
-            GameObject canvasObject = new GameObject(panelName, typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler));
+            panelCreationIndex++;
+            string stepLabel = $"Step {panelCreationIndex}/{totalPanelCount}";
+
+            // Track positions for floor guide generation
+            panelPositions.Add(position);
+            panelNames.Add(panelName);
+
+            GameObject canvasObject = new GameObject(panelName, typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(CanvasGroup));
             canvasObject.transform.SetParent(root, false);
             canvasObject.transform.position = position;
             canvasObject.transform.rotation = Quaternion.Euler(eulerAngles);
@@ -248,14 +570,31 @@ namespace VRPublicSpeaking.AppShell.Flow
             CanvasScaler scaler = canvasObject.GetComponent<CanvasScaler>();
             scaler.dynamicPixelsPerUnit = 12f;
 
+            CanvasGroup canvasGroup = canvasObject.GetComponent<CanvasGroup>();
+
             CreateImage(canvasRect, "Background", StretchRect(Vector2.zero, Vector2.zero), PanelColor, true);
-            CreateImage(canvasRect, "AccentBar", TopRect(0f, 0f, 12f), HeaderColor, false);
+            Image accentBar = CreateImage(canvasRect, "AccentBar", TopRect(0f, 0f, 12f), HeaderColor, false);
+
+            // Step badge (top-right corner)
+            CreateText(
+                canvasRect,
+                "StepBadge",
+                stepLabel,
+                new RectOffset(0, 38, 42, 0),
+                24f,
+                MutedColor,
+                TextAlignmentOptions.TopRight,
+                FontStyles.Normal,
+                new Vector2(0.7f, 1f),
+                new Vector2(1f, 1f),
+                new Vector2(1f, 1f),
+                new Vector2(0f, 40f));
 
             CreateText(
                 canvasRect,
                 "Title",
                 title,
-                new RectOffset(54, 54, 38, 0),
+                new RectOffset(54, 120, 38, 0),
                 58f,
                 HeaderColor,
                 TextAlignmentOptions.TopLeft,
@@ -292,6 +631,38 @@ namespace VRPublicSpeaking.AppShell.Flow
                 new Vector2(1f, 0f),
                 new Vector2(0.5f, 0f),
                 new Vector2(0f, 62f));
+
+            // Progress fill bar at bottom of panel
+            Image progressFill = CreateImage(canvasRect, "ProgressFill",
+                new RectTransformSetup(
+                    new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0f, 0f),
+                    Vector2.zero, new Vector2(0f, 5f), Vector2.zero),
+                new Color(HeaderColor.r, HeaderColor.g, HeaderColor.b, 0.7f), false);
+            progressFill.type = Image.Type.Filled;
+            progressFill.fillMethod = Image.FillMethod.Horizontal;
+            progressFill.fillAmount = 0f;
+
+            // Attach animator for reveal and proximity effects
+            if (enablePanelAnimations)
+            {
+                TutorialPanelAnimator animator = canvasObject.AddComponent<TutorialPanelAnimator>();
+                animator.Initialize(canvasGroup, accentBar, null, progressFill);
+                panelAnimators.Add(animator);
+                animatorsByName[panelName] = animator;
+            }
+
+            // Register with progress tracker
+            if (enableProgressTracking && progressTracker != null)
+            {
+                progressTracker.RegisterPanel(panelName, canvasObject.transform);
+            }
+
+            // Add spotlight for this panel
+            if (enableAmbientLighting && ambientLighting != null)
+            {
+                Vector3 panelForward = Quaternion.Euler(eulerAngles) * Vector3.forward;
+                ambientLighting.AddPanelSpotLight(panelName, position, panelForward);
+            }
         }
 
         private static Image CreateImage(

@@ -145,13 +145,15 @@ public class AudienceBehaviorController : MonoBehaviour
             else
             {
                 // HIGH SCORE (> 75)
+                bool hasGoodEyeContact = frame != null && frame.dominant_factors != null && frame.dominant_factors.Contains("good_eye_contact");
+
                 if (member.CurrentState == AudienceState.Nodding ||
                     member.CurrentState == AudienceState.NoteTaking ||
                     member.CurrentState == AudienceState.Attentive)
                 {
                     targetState = member.CurrentState;
                     // Force Nodding if eye contact is exceptionally good
-                    if (frame.dominant_factors.Contains("good_eye_contact") && targetState != AudienceState.Nodding)
+                    if (hasGoodEyeContact && targetState != AudienceState.Nodding)
                     {
                         targetState = AudienceState.Nodding;
                     }
@@ -159,7 +161,7 @@ public class AudienceBehaviorController : MonoBehaviour
                 else
                 {
                     float r = Random.value;
-                    if (r > 0.6f || frame.dominant_factors.Contains("good_eye_contact"))
+                    if (r > 0.6f || hasGoodEyeContact)
                         targetState = AudienceState.Nodding;
                     else if (r > 0.3f)
                         targetState = AudienceState.NoteTaking;
