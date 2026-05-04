@@ -8,6 +8,13 @@ namespace VRPublicSpeaking.AppShell.Integration
         [SerializeField] private GazeScoringSystem gazeScoringSystem;
         [SerializeField] private PerformanceScoringEngine performanceScoringEngine;
 
+        public PerformanceScoringEngine PerformanceScoringEngine => performanceScoringEngine;
+
+        public void SetPerformanceScoringEngine(PerformanceScoringEngine engine)
+        {
+            performanceScoringEngine = engine;
+        }
+
         public void AutoWireIfNeeded()
         {
             if (gazeScoringSystem == null)

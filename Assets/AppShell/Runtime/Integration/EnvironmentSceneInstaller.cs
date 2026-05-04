@@ -114,17 +114,20 @@ namespace VRPublicSpeaking.AppShell.Integration
                 scoringEngine = scoringRoot.AddComponent<PerformanceScoringEngine>();
             }
 
+            scoringAdapter?.SetPerformanceScoringEngine(scoringEngine);
             speechAdapter.SetScoringEngine(scoringEngine);
 
             speechPipelineController ??= FindFirstObjectByType<SpeechPipelineController>(FindObjectsInactive.Include);
             if (speechPipelineController == null)
             {
                 GameObject speechRoot = new GameObject("SpeechPipeline_Auto");
+                speechRoot.AddComponent<AudioSource>();
                 speechPipelineController = speechRoot.AddComponent<SpeechPipelineController>();
             }
 
             speechPipelineController.SpeechAdapter = speechAdapter;
             speechPipelineController.ScoringEngine = scoringEngine;
+            existingSceneFlowAdapter?.SetSpeechPipelineController(speechPipelineController);
         }
 
         private void EnsureEnvironmentRuntimeStack(Camera sceneCamera)
