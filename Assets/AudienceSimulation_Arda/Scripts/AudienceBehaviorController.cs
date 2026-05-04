@@ -44,9 +44,13 @@ public class AudienceBehaviorController : MonoBehaviour
 
     [Header("Live State")]
     public bool sessionEnded = false;
+    private float _sessionStartTime;
+    private float _gracePeriod = 8.0f;
+    private float _warmupDuration = 10.0f; // 8s + 10s = 18. saniyede tam kapasite
 
     void Start()
     {
+        _sessionStartTime = Time.time;
         ApplyScenario(currentStressLevel);
         foreach (var member in audienceMembers)
             if (member != null) member.SetState(AudienceState.Neutral);
@@ -77,6 +81,18 @@ public class AudienceBehaviorController : MonoBehaviour
         float negMult = _activeScenario != null ? _activeScenario.negativeReactionMultiplier : 1f;
         float finalScore = reactionEngine.scoringEngine.GetFinalScore();
 
+        float elapsedTime = Time.time - _sessionStartTime;
+        
+        // 1) 8 Saniyelik Alışma Süresi (Grace Period)
+        if (elapsedTime < _gracePeriod)
+        {
+            foreach (var m in audienceMembers) if (m != null) m.SetState(AudienceState.Neutral);
+            return;
+        }
+
+        // 2) Kademeli Devreye Girme (Warmup)
+        float warmupMultiplier = Mathf.Clamp01((elapsedTime - _gracePeriod) / _warmupDuration);
+
         foreach (var member in audienceMembers)
         {
             if (member == null) continue;
@@ -90,6 +106,9 @@ public class AudienceBehaviorController : MonoBehaviour
 
             // Stress seviyesine göre negatif tepkileri güçlendir
             personalScore = Mathf.Lerp(personalScore, personalScore * (2f - negMult), 0.5f);
+
+            // Warmup: İlk saniyelerde skoru merkeze (50) yakın tut, zamanla gerçeğe çek
+            personalScore = Mathf.Lerp(50f, personalScore, warmupMultiplier);
 
             AudienceState targetState;
 

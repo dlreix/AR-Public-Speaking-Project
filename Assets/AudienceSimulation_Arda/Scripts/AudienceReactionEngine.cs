@@ -30,13 +30,17 @@ public class AudienceReactionEngine : MonoBehaviour
         }
     }
 
+    private float smoothedScore = 50f;
+    [SerializeField] private float smoothingSpeed = 1.5f;
+
     public void GenerateReactionFrame()
     {
-        float finalScore = scoringEngine.GetFinalScore();
-        string performanceLevel = "MEDIUM";
+        float rawScore = scoringEngine.GetFinalScore();
+        smoothedScore = Mathf.Lerp(smoothedScore, rawScore, Time.deltaTime * smoothingSpeed);
         
-        if (finalScore < 40f) performanceLevel = "LOW";
-        else if (finalScore < 70f) performanceLevel = "MEDIUM";
+        string performanceLevel = "MEDIUM";
+        if (smoothedScore < 38f) performanceLevel = "LOW";
+        else if (smoothedScore < 65f) performanceLevel = "MEDIUM";
         else performanceLevel = "HIGH";
 
         currentReaction.performance_level = performanceLevel;
