@@ -56,14 +56,17 @@ public class AudienceSpawner : MonoBehaviour
             if (m != null) Destroy(m.gameObject);
         controller.audienceMembers.Clear();
 
-        // 2) Cleanup static characters (Ghost characters)
+        // 2) Cleanup static characters (Ghost characters) - SADECE "Sitting" isimli olanları hedefle
         GameObject[] allObjects = FindObjectsByType<GameObject>(FindObjectsSortMode.None);
         foreach (var go in allObjects)
         {
-            string n = go.name.ToLower();
-            if (n.Contains("sitting") || n.Contains("student") || n.Contains("audience_") || n.Contains("character_"))
+            if (go == null) continue;
+            string n = go.name; // ToLower yapma, tam eşleşme arıyoruz
+            
+            // Sadece fotoğraftaki o iki "Sitting" nesnesini sil
+            if (n == "Sitting" || n.StartsWith("Sitting ("))
             {
-                if (go.hideFlags == HideFlags.None && go.transform.parent == null) Destroy(go);
+                if (go.hideFlags == HideFlags.None) Destroy(go);
             }
         }
 
