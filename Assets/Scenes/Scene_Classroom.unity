@@ -38367,7 +38367,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: -6514141196799729507, guid: 90c28ba8002098348af63395fb3fe3cf, type: 3}
       propertyPath: m_Name
-      value: School chair
+      value: TeacherChair
       objectReference: {fileID: 0}
     - target: {fileID: -6514141196799729507, guid: 90c28ba8002098348af63395fb3fe3cf, type: 3}
       propertyPath: m_Layer
