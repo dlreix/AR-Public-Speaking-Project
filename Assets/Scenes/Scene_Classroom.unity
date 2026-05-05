@@ -19289,8 +19289,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 055c71675c9efd143837f645178d595b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::VRPublicSpeaking.AppShell.Integration.ScoringAdapter
-  gazeScoringSystem: {fileID: 0}
-  performanceScoringEngine: {fileID: 0}
+  gazeScoringSystem: {fileID: 9020778533418410529}
+  performanceScoringEngine: {fileID: 1926677405}
 --- !u!114 &638237677
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -19303,9 +19303,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8e812bdbf50e40042910f55258b0dc20, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::VRPublicSpeaking.AppShell.Integration.TrackingAdapter
-  eyeTrackingSystem: {fileID: 0}
-  gazeScoringSystem: {fileID: 0}
-  circleEventSystem: {fileID: 0}
+  eyeTrackingSystem: {fileID: 1413462843}
+  gazeScoringSystem: {fileID: 9020778533418410529}
+  circleEventSystem: {fileID: 3431839685594447753}
 --- !u!114 &638237678
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -19318,7 +19318,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a1d198328eb1846498f11d637b37b4e8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::VRPublicSpeaking.AppShell.Integration.ExistingSceneFlowAdapter
-  mainController: {fileID: 0}
+  mainController: {fileID: 8699008519291875985}
   scoringAdapter: {fileID: 638237676}
   speechPipelineController: {fileID: 0}
   environmentSessionOverlayController: {fileID: 633899308}
@@ -54233,6 +54233,112 @@ Transform:
   - {fileID: 409544122}
   m_Father: {fileID: 1093059457}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1926677404
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1926677406}
+  - component: {fileID: 1926677405}
+  m_Layer: 0
+  m_Name: PerformanceScoringEngine
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1926677405
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1926677404}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 19c2953e31afb43e685ec72941205b4d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PerformanceScoringEngine
+  finalScoreText: {fileID: 0}
+  speechScoreText: {fileID: 0}
+  eyeScoreText: {fileID: 0}
+  postureScoreText: {fileID: 0}
+  strongestText: {fileID: 0}
+  weakestText: {fileID: 0}
+  feedbackSummaryText: {fileID: 0}
+  speechMetrics:
+    wpm: 140
+    fillerWordsPerMinute: 2
+    averagePauseDuration: 0.8
+    toneVariationScore: 75
+  eyeMetrics:
+    eyeContactRatio: 0.65
+  postureMetrics:
+    slouchEventsPerMinute: 1
+    swayDurationPercent: 10
+    crossedArmsPercent: 5
+  scoreBreakdown:
+    speechScore: 0
+    eyeScore: 0
+    postureScore: 0
+    speechSubScores:
+      wpmScore: 0
+      fillerScore: 0
+      pauseScore: 0
+      toneScore: 0
+    totalScore: 0
+    slouchScore: 0
+    swayScore: 0
+    crossedArmsScore: 0
+  speechFeedback: 
+  eyeFeedback: 
+  postureFeedback: 
+  strongestArea: 
+  weakestArea: 
+  eyeTrackingSystem: {fileID: 1413462843}
+  swaySpeedThreshold: 40
+  swaySmoothing: 0.95
+  wpmWeight: 0.35
+  fillerWeight: 0.35
+  pauseWeight: 0.15
+  toneWeight: 0.15
+  speechFinalWeight: 0.4
+  eyeFinalWeight: 0.35
+  postureFinalWeight: 0.25
+  idealWpmMin: 120
+  idealWpmMax: 160
+  minAcceptableWpm: 80
+  maxAcceptableWpm: 220
+  idealFillerPerMin: 0
+  maxFillerPerMin: 10
+  idealPauseMin: 0.5
+  idealPauseMax: 1.5
+  minAcceptablePause: 0.1
+  maxAcceptablePause: 3
+  slouchPenalty: 8
+  swayPenalty: 0.5
+  crossedArmsPenalty: 0.4
+  strengthThreshold: 75
+  majorWeaknessThreshold: 50
+  calculateEveryFrame: 0
+--- !u!4 &1926677406
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1926677404}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -1.84505, y: 2.36929, z: 2.63087}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1927211590
 GameObject:
   m_ObjectHideFlags: 0
@@ -63896,3 +64002,4 @@ SceneRoots:
   - {fileID: 4069565894025889411}
   - {fileID: 638237680}
   - {fileID: 594526602}
+  - {fileID: 1926677406}
