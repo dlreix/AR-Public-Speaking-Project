@@ -28960,6 +28960,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::VRPublicSpeaking.AppShell.Results.DashboardAdapter
   dashboardController: {fileID: 0}
   dashboardRoot: {fileID: 0}
+  dashboardSceneName: Overview
+  dashboardLoadingMessage: Opening dashboard...
   openMessage: Open
   alternateOpenMessages:
   - OpenDashboard
@@ -30099,6 +30101,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::VRPublicSpeaking.AppShell.Results.DashboardAdapter
   dashboardController: {fileID: 0}
   dashboardRoot: {fileID: 0}
+  dashboardSceneName: Overview
+  dashboardLoadingMessage: Opening dashboard...
   openMessage: Open
   alternateOpenMessages:
   - OpenDashboard
@@ -36154,20 +36158,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1205295339}
   m_CullTransparentMesh: 1
---- !u!114 &1208060658
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: fc1515ab76e54f068e2f2207940fab32, type: 3}
-  m_Name: UI/TrackedDevicePosition
-  m_EditorClassIdentifier: Unity.InputSystem::UnityEngine.InputSystem.InputActionReference
-  m_Asset: {fileID: 1439541704}
-  m_ActionId: 24908448-c609-4bc3-a128-ea258674378a
 --- !u!1 &1223666402
 GameObject:
   m_ObjectHideFlags: 0
@@ -39268,20 +39258,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1316986306}
   m_CullTransparentMesh: 1
---- !u!114 &1319612599
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: fc1515ab76e54f068e2f2207940fab32, type: 3}
-  m_Name: UI/Navigate
-  m_EditorClassIdentifier: Unity.InputSystem::UnityEngine.InputSystem.InputActionReference
-  m_Asset: {fileID: 1439541704}
-  m_ActionId: c95b2375-e6d9-4b88-9c4c-c5e76515df4b
 --- !u!1 &1323696215
 GameObject:
   m_ObjectHideFlags: 0
@@ -47124,27 +47100,35 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ab68ce6587aab0146b8dabefbd806791, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: Unity.XR.Interaction.Toolkit::UnityEngine.XR.Interaction.Toolkit.UI.XRUIInputModule
   m_SendPointerHoverToParent: 1
-  m_MoveRepeatDelay: 0.5
-  m_MoveRepeatRate: 0.1
-  m_XRTrackingOrigin: {fileID: 1717954561738086117}
-  m_ActionsAsset: {fileID: 1439541704}
+  m_ClickSpeed: 0.3
+  m_MoveDeadzone: 0.6
+  m_RepeatDelay: 0.5
+  m_RepeatRate: 0.1
+  m_TrackedDeviceDragThresholdMultiplier: 2
+  m_TrackedScrollDeltaMultiplier: 5
+  m_BypassUIToolkitEvents: 0
+  m_ActiveInputMode: 0
+  m_EnableXRInput: 1
+  m_EnableMouseInput: 1
+  m_EnableTouchInput: 1
+  m_EnableGamepadInput: 1
+  m_EnableJoystickInput: 1
   m_PointAction: {fileID: 1727038244}
-  m_MoveAction: {fileID: 1319612599}
-  m_SubmitAction: {fileID: 807520534}
-  m_CancelAction: {fileID: 1078880266}
   m_LeftClickAction: {fileID: 911463810}
   m_MiddleClickAction: {fileID: 1916901154}
   m_RightClickAction: {fileID: 627748515}
   m_ScrollWheelAction: {fileID: 208617618}
-  m_TrackedDevicePositionAction: {fileID: 1208060658}
-  m_TrackedDeviceOrientationAction: {fileID: 1849108845}
-  m_DeselectOnBackgroundClick: 1
-  m_PointerBehavior: 0
-  m_CursorLockBehavior: 0
-  m_ScrollDeltaPerTick: 6
+  m_NavigateAction: {fileID: 0}
+  m_SubmitAction: {fileID: 807520534}
+  m_CancelAction: {fileID: 1078880266}
+  m_EnableBuiltinActionsAsFallback: 1
+  m_HorizontalAxis: Horizontal
+  m_VerticalAxis: Vertical
+  m_SubmitButton: Submit
+  m_CancelButton: Cancel
 --- !u!114 &1510994667
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -48826,6 +48810,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1606532353}
   - component: {fileID: 1606532354}
+  - component: {fileID: 1606532355}
   m_Layer: 0
   m_Name: CoolRoomSpot_Right
   m_TagString: Untagged
@@ -48917,6 +48902,35 @@ Light:
   m_LightUnit: 1
   m_LuxAtDistance: 1
   m_EnableSpotReflector: 1
+--- !u!114 &1606532355
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1606532352}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 474bcb49853aa07438625e644c072ee6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.UniversalAdditionalLightData
+  m_UsePipelineSettings: 1
+  m_AdditionalLightsShadowResolutionTier: 2
+  m_CustomShadowLayers: 0
+  m_LightCookieSize: {x: 1, y: 1}
+  m_LightCookieOffset: {x: 0, y: 0}
+  m_SoftShadowQuality: 0
+  m_RenderingLayersMask:
+    serializedVersion: 0
+    m_Bits: 1
+  m_ShadowRenderingLayersMask:
+    serializedVersion: 0
+    m_Bits: 1
+  m_Version: 4
+  m_LightLayerMask: 1
+  m_ShadowLayerMask: 1
+  m_RenderingLayers: 1
+  m_ShadowRenderingLayers: 1
 --- !u!1 &1612767085
 GameObject:
   m_ObjectHideFlags: 0
@@ -54681,20 +54695,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1843279209}
   m_CullTransparentMesh: 1
---- !u!114 &1849108845
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: fc1515ab76e54f068e2f2207940fab32, type: 3}
-  m_Name: UI/TrackedDeviceOrientation
-  m_EditorClassIdentifier: Unity.InputSystem::UnityEngine.InputSystem.InputActionReference
-  m_Asset: {fileID: 1439541704}
-  m_ActionId: 9caa3d8a-6b2f-4e8e-8bad-6ede561bd9be
 --- !u!1 &1851391282
 GameObject:
   m_ObjectHideFlags: 0
