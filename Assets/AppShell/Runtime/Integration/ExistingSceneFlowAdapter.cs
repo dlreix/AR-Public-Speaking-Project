@@ -123,6 +123,16 @@ namespace VRPublicSpeaking.AppShell.Integration
             environmentSessionOverlayController?.HandleSessionStarted();
         }
 
+        private void HandleSessionPaused()
+        {
+            speechPipelineController?.PauseRecordingFromShell();
+        }
+
+        private void HandleSessionResumed()
+        {
+            speechPipelineController?.ResumeRecordingFromShell();
+        }
+
         private void HandleSessionEnded(float durationSeconds, float gazeScore)
         {
             if (runtimeState == null)
@@ -279,9 +289,13 @@ namespace VRPublicSpeaking.AppShell.Integration
             }
 
             mainController.SessionStarted -= HandleSessionStarted;
-            mainController.SessionEnded -= HandleSessionEnded;
+            mainController.SessionEnded   -= HandleSessionEnded;
+            mainController.SessionPaused  -= HandleSessionPaused;
+            mainController.SessionResumed -= HandleSessionResumed;
             mainController.SessionStarted += HandleSessionStarted;
-            mainController.SessionEnded += HandleSessionEnded;
+            mainController.SessionEnded   += HandleSessionEnded;
+            mainController.SessionPaused  += HandleSessionPaused;
+            mainController.SessionResumed += HandleSessionResumed;
         }
 
         private void StartSpeechPipelineIfEnabled()
@@ -369,7 +383,9 @@ namespace VRPublicSpeaking.AppShell.Integration
             }
 
             mainController.SessionStarted -= HandleSessionStarted;
-            mainController.SessionEnded -= HandleSessionEnded;
+            mainController.SessionEnded   -= HandleSessionEnded;
+            mainController.SessionPaused  -= HandleSessionPaused;
+            mainController.SessionResumed -= HandleSessionResumed;
         }
     }
 }

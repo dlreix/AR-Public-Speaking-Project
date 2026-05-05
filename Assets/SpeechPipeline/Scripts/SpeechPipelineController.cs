@@ -50,6 +50,10 @@ namespace SpeechPipeline
         public SpeechAdapter SpeechAdapter;
         public bool UpdateScoringOnSessionEnd = true;
 
+        [Header("Debug Input")]
+        [Tooltip("Allow SPACE key to start/stop recording without MainController. Disable in VR builds.")]
+        public bool EnableSpaceKeyInput = false;
+
         // ── State machine ─────────────────────────────────────────────────────
 
         private enum PipelineState { Loading, Ready, Recording }
@@ -57,9 +61,11 @@ namespace SpeechPipeline
         private bool _startWhenReadyRequested;
         private bool _modelUnavailable;
         private bool _loadErrorLogged;
+        private bool _isPaused;
 
         public bool IsReady => _state == PipelineState.Ready;
         public bool IsRecording => _state == PipelineState.Recording;
+        public bool IsPaused => _isPaused;
 
         // ── Subsystems ────────────────────────────────────────────────────────
 
@@ -107,6 +113,8 @@ namespace SpeechPipeline
 
         private bool  _modelReadyLogged;
         private float _chunkTimer;
+        private float _totalPausedSec;
+        private float _pauseStartedAt = -1f;
         private const float ChunkSec = 0.1f;
 
         // ── Unity lifecycle ───────────────────────────────────────────────────
@@ -187,8 +195,8 @@ namespace SpeechPipeline
                 }
             }
 
-            // ── Space key ─────────────────────────────────────────────────────
-            if (Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame)
+            // ── Space key (debug only — disabled by default in VR) ────────────
+            if (EnableSpaceKeyInput && Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame)
             {
                 switch (_state)
                 {
@@ -198,7 +206,7 @@ namespace SpeechPipeline
                 return;
             }
 
-            if (_state != PipelineState.Recording) return;
+            if (_state != PipelineState.Recording || _isPaused) return;
 
             // ── Drain STT results ─────────────────────────────────────────────
             DrainSTT();
@@ -288,13 +296,54 @@ namespace SpeechPipeline
                 return false;
             }
 
+            _isPaused = false;
             EndSession();
             return true;
+        }
+
+        public void PauseRecordingFromShell()
+        {
+            if (_state != PipelineState.Recording || _isPaused)
+            {
+                return;
+            }
+
+            _isPaused = true;
+            _pauseStartedAt = Time.realtimeSinceStartup;
+            _capture?.Poll(); // flush buffered audio so we don't process dead air on resume
+            if (_wasSpeaking)
+            {
+                _pace?.CancelUtterance(); // avoid orphaned StartUtterance inflating WPM on resume
+                _wasSpeaking   = false;
+                _speakingTimer = 0f;
+                _tickTimer     = 0f;
+            }
+        }
+
+        public void ResumeRecordingFromShell()
+        {
+            if (_state != PipelineState.Recording || !_isPaused)
+            {
+                return;
+            }
+
+            if (_pauseStartedAt >= 0f)
+            {
+                _totalPausedSec += Time.realtimeSinceStartup - _pauseStartedAt;
+                _pauseStartedAt  = -1f;
+            }
+
+            _isPaused = false;
+            _capture?.Poll(); // discard audio captured while paused
+            _pause?.Reset();  // clear stale SilenceTimer so resume doesn't fire a spurious OnPauseDetected
         }
 
         private void BeginSession()
         {
             _state = PipelineState.Recording;
+            _isPaused       = false;
+            _pauseStartedAt = -1f;
+            _totalPausedSec = 0f;
             _capture.Poll(); // flush stale audio
 
             _sessionStart       = Time.realtimeSinceStartup;
@@ -324,7 +373,7 @@ namespace SpeechPipeline
 
             float avgWpm      = _sessionWpmCount   > 0 ? _sessionWpmSum      / _sessionWpmCount   : EstimateSessionWpm();
             float avgPitchStd = _sessionPitchCount > 0 ? _sessionPitchStdSum / _sessionPitchCount : 0f;
-            float totalSec    = Time.realtimeSinceStartup - _sessionStart;
+            float totalSec    = Mathf.Max(0f, Time.realtimeSinceStartup - _sessionStart - _totalPausedSec);
             float totalMin    = totalSec / 60f;
             float fillerPerMin = totalMin > 0f ? _sessionFillers / totalMin : 0f;
             float avgPause = _sessionPauses > 0 ? _sessionPauseTotal / _sessionPauses : 0f;
@@ -500,12 +549,24 @@ namespace SpeechPipeline
 
         private static bool IsUsableModelFolder(string modelPath)
         {
-            if (string.IsNullOrWhiteSpace(modelPath) || !Directory.Exists(modelPath))
+            if (string.IsNullOrWhiteSpace(modelPath))
+            {
+                return false;
+            }
+
+            // On Android, StreamingAssets lives inside a .jar so Directory.Exists always
+            // returns false. Trust that the model is present and let VoskSTTEngine report
+            // a load error if it isn't.
+#if UNITY_ANDROID && !UNITY_EDITOR
+            return true;
+#else
+            if (!Directory.Exists(modelPath))
             {
                 return false;
             }
 
             return Directory.GetFiles(modelPath).Length > 0 || Directory.GetDirectories(modelPath).Length > 0;
+#endif
         }
 
         // ── Cleanup ───────────────────────────────────────────────────────────
