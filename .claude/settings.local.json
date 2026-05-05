@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs grep *)",
+      "Bash(python update_ui.py)",
+      "Bash(python fix_ui.py)",
+      "Bash(python update_brown_ui.py)"
+    ]
+  }
+}
