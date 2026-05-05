@@ -58,6 +58,11 @@ namespace VRPublicSpeaking.AppShell.Flow
             ConfigureTutorialHub();
         }
 
+        public void OpenLoginPanel()
+        {
+            uiStateController?.ShowPanel(AppPanelType.Login);
+        }
+
         public void OpenHomePanel()
         {
             uiStateController?.ShowPanel(AppPanelType.Home);
@@ -151,9 +156,9 @@ namespace VRPublicSpeaking.AppShell.Flow
 
         private void OpenRequestedStartupPanel()
         {
-            if (runtimeState == null)
+            if (DataManager.Instance != null && DataManager.Instance.currentUser == "DefaultUser")
             {
-                OpenHomePanel();
+                OpenLoginPanel(); // DEÐÝÞTÝ: Eskiden OpenHomePanel idi, artýk ilk Login açýlacak
                 return;
             }
 
@@ -186,8 +191,12 @@ namespace VRPublicSpeaking.AppShell.Flow
                     OpenSettingsPanel();
                     break;
 
+                case AppPanelType.Home:
+                    OpenHomePanel(); // Baþka bir ekrandan özel olarak Home'a dönmek istenirse
+                    break;
+
                 default:
-                    OpenHomePanel();
+                    OpenLoginPanel(); // DEÐÝÞTÝ: Eskiden OpenHomePanel idi, artýk varsayýlanýmýz Login
                     break;
             }
         }

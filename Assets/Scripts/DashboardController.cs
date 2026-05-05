@@ -46,12 +46,17 @@ public class DashboardController : MonoBehaviour
     void Start()
     {
         EnsureDataManager();
-        ImportLatestAppShellResult();
 
         if (PerformanceScoringEngine.Instance != null)
         {
             PerformanceScoringEngine.Instance.OnScoreCalculated += HandleNewSessionData;
         }
+    }
+
+    // YENÝ EKLENDÝ: Ekran her aktif olduðunda son veriyi çeker ve UI'ý günceller
+    void OnEnable()
+    {
+        ImportLatestAppShellResult();
         RefreshAllUI();
     }
 
@@ -63,54 +68,6 @@ public class DashboardController : MonoBehaviour
         }
     }
 
-    // --- MANUEL SAVE VE TEST FONKSÝYONU ---
-    public void FinishAndSaveSession()
-    {
-        if (PerformanceScoringEngine.Instance != null)
-        {
-            // 1. ADIM: Baðýmsýz ham metrikleri rastgele üret (Sensörden geliyormuþ gibi)
-            float randomWPM = Random.Range(100f, 180f);
-            float randomFiller = Random.Range(0f, 8f);
-            float randomPause = Random.Range(0.2f, 2.5f);
-            float randomTone = Random.Range(40f, 100f);
-
-            float randomEyeRatio = Random.Range(0.3f, 1.0f); // 0 ile 1 arasý oran
-
-            float randomSlouch = Random.Range(0f, 5f);
-            float randomSway = Random.Range(0f, 40f);
-            float randomCrossed = Random.Range(0f, 30f);
-
-            // 2. ADIM: Bu verileri Engine'in kendi güvenlikli fonksiyonlarýyla içeri gönder
-            PerformanceScoringEngine.Instance.SetSpeechMetrics(randomWPM, randomFiller, randomPause, randomTone);
-            PerformanceScoringEngine.Instance.SetEyeContactRatio(randomEyeRatio);
-            PerformanceScoringEngine.Instance.SetPostureMetrics(randomSlouch, randomSway, randomCrossed);
-
-            // 3. ADIM: Engine'e "Tüm bu verileri harmanla ve skoru hesapla" diyoruz
-            PerformanceScoringEngine.Instance.CalculateSessionScore();
-
-            // 4. ADIM: Algoritmanýn ürettiði, tavsiyelerle dolu o "Akýllý Raporu" çekiyoruz
-            FeedbackReport finalReport = PerformanceScoringEngine.Instance.GetFeedbackReport();
-
-            // 5. ADIM: Raporu DataManager'a kaydedip ekraný güncelliyoruz
-            if (finalReport != null && DataManager.Instance != null)
-            {
-                DataManager.Instance.SaveSession(finalReport);
-                RefreshAllUI();
-                Debug.Log($"Algoritma çalýþtý! Yeni skor: {finalReport.totalScore:F1} | Kayýt baþarýlý.");
-            }
-            else
-            {
-                Debug.LogError("Rapor alýnamadý veya DataManager yok!");
-            }
-        }
-        else
-        {
-            Debug.LogError("PerformanceScoringEngine sahnede bulunamadý! Lütfen sahnede olduðundan emin ol.");
-        }
-    }
-
-
-    // --- ENGINE'DEN GELEN VERÝYÝ YAKALAMA ---
     public void HandleNewSessionData(FeedbackReport report)
     {
         if (DataManager.Instance != null)
@@ -133,13 +90,9 @@ public class DashboardController : MonoBehaviour
         UpdateChart();
     }
 
-    // --- TÜM SAYFALARI GÜNCELLEYEN ANA FONKSÝYON ---
     private void EnsureDataManager()
     {
-        if (DataManager.Instance != null)
-        {
-            return;
-        }
+        if (DataManager.Instance != null) return;
 
         GameObject dataManagerRoot = new GameObject("DataManager_Auto");
         dataManagerRoot.AddComponent<DataManager>();
@@ -147,24 +100,47 @@ public class DashboardController : MonoBehaviour
 
     private void ImportLatestAppShellResult()
     {
-        if (DataManager.Instance == null || !AppRuntimeState.HasInstance)
+        Debug.Log("[DashboardController] Veri çekme (Import) iþlemi baþladý...");
+
+        if (DataManager.Instance == null)
         {
+            Debug.LogError("[DashboardController] HATA: DataManager bulunamadý!");
+            return;
+        }
+
+        if (!AppRuntimeState.HasInstance)
+        {
+            Debug.LogError("[DashboardController] HATA: AppRuntimeState bulunamadý! Motor veriyi tutmuyor.");
             return;
         }
 
         SessionResultSummary latestSummary = AppRuntimeState.Instance.GetLastSessionResultCopy();
-        DataManager.Instance.SaveSession(latestSummary);
+
+        if (latestSummary == null)
+        {
+            Debug.LogWarning("[DashboardController] AppRuntimeState bulundu ama oturum verisi BOÞ (null).");
+            return;
+        }
+
+        bool basarili = DataManager.Instance.SaveSession(latestSummary);
+
+        if (basarili)
+        {
+            Debug.Log("<color=green>[DashboardController] MÜKEMMEL! Sahne geçiþinde konuþma verisi baþarýyla yakalandý ve kaydedildi!</color>");
+        }
+        else
+        {
+            Debug.LogWarning("[DashboardController] Veri bulundu ancak DataManager kaydetmeyi reddetti (veri 0 veya ayný veri az önce kaydedildi).");
+        }
     }
 
     public void DisplaySession(SessionData data)
     {
         if (data == null) return;
 
-        // 1. Overview Güncelle
         if (overviewScoreText != null) overviewScoreText.text = data.overallScore.ToString("F0");
         if (overviewDateText != null) overviewDateText.text = data.date;
 
-        // 2. Performance Güncelle (Eski Bar Dizileri)
         if (performanceBars != null)
         {
             for (int i = 0; i < performanceBars.Length; i++)
@@ -182,13 +158,11 @@ public class DashboardController : MonoBehaviour
         }
         if (performanceDateText != null) performanceDateText.text = data.date;
 
-
         if (data.detailedReport != null)
         {
             UpdateDetailedColumns(data.detailedReport, data.eyeContact);
             UpdateAICoachPage(data.detailedReport);
         }
-
 
         if (historyDateText != null) historyDateText.text = data.date;
     }
@@ -227,7 +201,7 @@ public class DashboardController : MonoBehaviour
                 if (item.severity == FeedbackItem.Severity.Strength)
                     sb.AppendLine("• " + item.message);
 
-            sb.AppendLine("\n<color=#FF4444><b>- <Weaknesses</b></color>");
+            sb.AppendLine("\n<color=#FF4444><b>- Weaknesses</b></color>");
             foreach (var item in report.items)
                 if (item.severity == FeedbackItem.Severity.Major || item.severity == FeedbackItem.Severity.Minor)
                     sb.AppendLine("• " + item.message);
@@ -249,7 +223,6 @@ public class DashboardController : MonoBehaviour
         return summary != null ? summary.message : "Analysis complete.";
     }
 
-    // --- GEÇMÝÞ KARTLARINI TAZELEME (ESKÝ KODUN BÝREBÝR AYNISI) ---
     public void RefreshHistoryCards()
     {
         if (DataManager.Instance == null || cardScores == null || cardDates == null) return;
@@ -271,7 +244,6 @@ public class DashboardController : MonoBehaviour
         }
     }
 
-    // --- GRAFÝK GÜNCELLEME (ESKÝ KODUN BÝREBÝR AYNISI) ---
     public void UpdateChart()
     {
         if (DataManager.Instance == null || chartLine == null) return;
@@ -285,12 +257,11 @@ public class DashboardController : MonoBehaviour
             int dataIndex = all.Count - count + i;
             float score = all[dataIndex].overallScore;
 
-            float xPos = (i * 95f) - 400f; // Geniþlik ve hizalama ayarý
-            float yPos = (score * 2.5f) - 120f; // Yükseklik ayarý
+            float xPos = (i * 95f) - 400f;
+            float yPos = (score * 2.5f) - 120f;
 
             chartLine.SetPosition(i, new Vector3(xPos, yPos, 0));
 
-            // s1, s2 etiketlerini kaydýr
             if (chartLabels != null && i < chartLabels.Length && chartLabels[i] != null)
             {
                 int sessionNum = all.Count - count + i + 1;
@@ -299,7 +270,6 @@ public class DashboardController : MonoBehaviour
         }
     }
 
-    // --- SÝSTEMÝ SIFIRLAMA ---
     public void ResetSystem()
     {
         if (DataManager.Instance != null)
@@ -307,7 +277,6 @@ public class DashboardController : MonoBehaviour
             DataManager.Instance.DeleteAllData();
             if (chartLine != null) chartLine.positionCount = 0;
 
-            // DÜZELTME: Etiketleri boþaltmak yerine s1'den s9'a kadar diz
             if (chartLabels != null)
             {
                 for (int i = 0; i < chartLabels.Length; i++)
