@@ -57,10 +57,13 @@ namespace VRPublicSpeaking.AppShell.Results
                 }
             }
 
+          
+            
             if (!opened)
             {
+        
                 opened = TryOpenDashboardScene();
-            }
+            } 
 
             if (!opened)
             {
@@ -133,6 +136,7 @@ namespace VRPublicSpeaking.AppShell.Results
 
             if (!Application.CanStreamedLevelBeLoaded(sceneName))
             {
+
                 Debug.LogWarning($"[DashboardAdapter] Dashboard scene '{sceneName}' is not in the build settings.");
                 return false;
             }
