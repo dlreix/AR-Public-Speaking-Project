@@ -22,6 +22,12 @@ namespace SpeechPipeline
             _running = true;
         }
 
+        /// <summary>Cancels a running utterance without producing a result. Call when the session is externally paused mid-utterance.</summary>
+        public void CancelUtterance()
+        {
+            _running = false;
+        }
+
         /// <summary>Returns (wpm, durationSeconds). Both 0 if not started or word count is 0.</summary>
         public (float wpm, float sec) StopUtterance(int wordCount)
         {

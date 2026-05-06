@@ -29,4 +29,19 @@ namespace SpeechPipeline
         public float        AvgRMS;
         public float        PeakRMS;
     }
+
+    [Serializable]
+    public class SessionData
+    {
+        public float        TotalSec;
+        public float        SpeakingSec;
+        public int          PauseCount;
+        public float        PauseTotalSec;
+        public int          WordCount;
+        public float        AvgWpm;
+        public float        AvgPitchStdDev;
+        public int          FillerCount;
+        public List<string> FillerWords;
+        public List<string> Transcript;
+    }
 }

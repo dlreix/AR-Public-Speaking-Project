@@ -68,6 +68,16 @@ namespace SpeechPipeline
             return voiced;
         }
 
+        /// <summary>Resets all internal timers. Call when resuming after an external pause so stale silence does not trigger a spurious OnPauseDetected.</summary>
+        public void Reset()
+        {
+            IsSpeaking   = false;
+            IsInPause    = false;
+            PauseElapsed = 0f;
+            SilenceTimer = 0f;
+            _gapTimer    = 0f;
+        }
+
         public static float ComputeRMS(float[] samples)
         {
             if (samples == null || samples.Length == 0) return 0f;

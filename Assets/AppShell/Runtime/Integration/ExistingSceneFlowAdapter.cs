@@ -123,6 +123,16 @@ namespace VRPublicSpeaking.AppShell.Integration
             environmentSessionOverlayController?.HandleSessionStarted();
         }
 
+        private void HandleSessionPaused()
+        {
+            speechPipelineController?.PauseRecordingFromShell();
+        }
+
+        private void HandleSessionResumed()
+        {
+            speechPipelineController?.ResumeRecordingFromShell();
+        }
+
         private void HandleSessionEnded(float durationSeconds, float gazeScore)
         {
             if (runtimeState == null)
@@ -253,6 +263,11 @@ namespace VRPublicSpeaking.AppShell.Integration
             return mainController != null;
         }
 
+        public void SetSpeechPipelineController(SpeechPipelineController controller)
+        {
+            speechPipelineController = controller;
+        }
+
         private void AttachToMainController(MainController controller)
         {
             if (mainController == controller)
@@ -274,9 +289,13 @@ namespace VRPublicSpeaking.AppShell.Integration
             }
 
             mainController.SessionStarted -= HandleSessionStarted;
-            mainController.SessionEnded -= HandleSessionEnded;
+            mainController.SessionEnded   -= HandleSessionEnded;
+            mainController.SessionPaused  -= HandleSessionPaused;
+            mainController.SessionResumed -= HandleSessionResumed;
             mainController.SessionStarted += HandleSessionStarted;
-            mainController.SessionEnded += HandleSessionEnded;
+            mainController.SessionEnded   += HandleSessionEnded;
+            mainController.SessionPaused  += HandleSessionPaused;
+            mainController.SessionResumed += HandleSessionResumed;
         }
 
         private void StartSpeechPipelineIfEnabled()
@@ -289,7 +308,12 @@ namespace VRPublicSpeaking.AppShell.Integration
             AutoWireIfNeeded();
             if (speechPipelineController == null)
             {
-                Debug.LogWarning("[ExistingSceneFlowAdapter] Voice analysis is enabled, but no SpeechPipelineController was found.");
+                speechPipelineController = EnsureSpeechPipelineSystem();
+            }
+
+            if (speechPipelineController == null)
+            {
+                Debug.LogWarning("[ExistingSceneFlowAdapter] Voice analysis is enabled, but SpeechPipelineController could not be created.");
                 return;
             }
 
@@ -307,6 +331,50 @@ namespace VRPublicSpeaking.AppShell.Integration
             speechPipelineController?.EndRecordingFromShell();
         }
 
+        private SpeechPipelineController EnsureSpeechPipelineSystem()
+        {
+            SpeechAdapter speechAdapter = FindFirstObjectByType<SpeechAdapter>(FindObjectsInactive.Include);
+            if (speechAdapter == null)
+            {
+                speechAdapter = GetComponent<SpeechAdapter>() ?? gameObject.AddComponent<SpeechAdapter>();
+            }
+
+            PerformanceScoringEngine scoringEngine = null;
+            if (scoringAdapter != null)
+            {
+                scoringAdapter.AutoWireIfNeeded();
+                scoringEngine = scoringAdapter.PerformanceScoringEngine;
+            }
+
+            if (scoringEngine == null)
+            {
+                scoringEngine = FindFirstObjectByType<PerformanceScoringEngine>(FindObjectsInactive.Include);
+            }
+
+            if (scoringEngine == null)
+            {
+                GameObject scoringRoot = new GameObject("PerformanceScoringEngine_Auto");
+                scoringEngine = scoringRoot.AddComponent<PerformanceScoringEngine>();
+            }
+
+            scoringAdapter?.SetPerformanceScoringEngine(scoringEngine);
+            speechAdapter.SetScoringEngine(scoringEngine);
+
+            SpeechPipelineController controller =
+                FindFirstObjectByType<SpeechPipelineController>(FindObjectsInactive.Include);
+            if (controller == null)
+            {
+                GameObject speechRoot = new GameObject("SpeechPipeline_Auto");
+                speechRoot.AddComponent<AudioSource>();
+                controller = speechRoot.AddComponent<SpeechPipelineController>();
+            }
+
+            controller.SpeechAdapter = speechAdapter;
+            controller.ScoringEngine = scoringEngine;
+            Debug.Log("[ExistingSceneFlowAdapter] Speech pipeline runtime binding is ready.");
+            return controller;
+        }
+
         private void DetachEvents()
         {
             if (mainController == null)
@@ -315,7 +383,9 @@ namespace VRPublicSpeaking.AppShell.Integration
             }
 
             mainController.SessionStarted -= HandleSessionStarted;
-            mainController.SessionEnded -= HandleSessionEnded;
+            mainController.SessionEnded   -= HandleSessionEnded;
+            mainController.SessionPaused  -= HandleSessionPaused;
+            mainController.SessionResumed -= HandleSessionResumed;
         }
     }
 }

@@ -53,19 +53,19 @@ public class ScoreBreakdown
     [Range(0f, 100f)] public float totalScore;
 
     [Header("Posture Sub-Scores")]
-public float slouchScore;
-public float swayScore;
-public float crossedArmsScore;
+    public float slouchScore;
+    public float swayScore;
+    public float crossedArmsScore;
 }
 
 [System.Serializable]
 public class FeedbackItem
 {
     public enum Severity { Strength, Minor, Major }
-    public string category;   // "Speech", "Eye Contact", "Posture"
-    public string metric;     // "WPM", "Filler Words", vb.
+    public string category;
+    public string metric;
     public Severity severity;
-    public string message;    // Kullanıcıya gösterilen açıklamalı metin
+    public string message;
     public float score;
     public FeedbackItem(string cat, string met, Severity sev, string msg, float sc)
     {
@@ -86,7 +86,6 @@ public class FeedbackReport
     public List<FeedbackItem> items        = new List<FeedbackItem>();
     public List<string>       strengths    = new List<string>();
     public List<string>       improvements = new List<string>();
-
     public long sessionTimestamp;
 }
 
@@ -95,7 +94,7 @@ public class PerformanceScoringEngine : MonoBehaviour
     public static PerformanceScoringEngine Instance { get; private set; }
     public event Action<FeedbackReport> OnScoreCalculated;
 
-    //  UI
+    // ── UI ────────────────────────────────────────────────────────────────────
 
     [Header("UI — Skor Metinleri")]
     public TextMeshProUGUI finalScoreText;
@@ -108,7 +107,7 @@ public class PerformanceScoringEngine : MonoBehaviour
     [Header("UI — Feedback Paneli")]
     public TextMeshProUGUI feedbackSummaryText;
 
-    // metrics and scores
+    // ── Metrics ───────────────────────────────────────────────────────────────
 
     [Header("Input Metrics")]
     public SpeechMetrics  speechMetrics  = new SpeechMetrics();
@@ -125,8 +124,28 @@ public class PerformanceScoringEngine : MonoBehaviour
     public string strongestArea;
     public string weakestArea;
 
+    // ── Posture — Head Tracking ───────────────────────────────────────────────
 
-    //  weights
+    [Header("Posture — Head Tracking (EyeTrackingSystem)")]
+    [Tooltip("Main Camera üzerindeki EyeTrackingSystem. Bağlanırsa baş hareketinden posture tahmini yapılır.")]
+    [SerializeField] private EyeTrackingSystem eyeTrackingSystem;
+
+    [Tooltip("Sway hesabı için baş hız eşiği (°/s). Bu değerin üzeri sway sayılır.")]
+    [SerializeField] private float swaySpeedThreshold = 40f;
+
+    [Tooltip("Sway yüzdesi yumuşatma faktörü (0=anlık, 1=hiç değişmez).")]
+    [Range(0f, 0.99f)]
+    [SerializeField] private float swaySmoothing = 0.95f;
+
+    // Posture tracking iç değişkenleri
+    private float _postureSessionStart;
+    private float _swayAccumSec;
+    private float _totalActiveSec;
+    private float _smoothedSwayPercent;
+    private int   _headWarningCount;
+    private bool  _postureTrackingActive;
+
+    // ── Weights ───────────────────────────────────────────────────────────────
 
     [Header("Speech Score Weights")]
     [Range(0f, 1f)] public float wpmWeight    = 0.35f;
@@ -139,17 +158,21 @@ public class PerformanceScoringEngine : MonoBehaviour
     [Range(0f, 1f)] public float eyeFinalWeight     = 0.35f;
     [Range(0f, 1f)] public float postureFinalWeight = 0.25f;
 
-
     [Header("WPM Target Range")]
-    public float idealWpmMin = 120f;    public float idealWpmMax = 160f;
-    public float minAcceptableWpm = 80f; public float maxAcceptableWpm = 220f;
+    public float idealWpmMin = 120f;
+    public float idealWpmMax = 160f;
+    public float minAcceptableWpm = 80f;
+    public float maxAcceptableWpm = 220f;
 
     [Header("Filler Word Thresholds")]
-    public float idealFillerPerMin = 0f;  public float maxFillerPerMin = 10f;
+    public float idealFillerPerMin = 0f;
+    public float maxFillerPerMin = 10f;
 
     [Header("Pause Duration Thresholds (seconds)")]
-    public float idealPauseMin = 0.5f;    public float idealPauseMax = 1.5f;
-    public float minAcceptablePause = 0.1f; public float maxAcceptablePause = 3.0f;
+    public float idealPauseMin = 0.5f;
+    public float idealPauseMax = 1.5f;
+    public float minAcceptablePause = 0.1f;
+    public float maxAcceptablePause = 3.0f;
 
     [Header("Posture Penalty Constants")]
     public float slouchPenalty      = 8f;
@@ -157,9 +180,7 @@ public class PerformanceScoringEngine : MonoBehaviour
     public float crossedArmsPenalty = 0.4f;
 
     [Header("Feedback Thresholds")]
-
     [Range(50f, 90f)] public float strengthThreshold      = 75f;
-
     [Range(20f, 60f)] public float majorWeaknessThreshold = 50f;
 
     [Header("Auto Recalculate")]
@@ -167,29 +188,105 @@ public class PerformanceScoringEngine : MonoBehaviour
 
     private FeedbackReport lastReport;
 
+    // ── Lifecycle ─────────────────────────────────────────────────────────────
+
     private void Awake()
     {
         if (Instance == null || Instance == this)
-        {
             Instance = this;
-        }
+
+        // Inspector'da atanmamışsa otomatik bul
+        if (eyeTrackingSystem == null)
+            eyeTrackingSystem = FindObjectOfType<EyeTrackingSystem>(true);
     }
 
     private void OnDestroy()
     {
         if (Instance == this)
-        {
             Instance = null;
-        }
     }
 
-    private void Start() { CalculateSessionScore(false); }
+    private void Start()
+    {
+        CalculateSessionScore(false);
+    }
 
     private void Update()
     {
-        if (calculateEveryFrame) CalculateSessionScore();
+        UpdatePostureFromHeadTracking();
+
+        if (calculateEveryFrame)
+            CalculateSessionScore();
     }
 
+    // ── Posture Head Tracking ─────────────────────────────────────────────────
+
+    /// <summary>
+    /// Her frame çağrılır. EyeTrackingSystem aktifse baş hızından
+    /// sway ve slouch tahminlerini günceller.
+    /// </summary>
+    private void UpdatePostureFromHeadTracking()
+    {
+        if (eyeTrackingSystem == null || !eyeTrackingSystem.IsActive || eyeTrackingSystem.IsPaused)
+        {
+            _postureTrackingActive = false;
+            return;
+        }
+
+        float dt = Time.deltaTime;
+        _totalActiveSec += dt;
+
+        // İlk aktif frame'de sıfırla
+        if (!_postureTrackingActive)
+        {
+            _postureTrackingActive = true;
+            _postureSessionStart   = Time.time;
+            _swayAccumSec          = 0f;
+            _totalActiveSec        = 0f;
+            _headWarningCount      = 0;
+            _smoothedSwayPercent   = 0f;
+        }
+
+        float headSpeed = eyeTrackingSystem.SmoothedHeadSpeed;
+
+        // Baş hızı eşiği aşıyorsa sway zamanı biriktir
+        if (headSpeed > swaySpeedThreshold)
+            _swayAccumSec += dt;
+
+        // Sway yüzdesi = sway süresi / toplam aktif süre
+        float rawSwayPercent = _totalActiveSec > 0.5f
+            ? Mathf.Clamp(_swayAccumSec / _totalActiveSec * 100f, 0f, 100f)
+            : 0f;
+
+        // Yumuşat — ani spike'ları önler
+        _smoothedSwayPercent = Mathf.Lerp(rawSwayPercent, _smoothedSwayPercent, swaySmoothing);
+
+        // Baş uyarısından slouch tahmini (dakika başına uyarı sayısı)
+        if (eyeTrackingSystem.IsHeadWarning)
+            _headWarningCount++;
+
+        float sessionMinutes = _totalActiveSec / 60f;
+        float slouchPerMin   = sessionMinutes > 0f ? _headWarningCount / sessionMinutes : 0f;
+
+        // PostureMetrics'e yaz — SetPostureMetrics üzerinden
+        postureMetrics.swayDurationPercent   = _smoothedSwayPercent;
+        postureMetrics.slouchEventsPerMinute = slouchPerMin;
+        postureMetrics.crossedArmsPercent    = 0f; // VR'da ölçülemiyor
+    }
+
+    /// <summary>
+    /// Posture tracking iç sayaçlarını sıfırlar. Session başlangıcında çağrılabilir.
+    /// </summary>
+    public void ResetPostureTracking()
+    {
+        _swayAccumSec        = 0f;
+        _totalActiveSec      = 0f;
+        _headWarningCount    = 0;
+        _smoothedSwayPercent = 0f;
+        _postureTrackingActive = false;
+    }
+
+    // ── Score Calculation ─────────────────────────────────────────────────────
 
     [ContextMenu("Calculate Session Score")]
     public void CalculateSessionScore()
@@ -216,9 +313,7 @@ public class PerformanceScoringEngine : MonoBehaviour
 
         UpdateUI();
         if (notifyListeners)
-        {
             OnScoreCalculated?.Invoke(lastReport);
-        }
 
         Debug.Log(
             $"[PerformanceScoringEngine] Speech={scoreBreakdown.speechScore:F1} " +
@@ -227,7 +322,8 @@ public class PerformanceScoringEngine : MonoBehaviour
             $"Pause={scoreBreakdown.speechSubScores.pauseScore:F1} " +
             $"Tone={scoreBreakdown.speechSubScores.toneScore:F1}), " +
             $"Eye={scoreBreakdown.eyeScore:F1}, " +
-            $"Posture={scoreBreakdown.postureScore:F1}, " +
+            $"Posture={scoreBreakdown.postureScore:F1} " +
+            $"(Sway={postureMetrics.swayDurationPercent:F1}% Slouch={postureMetrics.slouchEventsPerMinute:F1}/min), " +
             $"Total={scoreBreakdown.totalScore:F1} [{GetPerformanceBand()}]"
         );
     }
@@ -256,15 +352,15 @@ public class PerformanceScoringEngine : MonoBehaviour
     }
 
     private float CalculatePostureScore()
-{
-    scoreBreakdown.slouchScore      = ClampScore(100f - slouchPenalty * postureMetrics.slouchEventsPerMinute);
-    scoreBreakdown.swayScore        = ClampScore(100f - swayPenalty * postureMetrics.swayDurationPercent);
-    scoreBreakdown.crossedArmsScore = ClampScore(100f - crossedArmsPenalty * postureMetrics.crossedArmsPercent);
+    {
+        scoreBreakdown.slouchScore      = ClampScore(100f - slouchPenalty * postureMetrics.slouchEventsPerMinute);
+        scoreBreakdown.swayScore        = ClampScore(100f - swayPenalty * postureMetrics.swayDurationPercent);
+        scoreBreakdown.crossedArmsScore = ClampScore(100f - crossedArmsPenalty * postureMetrics.crossedArmsPercent);
 
-    return ClampScore(
-        (scoreBreakdown.slouchScore + scoreBreakdown.swayScore + scoreBreakdown.crossedArmsScore) / 3f
-    );
-}
+        return ClampScore(
+            (scoreBreakdown.slouchScore + scoreBreakdown.swayScore + scoreBreakdown.crossedArmsScore) / 3f
+        );
+    }
 
     private void GenerateFeedback()
     {
@@ -288,10 +384,10 @@ public class PerformanceScoringEngine : MonoBehaviour
         if (scoreBreakdown.postureScore >= 80)
             postureFeedback = "Confident posture throughout the session.";
         else if (scoreBreakdown.postureScore >= 60)
-            postureFeedback = $"Posture is acceptable. Slouch: {postureMetrics.slouchEventsPerMinute:F1}/min, Sway: {postureMetrics.swayDurationPercent:F0}%.";
+            postureFeedback = $"Posture is acceptable. Sway: {postureMetrics.swayDurationPercent:F0}% of session.";
         else
-            postureFeedback = $"Posture appears unstable. Slouch: {postureMetrics.slouchEventsPerMinute:F1}/min, " +
-                              $"Sway: {postureMetrics.swayDurationPercent:F0}%, Crossed arms: {postureMetrics.crossedArmsPercent:F0}%.";
+            postureFeedback = $"Posture appears unstable. Sway: {postureMetrics.swayDurationPercent:F0}%, " +
+                              $"Head warnings: {postureMetrics.slouchEventsPerMinute:F1}/min.";
     }
 
     private void DetermineStrengths()
@@ -370,34 +466,23 @@ public class PerformanceScoringEngine : MonoBehaviour
             $"Eye contact is low ({eyePct:F0}%). Face the audience, not your notes or screen."
         );
 
-        // ── Posture: Slouching ───────────────────────────────
-        float slouchScore = scoreBreakdown.slouchScore;
-        AddFeedbackItem(report, "Posture", "Slouching",
-            slouchScore,
-            "Upright and confident posture throughout.",
-            $"Some slouching detected ({postureMetrics.slouchEventsPerMinute:F1}/min). Keep your shoulders back.",
-            $"Frequent slouching ({postureMetrics.slouchEventsPerMinute:F1}/min). This signals low confidence."
-        );
-
         // ── Posture: Swaying ─────────────────────────────────
-        float swayScore = scoreBreakdown.swayScore;
-        AddFeedbackItem(report, "Posture", "Swaying",
-            swayScore,
-            "Stable and grounded stance.",
-            $"Some swaying detected ({postureMetrics.swayDurationPercent:F0}% of session). Try to stand still.",
-            $"Excessive swaying ({postureMetrics.swayDurationPercent:F0}%). Can appear nervous or distracting."
+        AddFeedbackItem(report, "Posture", "Head Movement",
+            scoreBreakdown.swayScore,
+            "Stable and grounded head movement throughout.",
+            $"Some excessive head movement detected ({postureMetrics.swayDurationPercent:F0}% of session). Try to stay still.",
+            $"Excessive head movement ({postureMetrics.swayDurationPercent:F0}%). Can appear nervous or distracting."
         );
 
-        // ── Posture: Crossed Arms ────────────────────────────
-        float crossedScore = scoreBreakdown.crossedArmsScore;
-        AddFeedbackItem(report, "Posture", "Crossed Arms",
-            crossedScore,
-            "Open body language — approachable and confident.",
-            $"Arms crossed {postureMetrics.crossedArmsPercent:F0}% of the time. Try to keep them at your sides.",
-            $"Arms crossed frequently ({postureMetrics.crossedArmsPercent:F0}%). Looks closed-off and defensive."
+        // ── Posture: Head Warnings ───────────────────────────
+        AddFeedbackItem(report, "Posture", "Head Speed",
+            scoreBreakdown.slouchScore,
+            "Head movement speed is well controlled.",
+            $"Some rapid head movements detected ({postureMetrics.slouchEventsPerMinute:F1}/min). Move more deliberately.",
+            $"Frequent rapid head movements ({postureMetrics.slouchEventsPerMinute:F1}/min). Slow down your movements."
         );
 
-        // ── Strengths / Improvements listeleri ──────────────
+        // ── Strengths / Improvements ─────────────────────────
         foreach (var item in report.items)
         {
             if (item.severity == FeedbackItem.Severity.Strength)
@@ -451,11 +536,13 @@ public class PerformanceScoringEngine : MonoBehaviour
         sb.AppendLine("AREAS TO IMPROVE");
         foreach (var it in report.items)
         {
-            if (it.severity == FeedbackItem.Severity.Major)  sb.AppendLine($"  {it.message}");
-            else if (it.severity == FeedbackItem.Severity.Minor) sb.AppendLine($"  {it.message}");
+            if (it.severity == FeedbackItem.Severity.Major)       sb.AppendLine($"  ✗ {it.message}");
+            else if (it.severity == FeedbackItem.Severity.Minor)  sb.AppendLine($"  △ {it.message}");
         }
         return sb.ToString();
     }
+
+    // ── Normalization Helpers ─────────────────────────────────────────────────
 
     private float NormalizeWpm(float wpm)
     {
@@ -482,6 +569,8 @@ public class PerformanceScoringEngine : MonoBehaviour
 
     private float ClampScore(float value) => Mathf.Clamp(value, 0f, 100f);
 
+    // ── Public API ────────────────────────────────────────────────────────────
+
     public void SetSpeechMetrics(float wpm, float fillerPerMin, float avgPause, float toneScore)
     {
         speechMetrics.wpm                  = wpm;
@@ -490,7 +579,10 @@ public class PerformanceScoringEngine : MonoBehaviour
         speechMetrics.toneVariationScore   = toneScore;
     }
 
-    public void SetEyeContactRatio(float ratio) { eyeMetrics.eyeContactRatio = Mathf.Clamp01(ratio); }
+    public void SetEyeContactRatio(float ratio)
+    {
+        eyeMetrics.eyeContactRatio = Mathf.Clamp01(ratio);
+    }
 
     public void SetPostureMetrics(float slouchPerMin, float swayPercent, float crossedArmsPercent)
     {
@@ -511,6 +603,7 @@ public class PerformanceScoringEngine : MonoBehaviour
     }
 
     public FeedbackReport GetFeedbackReport() => lastReport;
+
     public string GetFeedbackReportJson()
     {
         if (lastReport == null) return "{}";

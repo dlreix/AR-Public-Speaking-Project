@@ -1,3 +1,4 @@
+
 using UnityEngine;
 using VRPublicSpeaking.AppShell.Data;
 
@@ -7,6 +8,13 @@ namespace VRPublicSpeaking.AppShell.Integration
     {
         [SerializeField] private GazeScoringSystem gazeScoringSystem;
         [SerializeField] private PerformanceScoringEngine performanceScoringEngine;
+
+        public PerformanceScoringEngine PerformanceScoringEngine => performanceScoringEngine;
+
+        public void SetPerformanceScoringEngine(PerformanceScoringEngine engine)
+        {
+            performanceScoringEngine = engine;
+        }
 
         public void AutoWireIfNeeded()
         {
@@ -29,15 +37,22 @@ namespace VRPublicSpeaking.AppShell.Integration
             summary.Reset();
             summary.DurationSeconds = sessionDurationSeconds;
 
-            if (gazeScoringSystem != null)
+            // GazeScoringSystem reset edildiği için fallback öncelikli
+            if (fallbackGazeScore >= 0f)
+            {
+                summary.EyeContactScore = fallbackGazeScore;
+                summary.HasEyeContactScore = true;
+            }
+            else if (gazeScoringSystem != null)
             {
                 summary.EyeContactScore = gazeScoringSystem.GazeScore;
                 summary.HasEyeContactScore = true;
             }
-            else if (fallbackGazeScore >= 0f)
+
+            // Eye skorunu PerformanceScoringEngine'e set et ki toplam skor doğru hesaplansın
+            if (fallbackGazeScore >= 0f && performanceScoringEngine != null)
             {
-                summary.EyeContactScore = fallbackGazeScore;
-                summary.HasEyeContactScore = true;
+                performanceScoringEngine.SetEyeContactRatio(fallbackGazeScore / 100f);
             }
 
             if (performanceScoringEngine != null)
