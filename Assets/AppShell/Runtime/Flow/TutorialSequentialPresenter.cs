@@ -9,8 +9,8 @@ namespace VRPublicSpeaking.AppShell.Flow
 {
     /// <summary>
     /// Presents tutorial panels one at a time in front of the user as a guided slideshow.
-    /// After the welcome panel dismisses, each tutorial step fades in centrally,
-    /// and the user advances with a "Continue" action (trigger, A button, or click).
+    /// Each tutorial step fades in centrally, and the user advances with a
+    /// "Continue" action (trigger, A button, or click).
     /// </summary>
     [DisallowMultipleComponent]
     public class TutorialSequentialPresenter : MonoBehaviour
@@ -22,11 +22,10 @@ namespace VRPublicSpeaking.AppShell.Flow
 
         [Header("Timing")]
         [SerializeField] private float transitionDuration = 0.5f;
-        [SerializeField] private float autoShowDelayAfterWelcome = 1.2f;
 
         [Header("Colors")]
-        // Yarı şeffaf, daha premium "glass" hissiyatı veren koyu lacivert
-        [SerializeField] private Color panelBgColor = new Color(0.015f, 0.02f, 0.035f, 0.88f); 
+        // Opaque enough to keep the hub UI from bleeding through tutorial text.
+        [SerializeField] private Color panelBgColor = new Color(0.015f, 0.02f, 0.035f, 0.97f);
         // Canlı bir cyan/mavi accent, turuncu yerine daha teknolojik bir hava katar
         [SerializeField] private Color accentColor = new Color(0.12f, 0.78f, 0.96f, 1f);
         [SerializeField] private Color bodyTextColor = new Color(0.92f, 0.95f, 0.98f, 1f);
@@ -387,18 +386,22 @@ namespace VRPublicSpeaking.AppShell.Flow
             // Icon symbol (if provided)
             if (!string.IsNullOrEmpty(slide.IconSymbol))
             {
+                CreateAnchoredImage(canvasRect, "IconBadge",
+                    new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f),
+                    new Vector2(42f, -96f), new Vector2(118f, -32f),
+                    new Color(accentColor.r, accentColor.g, accentColor.b, 0.16f));
                 CreateLabel(canvasRect, "Icon", slide.IconSymbol,
-                    new Vector2(0f, 1f), new Vector2(0.12f, 1f), new Vector2(0f, 1f),
-                    new RectOffset(42, 0, 32, 0), new Vector2(0f, 85f),
-                    52f, accentColor, TextAlignmentOptions.TopLeft, FontStyles.Normal);
+                    new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f),
+                    new RectOffset(42, 0, 32, 0), new Vector2(76f, 64f),
+                    32f, accentColor, TextAlignmentOptions.Center, FontStyles.Bold);
             }
 
             // Title
-            float titleLeftPad = string.IsNullOrEmpty(slide.IconSymbol) ? 52f : 108f;
+            float titleLeftPad = string.IsNullOrEmpty(slide.IconSymbol) ? 52f : 142f;
             CreateLabel(canvasRect, "Title", slide.Title,
                 new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f),
                 new RectOffset((int)titleLeftPad, 52, 36, 0), new Vector2(0f, 110f),
-                52f, accentColor, TextAlignmentOptions.TopLeft, FontStyles.Bold);
+                48f, accentColor, TextAlignmentOptions.TopLeft, FontStyles.Bold);
 
             // Separator line
             CreateAnchoredImage(canvasRect, "Separator",
@@ -567,6 +570,9 @@ namespace VRPublicSpeaking.AppShell.Flow
             TextMeshProUGUI label = obj.GetComponent<TextMeshProUGUI>();
             label.text = text;
             label.fontSize = fontSize;
+            label.fontSizeMax = fontSize;
+            label.enableAutoSizing = true;
+            label.fontSizeMin = Mathf.Max(18f, fontSize * 0.72f);
             label.color = color;
             label.alignment = alignment;
             label.fontStyle = style;

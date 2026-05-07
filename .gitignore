@@ -24,6 +24,8 @@ UpgradeLog.htm
 *.VC.db
 
 sysinfo.txt
+mono_crash.mem.*.blob
+
 # macOS
 .DS_Store
 

@@ -181,11 +181,6 @@ namespace VRPublicSpeaking.AppShell.Data
                 enabledSystems.Add("Voice Analysis");
             }
 
-            if (PostureAnalysisEnabled)
-            {
-                enabledSystems.Add("Posture Analysis");
-            }
-
             return enabledSystems.Count > 0
                 ? string.Join(", ", enabledSystems)
                 : "No analysis systems enabled";

@@ -22,14 +22,14 @@ namespace VRPublicSpeaking.AppShell.Flow
         [SerializeField] private bool enableProgressTracking = true;
         [SerializeField] private bool enablePanelAnimations = true;
         [SerializeField] private bool enableAmbientLighting = true;
-        [SerializeField] private bool enableWelcomePanel = true;
+        [SerializeField] private bool enableWelcomePanel = false;
         [SerializeField] private bool enableProgressHud = false;
         [SerializeField] private bool enableFloorGuides = true;
         [SerializeField] private bool enableCompletionCelebration = true;
         [SerializeField] private bool enableSequentialReveal = true;
 
         [Header("Sequential Tutorial Mode")]
-        [Tooltip("When enabled, tutorial panels appear one at a time in front of the user after the welcome screen.")]
+        [Tooltip("When enabled, tutorial panels appear one at a time in front of the user.")]
         [SerializeField] private bool enableSequentialMode = true;
         [SerializeField] private float sequentialStartDelay = 1.5f;
 
@@ -57,6 +57,8 @@ namespace VRPublicSpeaking.AppShell.Flow
         private static readonly Color HeaderColor = new Color(0.12f, 0.78f, 0.96f, 1f);
         private static readonly Color BodyColor = new Color(0.92f, 0.95f, 0.98f, 1f);
         private static readonly Color MutedColor = new Color(0.55f, 0.65f, 0.75f, 0.8f);
+        private static readonly Color PanelSectionColor = new Color(0.055f, 0.09f, 0.13f, 0.92f);
+        private static readonly Color FooterPanelColor = new Color(0.035f, 0.055f, 0.075f, 0.95f);
         private static readonly Color BackplateColor = new Color(0.01f, 0.015f, 0.025f, 1f);
         private static readonly Color RugColor = new Color(0.015f, 0.03f, 0.05f, 1f);
         private static readonly Color TrimColor = new Color(0.12f, 0.78f, 0.96f, 1f);
@@ -81,11 +83,31 @@ namespace VRPublicSpeaking.AppShell.Flow
             PositionHubCanvas();
             ApplyTutorialSpaceLayout();
 
-            if (installed || transform.Find(TutorialRootName) != null)
+            if (installed)
             {
-                installed = true;
                 return;
             }
+
+            Transform existingRoot = transform.Find(TutorialRootName);
+            if (existingRoot != null)
+            {
+                existingRoot.gameObject.SetActive(false);
+                if (Application.isPlaying)
+                {
+                    Destroy(existingRoot.gameObject);
+                }
+                else
+                {
+                    DestroyImmediate(existingRoot.gameObject);
+                }
+            }
+
+            panelAnimators.Clear();
+            animatorsByName.Clear();
+            panelPositions.Clear();
+            panelNames.Clear();
+            panelCreationIndex = 0;
+            celebrationTriggered = false;
 
             // Initialize subsystems before creating panels
             InitializeSubsystems();
@@ -96,9 +118,9 @@ namespace VRPublicSpeaking.AppShell.Flow
             CreatePanel(
                 root,
                 "MovementTutorialPanel",
-                "Movement & UI",
-                "Left stick: move around the hub.\nRight stick: turn your view.\nAim the controller ray at a menu item.\nTrigger: select buttons and cards.",
-                "Walk to the wall menu when you are ready to start.",
+                "Move & Select",
+                "<b>MOVE</b>\nLeft stick walks. Right stick turns your view.\n\n<b>SELECT</b>\nAim the controller ray at a button, then press trigger.",
+                "Start at the wall menu when you are ready.",
                 new Vector3(-5.78f, 2.25f, 1.05f),
                 new Vector3(0f, -90f, 0f));
 
@@ -106,26 +128,26 @@ namespace VRPublicSpeaking.AppShell.Flow
                 root,
                 "SessionControlsTutorialPanel",
                 "Session Controls",
-                "A / X: start or stop the active session.\nB / Y tap: toggle debug guidance.\nB / Y hold: pause or resume during a session.\nGrip: trigger the circle event while recording.",
-                "These controls apply after you launch a practice room.",
+                "<b>DURING PRACTICE</b>\nA / X starts or stops the session.\nB / Y hold opens pause.\nGrip triggers the circle event.",
+                "Use these after the practice room opens.",
                 new Vector3(5.78f, 2.25f, 1.05f),
                 new Vector3(0f, 90f, 0f));
 
             CreatePanel(
                 root,
                 "DesktopTestingTutorialPanel",
-                "Desktop Testing",
-                "WASD: move.\nMouse: look around.\nR: start or stop.\nD: debug.\nEsc: pause.\nC or left click: circle event.",
-                "Use this when checking the flow without a headset.",
+                "Keyboard Fallback",
+                "<b>DESKTOP CHECKS</b>\nWASD moves. Mouse looks.\nR starts or stops.\nEsc pauses.\nC or click triggers the circle event.",
+                "Useful for quick testing without the headset.",
                 new Vector3(-2.25f, 2.2f, -1.48f),
                 new Vector3(0f, 180f, 0f));
 
             CreatePanel(
                 root,
                 "PracticeFlowTutorialPanel",
-                "Practice Flow",
-                "1. Choose Practice Mode.\n2. Pick a room.\n3. Review setup.\n4. Start Session.\n5. Read Results and recommendations.",
-                "The wall menu stays available as your main launch board.",
+                "Launch Flow",
+                "<b>1</b> Start Practice\n<b>2</b> Pick a room\n<b>3</b> Review setup\n<b>4</b> Start Session\n<b>5</b> Open Results or Dashboard",
+                "Dashboard is available from Main Hub and results.",
                 new Vector3(2.25f, 2.2f, -1.48f),
                 new Vector3(0f, 180f, 0f));
 
@@ -149,60 +171,41 @@ namespace VRPublicSpeaking.AppShell.Flow
 
             // Register slides with the sequential presenter
             sequentialPresenter.AddSlide(
+                "Welcome",
+                "- Move and select from the wall menu\n- Review in-session controls\n- Check the launch flow\n- Open dashboard from Main Hub or Results",
+                "This short guide replaces the separate welcome page, so you can begin faster.",
+                "VR");
+
+            sequentialPresenter.AddSlide(
                 "Movement & UI",
-                "◆  Left stick: move around the hub\n◆  Right stick: turn your view\n◆  Aim the controller ray at a menu item\n◆  Trigger: select buttons and cards",
+                "- Left stick: move around the hub\n- Right stick: turn your view\n- Aim the controller ray at a menu item\n- Trigger: select buttons and cards",
                 "Walk to the wall menu when you are ready to start.",
-                "🎮");
+                "VR");
 
             sequentialPresenter.AddSlide(
                 "Session Controls",
-                "◆  A / X: start or stop the active session\n◆  B / Y tap: toggle debug guidance\n◆  B / Y hold: pause or resume during a session\n◆  Grip: trigger the circle event while recording",
+                "- A / X: start or stop the active session\n- B / Y hold: pause or resume\n- Grip: trigger the circle event while recording",
                 "These controls apply after you launch a practice room.",
-                "🎯");
+                "XR");
 
             sequentialPresenter.AddSlide(
-                "Desktop Testing",
-                "◆  WASD: move\n◆  Mouse: look around\n◆  R: start or stop\n◆  D: debug mode\n◆  Esc: pause\n◆  C or left click: circle event",
+                "Keyboard Fallback",
+                "- WASD: move\n- Mouse: look around\n- R: start or stop\n- Esc: pause\n- C or left click: circle event",
                 "Use this when checking the flow without a headset.",
-                "💻");
+                "PC");
 
             sequentialPresenter.AddSlide(
-                "Practice Flow",
-                "1. Choose Practice Mode\n2. Pick a room\n3. Review setup\n4. Start Session\n5. Read Results and recommendations",
-                "The wall menu stays available as your main launch board.",
-                "📋");
+                "Launch Flow",
+                "1. Start Practice\n2. Pick a room\n3. Review setup\n4. Start Session\n5. Read Results and recommendations",
+                "Dashboard is available from Main Hub and Results.",
+                "GO");
 
             // Wire events
             sequentialPresenter.AllSlidesCompleted += OnSequentialCompleted;
             sequentialPresenter.TutorialSkipped += OnSequentialSkipped;
             sequentialPresenter.SlideShown += OnSequentialSlideShown;
 
-            // Start after welcome panel delay
-            float startDelay = enableWelcomePanel ? sequentialStartDelay + 12f : sequentialStartDelay;
-            // If welcome panel is enabled, wait for it to dismiss first
-            if (enableWelcomePanel && welcomePanel != null)
-            {
-                StartCoroutine(StartSequentialAfterWelcome());
-            }
-            else
-            {
-                sequentialPresenter.StartPresentationDelayed(startDelay);
-            }
-        }
-
-        private System.Collections.IEnumerator StartSequentialAfterWelcome()
-        {
-            // Wait until welcome panel is no longer showing
-            while (welcomePanel != null && welcomePanel.IsShowing)
-            {
-                yield return null;
-            }
-
-            yield return new WaitForSeconds(sequentialStartDelay);
-            if (sequentialPresenter != null)
-            {
-                sequentialPresenter.StartPresentation();
-            }
+            sequentialPresenter.StartPresentationDelayed(sequentialStartDelay);
         }
 
         private void OnSequentialCompleted()
@@ -260,9 +263,10 @@ namespace VRPublicSpeaking.AppShell.Flow
             if (enableWelcomePanel)
             {
                 welcomePanel = GetComponent<TutorialWelcomePanel>();
-                if (welcomePanel == null)
-                    welcomePanel = gameObject.AddComponent<TutorialWelcomePanel>();
-                welcomePanel.Show();
+                if (welcomePanel != null && welcomePanel.IsShowing)
+                {
+                    welcomePanel.Dismiss();
+                }
             }
 
             if (enableFloorGuides)
@@ -427,6 +431,7 @@ namespace VRPublicSpeaking.AppShell.Flow
                 SetChildActive(backdropRoot, "Footlight_Left", false);
                 SetChildActive(backdropRoot, "Footlight_Center", false);
                 SetChildActive(backdropRoot, "Footlight_Right", false);
+                SetChildActive(backdropRoot, "BackCeilingLightBar", false);
 
                 Transform stageDeck = FindChildRecursive(backdropRoot, "StageDeck");
                 if (stageDeck != null)
@@ -574,14 +579,38 @@ namespace VRPublicSpeaking.AppShell.Flow
 
             CreateImage(canvasRect, "Background", StretchRect(Vector2.zero, Vector2.zero), PanelColor, true);
             Image accentBar = CreateImage(canvasRect, "AccentBar", TopRect(0f, 0f, 12f), HeaderColor, false);
+            CreateImage(
+                canvasRect,
+                "BodyPanel",
+                new RectTransformSetup(
+                    Vector2.zero,
+                    Vector2.one,
+                    new Vector2(0.5f, 0.5f),
+                    new Vector2(52f, 98f),
+                    new Vector2(-52f, -154f),
+                    Vector2.zero),
+                PanelSectionColor,
+                false);
+            CreateImage(
+                canvasRect,
+                "FooterPanel",
+                new RectTransformSetup(
+                    new Vector2(0f, 0f),
+                    new Vector2(1f, 0f),
+                    new Vector2(0.5f, 0f),
+                    new Vector2(52f, 28f),
+                    new Vector2(-52f, 92f),
+                    Vector2.zero),
+                FooterPanelColor,
+                false);
 
             // Step badge (top-right corner)
             CreateText(
                 canvasRect,
                 "StepBadge",
                 stepLabel,
-                new RectOffset(0, 38, 42, 0),
-                24f,
+                new RectOffset(0, 44, 42, 0),
+                26f,
                 MutedColor,
                 TextAlignmentOptions.TopRight,
                 FontStyles.Normal,
@@ -595,7 +624,7 @@ namespace VRPublicSpeaking.AppShell.Flow
                 "Title",
                 title,
                 new RectOffset(54, 120, 38, 0),
-                58f,
+                60f,
                 HeaderColor,
                 TextAlignmentOptions.TopLeft,
                 FontStyles.Bold,
@@ -608,8 +637,8 @@ namespace VRPublicSpeaking.AppShell.Flow
                 canvasRect,
                 "Body",
                 body,
-                new RectOffset(58, 58, 150, 86),
-                35f,
+                new RectOffset(80, 80, 172, 152),
+                34f,
                 BodyColor,
                 TextAlignmentOptions.TopLeft,
                 FontStyles.Normal,
@@ -622,15 +651,15 @@ namespace VRPublicSpeaking.AppShell.Flow
                 canvasRect,
                 "Footer",
                 footer,
-                new RectOffset(58, 58, 0, 34),
-                25f,
+                new RectOffset(80, 80, 0, 42),
+                26f,
                 MutedColor,
                 TextAlignmentOptions.BottomLeft,
-                FontStyles.Italic,
+                FontStyles.Bold,
                 new Vector2(0f, 0f),
                 new Vector2(1f, 0f),
                 new Vector2(0.5f, 0f),
-                new Vector2(0f, 62f));
+                new Vector2(0f, 54f));
 
             // Progress fill bar at bottom of panel
             Image progressFill = CreateImage(canvasRect, "ProgressFill",

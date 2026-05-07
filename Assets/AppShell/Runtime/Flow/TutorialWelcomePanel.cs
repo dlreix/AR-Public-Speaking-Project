@@ -12,7 +12,7 @@ namespace VRPublicSpeaking.AppShell.Flow
     [DisallowMultipleComponent]
     public class TutorialWelcomePanel : MonoBehaviour
     {
-        [SerializeField] private float displayDurationSeconds = 12f;
+        [SerializeField] private float displayDurationSeconds = 4f;
         [SerializeField] private float fadeOutDuration = 1.2f;
         [SerializeField] private float panelScale = 0.0044f;
         [SerializeField] private Vector3 panelPosition = new Vector3(0f, 2.65f, 3.85f);

@@ -372,11 +372,11 @@ public class AudienceSpawner : MonoBehaviour
 
     private void ApplyRandomPersonality(AudienceMember am)
     {
-        switch (controller.currentStressLevel)
+        switch (controller.currentAudienceTemperament)
         {
-            case StressLevel.Easy: am.personalWpmTolerance = Random.Range(-40f, -10f); am.personalEyeContactTolerance = Random.Range(-0.2f, -0.05f); break;
-            case StressLevel.Medium: am.personalWpmTolerance = Random.Range(-10f, 10f); am.personalEyeContactTolerance = Random.Range(-0.08f, 0.08f); break;
-            case StressLevel.Hard: am.personalWpmTolerance = Random.Range(10f, 40f); am.personalEyeContactTolerance = Random.Range(0.1f, 0.3f); break;
+            case AudienceTemperament.Supportive: am.personalWpmTolerance = Random.Range(10f, 40f); am.personalEyeContactTolerance = Random.Range(0.05f, 0.2f); break;
+            case AudienceTemperament.Neutral: am.personalWpmTolerance = Random.Range(-10f, 10f); am.personalEyeContactTolerance = Random.Range(-0.08f, 0.08f); break;
+            case AudienceTemperament.Challenging: am.personalWpmTolerance = Random.Range(-40f, -10f); am.personalEyeContactTolerance = Random.Range(-0.2f, -0.05f); break;
         }
     }
 

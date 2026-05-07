@@ -1,4 +1,5 @@
 using UnityEngine;
+using Unity.XR.CoreUtils;
 
 namespace VRPublicSpeaking.AppShell.Integration
 {
@@ -28,14 +29,18 @@ namespace VRPublicSpeaking.AppShell.Integration
                 return false;
             }
 
-            CharacterController characterController = playerController.GetComponent<CharacterController>();
+            Camera sceneCamera = VrRigRuntimeUtility.ResolveSceneCamera();
+            XROrigin xrOrigin = VrRigRuntimeUtility.EnsureCameraInXrOrigin(sceneCamera, "[PlayerRigAdapter]");
+            Transform rigTransform = xrOrigin != null ? xrOrigin.transform : playerController.transform;
+
+            CharacterController characterController = rigTransform.GetComponent<CharacterController>();
             if (characterController != null)
             {
                 characterController.enabled = false;
             }
 
-            playerController.transform.position = spawnPoint.position;
-            playerController.transform.rotation = spawnPoint.rotation;
+            rigTransform.position = spawnPoint.position;
+            rigTransform.rotation = spawnPoint.rotation;
 
             if (characterController != null)
             {

@@ -2,12 +2,14 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using VRPublicSpeaking.AppShell.Flow;
+using VRPublicSpeaking.AppShell.Results;
 
 namespace VRPublicSpeaking.AppShell.UI
 {
     public class HomePanelPresenter : MonoBehaviour
     {
         [SerializeField] private AppFlowManager appFlowManager;
+        [SerializeField] private DashboardAdapter dashboardAdapter;
         [SerializeField] private Button primaryActionButton;
         [SerializeField] private TMP_Text primaryActionLabel;
         [SerializeField] private bool animatePrimaryAction = true;
@@ -20,12 +22,16 @@ namespace VRPublicSpeaking.AppShell.UI
 
         private void Awake()
         {
+            EnsureDashboardAdapter();
+            EnsureDashboardShortcut();
             AutoResolvePrimaryAction();
             ApplyPrimaryActionPolish();
         }
 
         private void OnEnable()
         {
+            EnsureDashboardAdapter();
+            EnsureDashboardShortcut();
             AutoResolvePrimaryAction();
             ApplyPrimaryActionPolish();
         }
@@ -65,6 +71,30 @@ namespace VRPublicSpeaking.AppShell.UI
         public void OpenResults()
         {
             appFlowManager?.OpenProgressPanel();
+        }
+
+        public void OpenDashboard()
+        {
+            EnsureDashboardAdapter();
+            if (dashboardAdapter != null && dashboardAdapter.TryOpenDashboard())
+            {
+                return;
+            }
+
+            appFlowManager?.OpenProgressPanel();
+        }
+
+        private void EnsureDashboardAdapter()
+        {
+            if (dashboardAdapter == null)
+            {
+                dashboardAdapter = GetComponent<DashboardAdapter>();
+            }
+
+            if (dashboardAdapter == null)
+            {
+                dashboardAdapter = gameObject.AddComponent<DashboardAdapter>();
+            }
         }
 
         public void OpenSettings()
@@ -116,6 +146,78 @@ namespace VRPublicSpeaking.AppShell.UI
             }
         }
 
+        private void EnsureDashboardShortcut()
+        {
+            if (FindDescendant(transform, "DashboardButton") != null)
+            {
+                return;
+            }
+
+            Transform settingsButtonTransform = FindDescendant(transform, "SettingsButton");
+            Button settingsButton = settingsButtonTransform != null
+                ? settingsButtonTransform.GetComponent<Button>()
+                : null;
+            if (settingsButton == null || settingsButton.transform.parent == null)
+            {
+                return;
+            }
+
+            GameObject dashboardButtonObject = Instantiate(settingsButton.gameObject, settingsButton.transform.parent);
+            dashboardButtonObject.name = "DashboardButton";
+            dashboardButtonObject.transform.SetSiblingIndex(settingsButton.transform.GetSiblingIndex());
+
+            Button dashboardButton = dashboardButtonObject.GetComponent<Button>();
+            if (dashboardButton != null)
+            {
+                dashboardButton.onClick.RemoveAllListeners();
+                dashboardButton.onClick.AddListener(OpenDashboard);
+            }
+
+            TMP_Text dashboardLabel = dashboardButtonObject.GetComponentInChildren<TMP_Text>(true);
+            if (dashboardLabel != null)
+            {
+                dashboardLabel.text = "Dashboard";
+            }
+
+            Transform settingsInfoTransform = FindDescendant(transform, "SettingsInfo");
+            if (settingsInfoTransform != null && settingsInfoTransform.parent == settingsButton.transform.parent)
+            {
+                GameObject dashboardInfoObject = Instantiate(settingsInfoTransform.gameObject, settingsInfoTransform.parent);
+                dashboardInfoObject.name = "DashboardInfo";
+                dashboardInfoObject.transform.SetSiblingIndex(dashboardButtonObject.transform.GetSiblingIndex() + 1);
+
+                TMP_Text dashboardInfo = dashboardInfoObject.GetComponent<TMP_Text>();
+                if (dashboardInfo != null)
+                {
+                    dashboardInfo.text = "Open analytics directly";
+                }
+            }
+        }
+
+        private static Transform FindDescendant(Transform root, string childName)
+        {
+            if (root == null || string.IsNullOrWhiteSpace(childName))
+            {
+                return null;
+            }
+
+            if (root.name == childName)
+            {
+                return root;
+            }
+
+            for (int index = 0; index < root.childCount; index++)
+            {
+                Transform found = FindDescendant(root.GetChild(index), childName);
+                if (found != null)
+                {
+                    return found;
+                }
+            }
+
+            return null;
+        }
+
         private void ApplyPrimaryActionPolish()
         {
             if (primaryActionButton == null)
@@ -125,7 +227,7 @@ namespace VRPublicSpeaking.AppShell.UI
 
             if (primaryActionLabel != null)
             {
-                primaryActionLabel.text = "Start Practice Demo";
+                primaryActionLabel.text = "Start Practice";
                 primaryActionLabel.fontStyle = FontStyles.Bold;
             }
 

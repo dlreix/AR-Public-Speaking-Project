@@ -6,6 +6,7 @@ using SpeechPipeline;
 using VRPublicSpeaking.AppShell.Core;
 using VRPublicSpeaking.AppShell.Data;
 using VRPublicSpeaking.AppShell.UI;
+using Unity.XR.CoreUtils;
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
@@ -48,6 +49,7 @@ namespace VRPublicSpeaking.AppShell.Integration
 
             SessionConfig config = runtimeState.GetSessionConfigCopy();
             Camera sceneCamera = VrRigRuntimeUtility.EnsureSceneVrReady("[EnvironmentSceneInstaller]");
+            EnsureControllerLocomotion(sceneCamera);
             EnsureEnvironmentRuntimeStack(sceneCamera);
 
             playerRigAdapter ??= GetOrAdd<PlayerRigAdapter>();
@@ -212,6 +214,29 @@ namespace VRPublicSpeaking.AppShell.Integration
             }
 
             EnsureAudienceSystem();
+        }
+
+        private void EnsureControllerLocomotion(Camera sceneCamera)
+        {
+            if (sceneCamera == null)
+            {
+                sceneCamera = VrRigRuntimeUtility.ResolveSceneCamera();
+            }
+
+            XROrigin xrOrigin = VrRigRuntimeUtility.EnsureCameraInXrOrigin(sceneCamera, "[EnvironmentSceneInstaller]");
+            if (xrOrigin == null)
+            {
+                return;
+            }
+
+            EnvironmentControllerLocomotion locomotion =
+                xrOrigin.GetComponent<EnvironmentControllerLocomotion>();
+            if (locomotion == null)
+            {
+                locomotion = xrOrigin.gameObject.AddComponent<EnvironmentControllerLocomotion>();
+            }
+
+            locomotion.Configure(xrOrigin);
         }
 
         private void EnsureAudienceSystem()

@@ -25,8 +25,7 @@ namespace VRPublicSpeaking.AppShell.Data
     {
         Supportive = 0,
         Neutral = 1,
-        Distracted = 2,
-        Challenging = 3
+        Challenging = 2
     }
 
     [Serializable]

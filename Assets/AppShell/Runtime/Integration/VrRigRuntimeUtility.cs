@@ -1,5 +1,7 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.XR;
 using Unity.XR.CoreUtils;
 
 namespace VRPublicSpeaking.AppShell.Integration
@@ -17,6 +19,7 @@ namespace VRPublicSpeaking.AppShell.Integration
 
             EnsureMainCameraTag(camera);
             EnsureAudioListener(camera.gameObject);
+            EnsureCameraInXrOrigin(camera, context);
             EnsureTrackedPoseDriver(camera);
             EnsureHeightSafety(camera);
             return camera;
@@ -91,31 +94,175 @@ namespace VRPublicSpeaking.AppShell.Integration
             trackedPoseDriver.updateType = UnityEngine.InputSystem.XR.TrackedPoseDriver.UpdateType.UpdateAndBeforeRender;
             trackedPoseDriver.ignoreTrackingState = false;
 
-            if (trackedPoseDriver.positionInput.action == null)
+            if (NeedsPoseAction(trackedPoseDriver.positionInput, "<XRHMD>/centerEyePosition", "<HandheldARInputDevice>/devicePosition"))
             {
                 trackedPoseDriver.positionInput = new InputActionProperty(CreatePoseAction(
                     "Position",
                     "Vector3",
-                    "<XRHMD>/centerEyePosition",
-                    "<HandheldARInputDevice>/devicePosition"));
+                    "<XRHMD>/centerEyePosition"));
             }
 
-            if (trackedPoseDriver.rotationInput.action == null)
+            if (NeedsPoseAction(trackedPoseDriver.rotationInput, "<XRHMD>/centerEyeRotation", "<HandheldARInputDevice>/deviceRotation"))
             {
                 trackedPoseDriver.rotationInput = new InputActionProperty(CreatePoseAction(
                     "Rotation",
                     "Quaternion",
-                    "<XRHMD>/centerEyeRotation",
-                    "<HandheldARInputDevice>/deviceRotation"));
+                    "<XRHMD>/centerEyeRotation"));
             }
 
-            if (trackedPoseDriver.trackingStateInput.action == null)
+            if (NeedsPoseAction(trackedPoseDriver.trackingStateInput, "<XRHMD>/trackingState"))
             {
                 trackedPoseDriver.trackingStateInput = new InputActionProperty(CreatePoseAction(
                     "Tracking State",
                     "Integer",
                     "<XRHMD>/trackingState"));
             }
+        }
+
+        public static XROrigin EnsureCameraInXrOrigin(Camera camera, string context = null)
+        {
+            if (camera == null)
+            {
+                return null;
+            }
+
+            XROrigin xrOrigin = ResolveXrOrigin(camera);
+            if (xrOrigin == null)
+            {
+                xrOrigin = TryCreateRuntimeXrOrigin(camera, context);
+                if (xrOrigin == null)
+                {
+                    return null;
+                }
+            }
+
+            Transform cameraOffset = ResolveCameraOffsetTransform(xrOrigin);
+            if (cameraOffset == null)
+            {
+                return xrOrigin;
+            }
+
+            if (camera.transform.parent != cameraOffset)
+            {
+                camera.transform.SetParent(cameraOffset, false);
+                Debug.Log(BuildMessage(context, $"Reparented '{camera.name}' under '{cameraOffset.name}' so HMD pose drives the view."));
+            }
+
+            camera.transform.localPosition = Vector3.zero;
+            camera.transform.localRotation = Quaternion.identity;
+            xrOrigin.Camera = camera;
+
+            return xrOrigin;
+        }
+
+        private static XROrigin TryCreateRuntimeXrOrigin(Camera camera, string context)
+        {
+            if (camera == null || !IsXrDisplayRunning())
+            {
+                return null;
+            }
+
+            Transform rigRoot = ResolveRigRoot(camera);
+            GameObject originObject;
+            if (rigRoot == camera.transform)
+            {
+                originObject = new GameObject("XR Origin (Runtime)");
+                originObject.transform.SetPositionAndRotation(camera.transform.position, camera.transform.rotation);
+                Transform originalParent = camera.transform.parent;
+                if (originalParent != null)
+                {
+                    originObject.transform.SetParent(originalParent, true);
+                }
+            }
+            else
+            {
+                originObject = rigRoot.gameObject;
+            }
+
+            XROrigin xrOrigin = originObject.GetComponent<XROrigin>();
+            if (xrOrigin == null)
+            {
+                xrOrigin = originObject.AddComponent<XROrigin>();
+                Debug.Log(BuildMessage(context, $"Added XROrigin to '{originObject.name}' for headset-driven camera pose."));
+            }
+
+            return xrOrigin;
+        }
+
+        private static Transform ResolveRigRoot(Camera camera)
+        {
+            PlayerController playerController = camera != null
+                ? camera.GetComponentInParent<PlayerController>(true)
+                : null;
+
+            if (playerController == null)
+            {
+                playerController = Object.FindFirstObjectByType<PlayerController>(FindObjectsInactive.Include);
+            }
+
+            if (playerController != null)
+            {
+                return playerController.transform;
+            }
+
+            return camera != null && camera.transform.parent != null
+                ? camera.transform.parent
+                : camera != null
+                    ? camera.transform
+                    : null;
+        }
+
+        private static Transform ResolveCameraOffsetTransform(XROrigin xrOrigin)
+        {
+            if (xrOrigin == null)
+            {
+                return null;
+            }
+
+            if (xrOrigin.CameraFloorOffsetObject != null)
+            {
+                return xrOrigin.CameraFloorOffsetObject.transform;
+            }
+
+            Transform existingOffset = xrOrigin.transform.Find("Camera Offset");
+            if (existingOffset != null)
+            {
+                xrOrigin.CameraFloorOffsetObject = existingOffset.gameObject;
+                return existingOffset;
+            }
+
+            GameObject offsetObject = new GameObject("Camera Offset");
+            offsetObject.transform.SetParent(xrOrigin.transform, false);
+            xrOrigin.CameraFloorOffsetObject = offsetObject;
+            return offsetObject.transform;
+        }
+
+        private static bool NeedsPoseAction(InputActionProperty property, string requiredPath, string blockedPath = null)
+        {
+            InputAction action = property.action;
+            if (action == null)
+            {
+                return true;
+            }
+
+            bool hasRequiredPath = false;
+            bool hasBlockedPath = false;
+            for (int index = 0; index < action.bindings.Count; index++)
+            {
+                string path = action.bindings[index].effectivePath;
+                if (string.Equals(path, requiredPath, System.StringComparison.Ordinal))
+                {
+                    hasRequiredPath = true;
+                }
+
+                if (!string.IsNullOrWhiteSpace(blockedPath) &&
+                    string.Equals(path, blockedPath, System.StringComparison.Ordinal))
+                {
+                    hasBlockedPath = true;
+                }
+            }
+
+            return !hasRequiredPath || hasBlockedPath;
         }
 
         private static InputAction CreatePoseAction(
@@ -158,6 +305,23 @@ namespace VRPublicSpeaking.AppShell.Integration
             return xrOrigin != null
                 ? xrOrigin
                 : Object.FindFirstObjectByType<XROrigin>(FindObjectsInactive.Include);
+        }
+
+        private static bool IsXrDisplayRunning()
+        {
+            var xrDisplays = new List<XRDisplaySubsystem>();
+            SubsystemManager.GetSubsystems(xrDisplays);
+
+            for (int index = 0; index < xrDisplays.Count; index++)
+            {
+                XRDisplaySubsystem display = xrDisplays[index];
+                if (display != null && display.running)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static string BuildMessage(string context, string message)
