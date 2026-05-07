@@ -240,7 +240,69 @@ namespace VRPublicSpeaking.AppShell.Editor
                 dropdown.itemText.fontSize = 18f;
             }
 
+            StyleDropdownTemplate(dropdown);
+
             return dropdown;
+        }
+
+        private static void StyleDropdownTemplate(TMP_Dropdown dropdown)
+        {
+            if (dropdown == null || dropdown.template == null)
+            {
+                return;
+            }
+
+            Image templateBackground = dropdown.template.GetComponent<Image>();
+            if (templateBackground != null)
+            {
+                AppShellEditorCommon.StyleSlicedImage(templateBackground, new Color(0.06f, 0.09f, 0.13f, 0.98f));
+            }
+
+            Image viewportBackground = AppShellEditorCommon.FindDescendantComponent<Image>(dropdown.template, "Viewport");
+            if (viewportBackground != null)
+            {
+                viewportBackground.color = new Color(0.06f, 0.09f, 0.13f, 0.98f);
+            }
+
+            Transform item = AppShellEditorCommon.FindDescendant(dropdown.template, "Item");
+            if (item != null)
+            {
+                Image itemBackground = item.GetComponent<Image>();
+                if (itemBackground != null)
+                {
+                    itemBackground.color = new Color(0.09f, 0.14f, 0.20f, 1f);
+                }
+
+                Toggle itemToggle = item.GetComponent<Toggle>();
+                if (itemToggle != null)
+                {
+                    ColorBlock colors = itemToggle.colors;
+                    colors.normalColor = new Color(0.09f, 0.14f, 0.20f, 1f);
+                    colors.highlightedColor = new Color(0.18f, 0.30f, 0.42f, 1f);
+                    colors.pressedColor = new Color(0.16f, 0.42f, 0.65f, 1f);
+                    colors.selectedColor = new Color(0.15f, 0.36f, 0.55f, 1f);
+                    colors.disabledColor = new Color(0.05f, 0.07f, 0.10f, 0.8f);
+                    colors.colorMultiplier = 1f;
+                    colors.fadeDuration = 0.06f;
+                    itemToggle.colors = colors;
+                }
+
+                TMP_Text itemLabel = AppShellEditorCommon.FindDescendantComponent<TMP_Text>(item, "Item Label");
+                if (itemLabel != null)
+                {
+                    itemLabel.color = AppShellEditorCommon.TextColor;
+                    itemLabel.fontSize = 18f;
+                    itemLabel.fontStyle = FontStyles.Bold;
+                    itemLabel.overflowMode = TextOverflowModes.Ellipsis;
+                    itemLabel.textWrappingMode = TextWrappingModes.NoWrap;
+                }
+
+                Image checkmark = AppShellEditorCommon.FindDescendantComponent<Image>(item, "Item Checkmark");
+                if (checkmark != null)
+                {
+                    checkmark.color = AppShellEditorCommon.SelectedAccentColor;
+                }
+            }
         }
 
         internal static Toggle CreateToggle(Transform parent, string name, string label, bool defaultValue)

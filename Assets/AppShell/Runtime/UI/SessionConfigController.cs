@@ -29,16 +29,9 @@ namespace VRPublicSpeaking.AppShell.UI
 
         [Header("Preview")]
         [SerializeField] private TMP_Text summaryPreviewLabel;
-        [SerializeField] private Button recommendedDemoSetupButton;
-        [SerializeField] private TMP_Text recommendedDemoSetupLabel;
-        [SerializeField] private bool createRecommendedDemoSetupButton = true;
-
-        private bool recommendedPresetApplied;
 
         private void Awake()
         {
-            EnsureRecommendedDemoSetupButton();
-
             if (durationSlider != null)
             {
                 durationSlider.onValueChanged.AddListener(_ => HandleConfigInputChanged());
@@ -65,15 +58,10 @@ namespace VRPublicSpeaking.AppShell.UI
             AddToggleListener(voiceAnalysisToggle);
             AddToggleListener(postureAnalysisToggle);
 
-            if (recommendedDemoSetupButton != null)
-            {
-                recommendedDemoSetupButton.onClick.AddListener(ApplyRecommendedDemoSetup);
-            }
         }
 
         private void OnEnable()
         {
-            EnsureRecommendedDemoSetupButton();
             LoadFromRuntime();
         }
 
@@ -215,50 +203,11 @@ namespace VRPublicSpeaking.AppShell.UI
                 summaryPreviewLabel.text =
                     $"Room: {environmentName}\n" +
                     $"Mode: {snapshot.PracticeMode}  |  {snapshot.GetDurationDisplay()}\n" +
-                    $"Context: {snapshot.DifficultyLevel} / {snapshot.AudiencePreset}\n" +
+                    $"Difficulty: {snapshot.DifficultyLevel}  |  Audience: {snapshot.AudiencePreset}\n" +
                     $"Feedback: {snapshot.FeedbackLevel}\n" +
                     $"Systems: {BuildCompactSystemsSummary(snapshot)}" +
-                    (recommendedPresetApplied ? "\nPreset: Demo-ready setup applied." : string.Empty) +
                     launchNote;
             }
-        }
-
-        public void ApplyRecommendedDemoSetup()
-        {
-            recommendedPresetApplied = true;
-
-            if (durationSlider != null)
-            {
-                float recommendedDuration = durationSliderUsesMinutes ? 3f : 180f;
-                durationSlider.SetValueWithoutNotify(Mathf.Clamp(
-                    recommendedDuration,
-                    durationSlider.minValue,
-                    durationSlider.maxValue));
-            }
-
-            if (difficultyDropdown != null)
-            {
-                difficultyDropdown.SetValueWithoutNotify((int)SessionDifficulty.Normal);
-            }
-
-            if (audienceDropdown != null)
-            {
-                audienceDropdown.SetValueWithoutNotify((int)AudiencePreset.Neutral);
-            }
-
-            if (feedbackDropdown != null)
-            {
-                feedbackDropdown.SetValueWithoutNotify((int)FeedbackLevel.Standard);
-            }
-
-            SetToggleWithoutNotify(eyeTrackingToggle, true);
-            SetToggleWithoutNotify(gazeScoringToggle, true);
-            SetToggleWithoutNotify(performanceScoringToggle, true);
-            SetToggleWithoutNotify(voiceAnalysisToggle, true);
-            SetToggleWithoutNotify(postureAnalysisToggle, false);
-
-            PushCurrentUIToRuntime();
-            RefreshSummaryPreview();
         }
 
         private static void SetToggleWithoutNotify(Toggle toggle, bool value)
@@ -279,7 +228,6 @@ namespace VRPublicSpeaking.AppShell.UI
 
         private void HandleConfigInputChanged()
         {
-            recommendedPresetApplied = false;
             RefreshSummaryPreview();
         }
 
@@ -328,89 +276,6 @@ namespace VRPublicSpeaking.AppShell.UI
             }
 
             return string.Join(", ", enabledSystems.GetRange(0, 3)) + $" +{enabledSystems.Count - 3}";
-        }
-
-        private void EnsureRecommendedDemoSetupButton()
-        {
-            if (!createRecommendedDemoSetupButton || recommendedDemoSetupButton != null)
-            {
-                return;
-            }
-
-            Transform parent = summaryPreviewLabel != null && summaryPreviewLabel.transform.parent != null
-                ? summaryPreviewLabel.transform.parent
-                : transform;
-
-            Transform existing = parent.Find("RecommendedDemoSetupButton");
-            GameObject buttonObject = existing != null
-                ? existing.gameObject
-                : new GameObject("RecommendedDemoSetupButton", typeof(RectTransform));
-            buttonObject.transform.SetParent(parent, false);
-
-            RectTransform rectTransform = buttonObject.GetComponent<RectTransform>();
-            rectTransform.anchorMin = new Vector2(0f, 0f);
-            rectTransform.anchorMax = new Vector2(1f, 0f);
-            rectTransform.pivot = new Vector2(0.5f, 0f);
-            rectTransform.anchoredPosition = new Vector2(0f, 10f);
-            rectTransform.sizeDelta = new Vector2(0f, 42f);
-
-            Image background = buttonObject.GetComponent<Image>();
-            if (background == null)
-            {
-                background = buttonObject.AddComponent<Image>();
-            }
-
-            background.color = new Color(0.21f, 0.63f, 0.96f, 1f);
-
-            recommendedDemoSetupButton = buttonObject.GetComponent<Button>();
-            if (recommendedDemoSetupButton == null)
-            {
-                recommendedDemoSetupButton = buttonObject.AddComponent<Button>();
-            }
-
-            recommendedDemoSetupButton.targetGraphic = background;
-
-            LayoutElement layoutElement = buttonObject.GetComponent<LayoutElement>();
-            if (layoutElement == null)
-            {
-                layoutElement = buttonObject.AddComponent<LayoutElement>();
-            }
-
-            layoutElement.preferredHeight = 42f;
-            layoutElement.minHeight = 38f;
-
-            Transform labelTransform = buttonObject.transform.Find("Label");
-            GameObject labelObject = labelTransform != null
-                ? labelTransform.gameObject
-                : new GameObject("Label", typeof(RectTransform));
-            labelObject.transform.SetParent(buttonObject.transform, false);
-
-            RectTransform labelRect = labelObject.GetComponent<RectTransform>();
-            labelRect.anchorMin = Vector2.zero;
-            labelRect.anchorMax = Vector2.one;
-            labelRect.offsetMin = new Vector2(14f, 0f);
-            labelRect.offsetMax = new Vector2(-14f, 0f);
-
-            recommendedDemoSetupLabel = labelObject.GetComponent<TMP_Text>();
-            if (recommendedDemoSetupLabel == null)
-            {
-                recommendedDemoSetupLabel = labelObject.AddComponent<TextMeshProUGUI>();
-            }
-
-            recommendedDemoSetupLabel.text = "Use Recommended Demo Setup";
-            recommendedDemoSetupLabel.fontSize = 17f;
-            recommendedDemoSetupLabel.fontStyle = FontStyles.Bold;
-            recommendedDemoSetupLabel.alignment = TextAlignmentOptions.Center;
-            recommendedDemoSetupLabel.color = Color.white;
-            recommendedDemoSetupLabel.raycastTarget = false;
-
-            ColorBlock colors = recommendedDemoSetupButton.colors;
-            colors.normalColor = Color.white;
-            colors.highlightedColor = new Color(0.96f, 0.99f, 1f, 1f);
-            colors.pressedColor = new Color(0.78f, 0.90f, 1f, 1f);
-            colors.selectedColor = Color.white;
-            colors.fadeDuration = 0.08f;
-            recommendedDemoSetupButton.colors = colors;
         }
     }
 }

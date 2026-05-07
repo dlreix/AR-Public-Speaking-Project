@@ -155,7 +155,7 @@ namespace VRPublicSpeaking.AppShell.Editor
             BuildPracticeModePanel(practicePanel.transform, practicePresenter, appFlowManager);
             BuildEnvironmentSelectionPanel(environmentPanel.transform, environmentController, appFlowManager, catalog);
             BuildSessionSetupPanel(setupPanel.transform, sessionConfigController, appFlowManager);
-            BuildReadyPanel(readyPanel.transform, readyPresenter);
+            BuildReadyPanel(readyPanel.transform, readyPresenter, catalog);
             BuildProgressPanel(progressPanel.transform, progressPresenter);
             BuildSettingsPanel(settingsPanel.transform, settingsPresenter);
             BuildResultsPanel(resultsPanel.transform, resultsPresenter, resultsFlowController, resultsDashboardAdapter);
@@ -1363,7 +1363,7 @@ namespace VRPublicSpeaking.AppShell.Editor
             fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
             fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
-            AppShellEditorUi.CreateTextBlock(brandingRoot, "BrandTitle", "Orator VR", 48f, FontStyles.Bold, TextAlignmentOptions.Center, 54f, AppShellEditorCommon.TextColor);
+            AppShellEditorUi.CreateTextBlock(brandingRoot, "BrandTitle", "PUBLIC SPEAKING VR", 46f, FontStyles.Bold, TextAlignmentOptions.Center, 56f, AppShellEditorCommon.TextColor);
             AppShellEditorUi.CreateTextBlock(
                 brandingRoot,
                 "BrandSubtitle",
@@ -1411,7 +1411,7 @@ namespace VRPublicSpeaking.AppShell.Editor
                 54f,
                 AppShellEditorCommon.HeroSurfaceColor,
                 AppShellEditorCommon.HeroAccentColor);
-            Button startButton = AppShellEditorUi.CreateStyledButton(startCard.transform, "StartPracticeButton", "Start Practice Demo", AppShellEditorUi.ButtonTone.Primary, -1f, 60f);
+            Button startButton = AppShellEditorUi.CreateStyledButton(startCard.transform, "StartPracticeButton", "Start Practice", AppShellEditorUi.ButtonTone.Primary, -1f, 60f);
             TMP_Text startButtonLabel = startButton.GetComponentInChildren<TMP_Text>(true);
 
             GameObject featuredQuickRow = AppShellEditorUi.CreateDashboardRow(featuredColumn.transform, "FeaturedQuickRow", 14f);
@@ -1603,9 +1603,9 @@ namespace VRPublicSpeaking.AppShell.Editor
             GameObject contextSection = AppShellEditorUi.CreateSectionCard(leftColumn.transform, "ContextSection", AppShellEditorCommon.TileSurfaceColor, 18, 18, 10f, AppShellEditorCommon.AccentColor);
             AppShellEditorUi.CreateTextBlock(contextSection.transform, "ContextTitle", "SESSION CONTEXT", 15f, FontStyles.Bold, TextAlignmentOptions.Left, 20f, AppShellEditorCommon.SoftAccentColor);
             GameObject contextRow = AppShellEditorUi.CreateDashboardRow(contextSection.transform, "ContextRow", 12f);
-            TMP_Dropdown difficultyDropdown = CreateDropdownFieldCard(contextRow.transform, "DifficultyFieldCard", "Difficulty", AppShellEditorCommon.EnumNames<SessionDifficulty>(), 215f);
-            TMP_Dropdown audienceDropdown = CreateDropdownFieldCard(contextRow.transform, "AudienceFieldCard", "Audience", AppShellEditorCommon.EnumNames<AudiencePreset>(), 215f);
-            TMP_Dropdown feedbackDropdown = CreateDropdownFieldCard(contextSection.transform, "FeedbackFieldCard", "Feedback Detail", AppShellEditorCommon.EnumNames<FeedbackLevel>(), -1f);
+            TMP_Dropdown difficultyDropdown = CreateDropdownFieldCard(contextRow.transform, "DifficultyFieldCard", "Difficulty", "Score pressure and tolerance.", AppShellEditorCommon.EnumNames<SessionDifficulty>(), 215f);
+            TMP_Dropdown audienceDropdown = CreateDropdownFieldCard(contextRow.transform, "AudienceFieldCard", "Audience", "Audience reaction style.", AppShellEditorCommon.EnumNames<AudiencePreset>(), 215f);
+            TMP_Dropdown feedbackDropdown = CreateDropdownFieldCard(contextSection.transform, "FeedbackFieldCard", "Feedback", "Result detail level.", AppShellEditorCommon.EnumNames<FeedbackLevel>(), -1f);
 
             GameObject analysisSection = AppShellEditorUi.CreateSectionCard(leftColumn.transform, "AnalysisSection", AppShellEditorCommon.UtilitySurfaceColor, 18, 18, 8f, AppShellEditorCommon.WithAlpha(AppShellEditorCommon.AccentColor, 0.8f));
             AppShellEditorUi.CreateTextBlock(analysisSection.transform, "AnalysisTitle", "ANALYSIS SYSTEMS", 15f, FontStyles.Bold, TextAlignmentOptions.Left, 20f, AppShellEditorCommon.SoftAccentColor);
@@ -1627,9 +1627,7 @@ namespace VRPublicSpeaking.AppShell.Editor
             AppShellEditorUi.CreateTextBlock(rightColumn.transform, "SummaryLead", "Keep this side short and readable like a final session card.", 15f, FontStyles.Normal, TextAlignmentOptions.Left, 32f, AppShellEditorCommon.MutedTextColor);
             GameObject summaryCard = AppShellEditorUi.CreateSectionCard(rightColumn.transform, "SummaryCard", AppShellEditorCommon.TileSurfaceColor, 18, 18, 8f, AppShellEditorCommon.AccentColor);
             AppShellEditorUi.CreateTextBlock(summaryCard.transform, "SummaryCardTitle", "CURRENT CONFIG", 15f, FontStyles.Bold, TextAlignmentOptions.Left, 20f, AppShellEditorCommon.SoftAccentColor);
-            TMP_Text summaryPreview = AppShellEditorUi.CreateTextBlock(summaryCard.transform, "SummaryPreviewLabel", string.Empty, 17f, FontStyles.Normal, TextAlignmentOptions.Left, 150f, AppShellEditorCommon.TextColor);
-            Button recommendedDemoSetupButton = AppShellEditorUi.CreateStyledButton(summaryCard.transform, "RecommendedDemoSetupButton", "Use Recommended Demo Setup", AppShellEditorUi.ButtonTone.Primary, -1f, 48f);
-            TMP_Text recommendedDemoSetupLabel = recommendedDemoSetupButton.GetComponentInChildren<TMP_Text>(true);
+            TMP_Text summaryPreview = AppShellEditorUi.CreateTextBlock(summaryCard.transform, "SummaryPreviewLabel", string.Empty, 17f, FontStyles.Normal, TextAlignmentOptions.Left, 188f, AppShellEditorCommon.TextColor);
             AppShellEditorUi.CreateSummaryStrip(rightColumn.transform, "SummaryHint", "Safe Integration", "Only shell configuration changes here. Scene logic stays intact.");
             AppShellEditorUi.CreateSummaryStrip(rightColumn.transform, "CapabilityHint", "Visible Systems", "Unhooked integrations can stay visible as disabled choices.");
 
@@ -1651,11 +1649,9 @@ namespace VRPublicSpeaking.AppShell.Editor
             AppShellEditorCommon.SetField(controller, "voiceAnalysisToggle", voiceAnalysisToggle);
             AppShellEditorCommon.SetField(controller, "postureAnalysisToggle", postureAnalysisToggle);
             AppShellEditorCommon.SetField(controller, "summaryPreviewLabel", summaryPreview);
-            AppShellEditorCommon.SetField(controller, "recommendedDemoSetupButton", recommendedDemoSetupButton);
-            AppShellEditorCommon.SetField(controller, "recommendedDemoSetupLabel", recommendedDemoSetupLabel);
         }
 
-        private static void BuildReadyPanel(Transform panelTransform, ReadyPanelPresenter presenter)
+        private static void BuildReadyPanel(Transform panelTransform, ReadyPanelPresenter presenter, AppEnvironmentCatalog catalog)
         {
             AppShellEditorUi.ClearGeneratedChildren(panelTransform);
 
@@ -1669,7 +1665,7 @@ namespace VRPublicSpeaking.AppShell.Editor
                 "Launch Brief",
                 "One last review before scene load, adapter handoff, and in-session HUD activation.",
                 "Final Check",
-                null,
+                GetEnvironmentPreviewSprite(catalog, 0),
                 320f,
                 548f,
                 backgroundColor: AppShellEditorCommon.HeroSurfaceColor,
@@ -1691,6 +1687,7 @@ namespace VRPublicSpeaking.AppShell.Editor
 
             AppShellEditorCommon.SetButtonEvent(backButton, presenter.GoBack);
             AppShellEditorCommon.SetButtonEvent(startButton, presenter.StartSession);
+            AppShellEditorCommon.SetField(presenter, "environmentPreviewImage", AppShellEditorCommon.FindDescendantComponent<Image>(launchCard.transform, "Preview"));
         }
 
         private static void BuildProgressPanel(Transform panelTransform, ProgressPanelPresenter presenter)
@@ -1964,12 +1961,16 @@ namespace VRPublicSpeaking.AppShell.Editor
             Transform parent,
             string name,
             string label,
+            string hint,
             IReadOnlyList<string> options,
             float preferredWidth)
         {
             GameObject card = AppShellEditorUi.CreateSectionCard(parent, name, AppShellEditorCommon.UtilitySurfaceColor, 16, 16, 8f, AppShellEditorCommon.WithAlpha(AppShellEditorCommon.AccentColor, 0.72f));
-            AppShellEditorCommon.ConfigureLayoutElement(card, preferredWidth, 96f);
+            AppShellEditorCommon.ConfigureLayoutElement(card, preferredWidth, 126f);
             AppShellEditorUi.CreateTextBlock(card.transform, "FieldLabel", label.ToUpperInvariant(), 14f, FontStyles.Bold, TextAlignmentOptions.Left, 18f, AppShellEditorCommon.SoftAccentColor);
+            TMP_Text hintLabel = AppShellEditorUi.CreateTextBlock(card.transform, "FieldHint", hint, 13f, FontStyles.Normal, TextAlignmentOptions.Left, 24f, AppShellEditorCommon.MutedTextColor);
+            hintLabel.textWrappingMode = TextWrappingModes.NoWrap;
+            hintLabel.overflowMode = TextOverflowModes.Ellipsis;
             return AppShellEditorUi.CreateDropdown(card.transform, "Dropdown", options);
         }
 
