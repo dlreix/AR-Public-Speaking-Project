@@ -26,11 +26,6 @@ namespace VRPublicSpeaking.AppShell.Editor
             }
 
             Scene activeScene = SceneManager.GetActiveScene();
-            if (AppShellXrRigPoseUtility.FixActiveScene(saveScene: true))
-            {
-                Debug.Log("[AppShell] XR headset camera bindings were normalized for the active scene.");
-            }
-
             if (activeScene.path == AppShellEditorCommon.MainHubScenePath)
             {
                 if (!NeedsMainHubUpgrade())
