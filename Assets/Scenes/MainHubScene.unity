@@ -5374,6 +5374,7 @@ MonoBehaviour:
   freePracticeButton: {fileID: 1060093075}
   evaluationModeButton: {fileID: 1350405814}
   challengeModeButton: {fileID: 1506054197}
+  showOnlyPrimaryPracticeMode: 1
   guidedPracticeAvailable: 1
   freePracticeAvailable: 1
   evaluationModeAvailable: 1
@@ -11711,6 +11712,7 @@ MonoBehaviour:
   appFlowManager: {fileID: 2013776753}
   summaryLabel: {fileID: 305638610}
   warningLabel: {fileID: 459200712}
+  environmentPreviewImage: {fileID: 0}
 --- !u!114 &342896116
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -30240,8 +30242,6 @@ MonoBehaviour:
   dashboardRoot: {fileID: 0}
   dashboardSceneName: Overview
   dashboardLoadingMessage: Opening dashboard...
-  dashboardSceneName: Overview
-  dashboardLoadingMessage: Opening dashboard...
   openMessage: Open
   alternateOpenMessages:
   - OpenDashboard
@@ -31382,8 +31382,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::VRPublicSpeaking.AppShell.Results.DashboardAdapter
   dashboardController: {fileID: 0}
   dashboardRoot: {fileID: 0}
-  dashboardSceneName: Overview
-  dashboardLoadingMessage: Opening dashboard...
   dashboardSceneName: Overview
   dashboardLoadingMessage: Opening dashboard...
   openMessage: Open
@@ -41656,7 +41654,6 @@ MonoBehaviour:
   m_DefaultSpriteDPI: 96
   m_DynamicPixelsPerUnit: 16
   m_PresetInfoIsWorld: 1
-  m_PresetInfoIsWorld: 1
 --- !u!223 &1334137175
 Canvas:
   m_ObjectHideFlags: 0
@@ -49052,22 +49049,8 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ab68ce6587aab0146b8dabefbd806791, type: 3}
   m_Name: 
-  m_Name: 
   m_EditorClassIdentifier: Unity.XR.Interaction.Toolkit::UnityEngine.XR.Interaction.Toolkit.UI.XRUIInputModule
   m_SendPointerHoverToParent: 1
-  m_ClickSpeed: 0.3
-  m_MoveDeadzone: 0.6
-  m_RepeatDelay: 0.5
-  m_RepeatRate: 0.1
-  m_TrackedDeviceDragThresholdMultiplier: 2
-  m_TrackedScrollDeltaMultiplier: 5
-  m_BypassUIToolkitEvents: 0
-  m_ActiveInputMode: 0
-  m_EnableXRInput: 1
-  m_EnableMouseInput: 1
-  m_EnableTouchInput: 1
-  m_EnableGamepadInput: 1
-  m_EnableJoystickInput: 1
   m_ClickSpeed: 0.3
   m_MoveDeadzone: 0.6
   m_RepeatDelay: 0.5
@@ -49086,14 +49069,6 @@ MonoBehaviour:
   m_MiddleClickAction: {fileID: 1916901154}
   m_RightClickAction: {fileID: 627748515}
   m_ScrollWheelAction: {fileID: 208617618}
-  m_NavigateAction: {fileID: 0}
-  m_SubmitAction: {fileID: 807520534}
-  m_CancelAction: {fileID: 1078880266}
-  m_EnableBuiltinActionsAsFallback: 1
-  m_HorizontalAxis: Horizontal
-  m_VerticalAxis: Vertical
-  m_SubmitButton: Submit
-  m_CancelButton: Cancel
   m_NavigateAction: {fileID: 0}
   m_SubmitAction: {fileID: 807520534}
   m_CancelAction: {fileID: 1078880266}
@@ -57366,6 +57341,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::VRPublicSpeaking.AppShell.UI.HomePanelPresenter
   appFlowManager: {fileID: 2013776753}
+  dashboardAdapter: {fileID: 0}
   primaryActionButton: {fileID: 0}
   primaryActionLabel: {fileID: 0}
   animatePrimaryAction: 1
@@ -66309,6 +66285,7 @@ GameObject:
   - component: {fileID: 5826056641305162746}
   - component: {fileID: 5033801203280308906}
   - component: {fileID: 245397710}
+  - component: {fileID: 6520291404712757573}
   m_Layer: 2
   m_Name: HubPlayerRig
   m_TagString: Untagged
@@ -70197,17 +70174,17 @@ MonoBehaviour:
   m_UpdateType: 0
   m_IgnoreTrackingState: 0
   m_PositionInput:
-    m_UseReference: 1
+    m_UseReference: 0
     m_Action:
       m_Name: Position
       m_Type: 0
-      m_ExpectedControlType: 
-      m_Id: 0bacfa51-7938-4a88-adae-9e8ba6c59d23
+      m_ExpectedControlType: Vector3
+      m_Id: 8fa5d1ce-b838-4612-8cd5-16981abdeb8e
       m_Processors: 
       m_Interactions: 
       m_SingletonActionBindings:
       - m_Name: 
-        m_Id: f5efb008-b167-4d0f-b9e0-49a2350a85b3
+        m_Id: 4adc7303-c521-46c2-8b98-fba8a0cdb680
         m_Path: <XRHMD>/centerEyePosition
         m_Interactions: 
         m_Processors: 
@@ -70215,19 +70192,19 @@ MonoBehaviour:
         m_Action: Position
         m_Flags: 0
       m_Flags: 0
-    m_Reference: {fileID: 7862207684358717888, guid: c348712bda248c246b8c49b3db54643f, type: 3}
+    m_Reference: {fileID: 0}
   m_RotationInput:
-    m_UseReference: 1
+    m_UseReference: 0
     m_Action:
       m_Name: Rotation
       m_Type: 0
-      m_ExpectedControlType: 
-      m_Id: 5439f14e-c9da-4bd1-ad3f-7121a75c10d9
+      m_ExpectedControlType: Quaternion
+      m_Id: a91fd61c-e45e-40da-99d4-696a287ae3d4
       m_Processors: 
       m_Interactions: 
       m_SingletonActionBindings:
       - m_Name: 
-        m_Id: f984a7fd-f7e2-45ef-b21d-699a5d160f29
+        m_Id: 586c9f87-4152-4105-b332-4e71be2e3ed1
         m_Path: <XRHMD>/centerEyeRotation
         m_Interactions: 
         m_Processors: 
@@ -70235,7 +70212,7 @@ MonoBehaviour:
         m_Action: Rotation
         m_Flags: 0
       m_Flags: 0
-    m_Reference: {fileID: -530380113134220495, guid: c348712bda248c246b8c49b3db54643f, type: 3}
+    m_Reference: {fileID: 0}
   m_TrackingStateInput:
     m_UseReference: 1
     m_Action:
@@ -70462,6 +70439,27 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_ActionAssets:
   - {fileID: -944628639613478452, guid: c348712bda248c246b8c49b3db54643f, type: 3}
+--- !u!114 &6520291404712757573
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1717954561738086118}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ab2d5df6e321541f1b8bc14dc1792f16, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::VRPublicSpeaking.AppShell.Integration.EnvironmentControllerLocomotion
+  xrOrigin: {fileID: 1178791450597742439}
+  characterController: {fileID: 6232745470653912145}
+  moveSpeed: 1.6
+  snapTurnDegrees: 35
+  snapTurnDeadzone: 0.65
+  snapTurnCooldown: 0.35
+  inputDeadzone: 0.18
+  movementEnabled: 1
+  snapTurnEnabled: 1
 --- !u!4 &6528530117304124397
 Transform:
   m_ObjectHideFlags: 0
