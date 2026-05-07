@@ -18,6 +18,7 @@ namespace VRPublicSpeaking.AppShell.Integration
             EnsureMainCameraTag(camera);
             EnsureAudioListener(camera.gameObject);
             EnsureTrackedPoseDriver(camera);
+            EnsureHeadsetPoseRuntimeDriver(camera);
             EnsureHeightSafety(camera);
             return camera;
         }
@@ -150,6 +151,19 @@ namespace VRPublicSpeaking.AppShell.Integration
             }
 
             safety.Configure(camera, xrOrigin);
+        }
+
+        private static void EnsureHeadsetPoseRuntimeDriver(Camera camera)
+        {
+            if (camera == null)
+            {
+                return;
+            }
+
+            if (camera.GetComponent<HeadsetPoseRuntimeDriver>() == null)
+            {
+                camera.gameObject.AddComponent<HeadsetPoseRuntimeDriver>();
+            }
         }
 
         private static XROrigin ResolveXrOrigin(Camera camera)
