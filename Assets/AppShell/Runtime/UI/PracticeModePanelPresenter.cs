@@ -19,7 +19,6 @@ namespace VRPublicSpeaking.AppShell.UI
         [SerializeField] private Button challengeModeButton;
 
         [Header("Availability")]
-        [SerializeField] private bool showOnlyPrimaryPracticeMode = true;
         [SerializeField] private bool guidedPracticeAvailable = true;
         [SerializeField] private bool freePracticeAvailable = true;
         [SerializeField] private bool evaluationModeAvailable = true;
@@ -38,12 +37,6 @@ namespace VRPublicSpeaking.AppShell.UI
 
         public void RefreshAvailability()
         {
-            if (showOnlyPrimaryPracticeMode)
-            {
-                ConfigurePrimaryModeOnly();
-                return;
-            }
-
             ConfigureModeButton(guidedPracticeButton, guidedPracticeAvailable, "Guided Practice");
             ConfigureModeButton(freePracticeButton, freePracticeAvailable, "Free Practice");
             ConfigureModeButton(evaluationModeButton, evaluationModeAvailable, "Evaluation Mode");
@@ -52,23 +45,6 @@ namespace VRPublicSpeaking.AppShell.UI
             if (availabilityLabel != null)
             {
                 availabilityLabel.text = BuildAvailabilitySummary();
-            }
-        }
-
-        private void ConfigurePrimaryModeOnly()
-        {
-            guidedPracticeAvailable = true;
-
-            SetModeCardVisible(guidedPracticeButton, true);
-            SetModeCardVisible(freePracticeButton, false);
-            SetModeCardVisible(evaluationModeButton, false);
-            SetModeCardVisible(challengeModeButton, false);
-
-            ConfigureModeButton(guidedPracticeButton, true, "Continue");
-
-            if (availabilityLabel != null)
-            {
-                availabilityLabel.text = "Final build uses one guided practice flow. Room, timing, audience, and feedback are selected in the next steps.";
             }
         }
 
@@ -124,42 +100,8 @@ namespace VRPublicSpeaking.AppShell.UI
             TMP_Text buttonLabel = button.GetComponentInChildren<TMP_Text>(true);
             if (buttonLabel != null)
             {
-                buttonLabel.text = available ? availableLabel : "Coming Soon";
+                buttonLabel.text = available ? "Select Mode" : "Coming Soon";
             }
-        }
-
-        private static void SetModeCardVisible(Button button, bool visible)
-        {
-            GameObject card = FindModeCard(button);
-            if (card != null)
-            {
-                card.SetActive(visible);
-            }
-            else if (button != null)
-            {
-                button.gameObject.SetActive(visible);
-            }
-        }
-
-        private static GameObject FindModeCard(Button button)
-        {
-            if (button == null)
-            {
-                return null;
-            }
-
-            Transform current = button.transform;
-            while (current != null)
-            {
-                if (current.name.EndsWith("Card", System.StringComparison.Ordinal))
-                {
-                    return current.gameObject;
-                }
-
-                current = current.parent;
-            }
-
-            return null;
         }
 
         private string BuildAvailabilitySummary()

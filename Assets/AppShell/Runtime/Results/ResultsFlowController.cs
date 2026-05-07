@@ -127,7 +127,7 @@ namespace VRPublicSpeaking.AppShell.Results
                 return;
             }
 
-            SetStatus("Dashboard is being connected for the final build. Your session summary remains available here.");
+            SetStatus("Dashboard is being connected for the final demo. Your session summary remains available here.");
         }
 
         private bool TryResolveRuntimeState()

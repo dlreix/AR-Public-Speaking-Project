@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using UnityEngine;
 
 public enum StressLevel { Easy, Medium, Hard }
-public enum AudienceTemperament { Supportive, Neutral, Challenging }
 
 public enum AudienceState
 {
@@ -33,7 +32,6 @@ public class AudienceBehaviorController : MonoBehaviour
 {
     [Header("Scenario Settings")]
     public StressLevel currentStressLevel = StressLevel.Medium;
-    public AudienceTemperament currentAudienceTemperament = AudienceTemperament.Neutral;
     public List<StressScenario> scenarios = new List<StressScenario>();
 
     [Header("Core Engines")]
@@ -81,7 +79,6 @@ public class AudienceBehaviorController : MonoBehaviour
         // Get the frame from Engine
         ReactionFrame frame = reactionEngine.currentReaction;
         float negMult = _activeScenario != null ? _activeScenario.negativeReactionMultiplier : 1f;
-        float posMult = _activeScenario != null ? _activeScenario.positiveReactionMultiplier : 1f;
         float finalScore = reactionEngine.scoringEngine.GetFinalScore();
 
         float elapsedTime = Time.time - _sessionStartTime;
@@ -103,14 +100,12 @@ public class AudienceBehaviorController : MonoBehaviour
             // ---- BİREYSEL SKOR HESABI ----
             // Her öğrencinin kişilik toleransı, genel skoru kendi perspektifinden kaydırır.
             float personalScore = finalScore 
-                + GetAudienceTemperamentScoreOffset()
                 + (member.personalEyeContactTolerance * 40f)
                 + (member.personalWpmTolerance * 0.3f);
             personalScore = Mathf.Clamp(personalScore, 0f, 100f);
 
-            // Difficulty skor baskısıdır: düşük skorda negatif, iyi skorda pozitif tepki eşiğini ayarlar.
-            float stressMultiplier = personalScore >= 55f ? posMult : 2f - negMult;
-            personalScore = Mathf.Lerp(personalScore, personalScore * stressMultiplier, 0.5f);
+            // Stress seviyesine göre negatif tepkileri güçlendir
+            personalScore = Mathf.Lerp(personalScore, personalScore * (2f - negMult), 0.5f);
 
             // Warmup: İlk saniyelerde skoru merkeze (50) yakın tut, zamanla gerçeğe çek
             personalScore = Mathf.Lerp(50f, personalScore, warmupMultiplier);
@@ -175,7 +170,7 @@ public class AudienceBehaviorController : MonoBehaviour
                 {
                     targetState = member.CurrentState;
                     // Force Nodding if eye contact is exceptionally good
-                    if (HasDominantFactor(frame, "good_eye_contact") && targetState != AudienceState.Nodding)
+                    if (frame.dominant_factors.Contains("good_eye_contact") && targetState != AudienceState.Nodding)
                     {
                         targetState = AudienceState.Nodding;
                     }
@@ -183,7 +178,7 @@ public class AudienceBehaviorController : MonoBehaviour
                 else
                 {
                     float r = Random.value;
-                    if (r > 0.6f || HasDominantFactor(frame, "good_eye_contact"))
+                    if (r > 0.6f || frame.dominant_factors.Contains("good_eye_contact"))
                         targetState = AudienceState.Nodding;
                     else if (r > 0.3f)
                         targetState = AudienceState.NoteTaking;
@@ -194,8 +189,6 @@ public class AudienceBehaviorController : MonoBehaviour
                 if (member.proceduralAnimator != null)
                     member.proceduralAnimator.externalBoredomLevel = 0f;
             }
-
-            targetState = ApplyReactionFrameInfluence(member, targetState, frame, personalScore);
 
             if (targetState == AudienceState.Stretching)
             {
@@ -247,121 +240,6 @@ public class AudienceBehaviorController : MonoBehaviour
         return scenario;
     }
 
-    private float GetAudienceTemperamentScoreOffset()
-    {
-        switch (currentAudienceTemperament)
-        {
-            case AudienceTemperament.Supportive:
-                return 8f;
-            case AudienceTemperament.Challenging:
-                return -8f;
-            case AudienceTemperament.Neutral:
-            default:
-                return 0f;
-        }
-    }
-
-    private AudienceState ApplyReactionFrameInfluence(AudienceMember member, AudienceState targetState, ReactionFrame frame, float personalScore)
-    {
-        if (frame == null)
-        {
-            return targetState;
-        }
-
-        if (personalScore < 35f)
-        {
-            if (HasReaction(frame, "phone_usage") || frame.overall_audience_state == AudienceState.Distracted)
-            {
-                return AudienceState.Distracted;
-            }
-
-            if (frame.overall_audience_state == AudienceState.Bored)
-            {
-                return AudienceState.Stretching;
-            }
-
-            return targetState;
-        }
-
-        if (personalScore < 55f)
-        {
-            if (HasReaction(frame, "phone_usage") || frame.overall_audience_state == AudienceState.Distracted)
-            {
-                return AudienceState.Distracted;
-            }
-
-            if (frame.overall_audience_state == AudienceState.Bored)
-            {
-                return AudienceState.Stretching;
-            }
-
-            if (HasReaction(frame, "taking_notes"))
-            {
-                return IsMemberInReactionGroup(member, 0.2f) ? AudienceState.NoteTaking : targetState;
-            }
-
-            return targetState;
-        }
-
-        if (personalScore <= 75f)
-        {
-            if (HasReaction(frame, "taking_notes"))
-            {
-                return IsMemberInReactionGroup(member, 0.3f) ? AudienceState.NoteTaking : targetState;
-            }
-
-            if (HasReaction(frame, "nodding") || HasReaction(frame, "professional_approval"))
-            {
-                return Random.value > 0.5f ? AudienceState.Nodding : AudienceState.Neutral;
-            }
-
-            return targetState;
-        }
-
-        if (HasReaction(frame, "taking_notes"))
-        {
-            if (member.CurrentState == AudienceState.Nodding || member.CurrentState == AudienceState.Attentive)
-            {
-                return member.CurrentState;
-            }
-
-            return IsMemberInReactionGroup(member, 0.35f) ? AudienceState.NoteTaking : targetState;
-        }
-
-        if (HasReaction(frame, "nodding") || HasReaction(frame, "professional_approval") || HasReaction(frame, "applause_and_laughs"))
-        {
-            return AudienceState.Nodding;
-        }
-
-        return targetState;
-    }
-
-    private static bool HasDominantFactor(ReactionFrame frame, string factor)
-    {
-        return frame != null
-            && frame.dominant_factors != null
-            && frame.dominant_factors.Contains(factor);
-    }
-
-    private static bool HasReaction(ReactionFrame frame, string reaction)
-    {
-        return frame != null
-            && frame.reactions != null
-            && frame.reactions.Contains(reaction);
-    }
-
-    private static bool IsMemberInReactionGroup(AudienceMember member, float ratio)
-    {
-        if (member == null)
-        {
-            return false;
-        }
-
-        int stableBucket = Mathf.Abs(member.GetInstanceID()) % 100;
-        return stableBucket < Mathf.RoundToInt(Mathf.Clamp01(ratio) * 100f);
-    }
-
     public void TriggerSessionEnd() => sessionEnded = true;
     public void ChangeStressLevel(StressLevel level) => ApplyScenario(level);
-    public void ChangeAudienceTemperament(AudienceTemperament temperament) => currentAudienceTemperament = temperament;
 }

@@ -137,7 +137,9 @@ public class MainController : MonoBehaviour
             }
         }
 
-        isVRMode = DetectVrMode();
+        List<InputDevice> headDevices = new List<InputDevice>();
+        InputDevices.GetDevicesWithCharacteristics(InputDeviceCharacteristics.HeadMounted, headDevices);
+        isVRMode = headDevices.Count > 0;
 
         if (!isVRMode && lockCursor)
         {
@@ -157,8 +159,6 @@ public class MainController : MonoBehaviour
 
     void Update()
     {
-        RefreshVrMode();
-
         if (!isVRMode) HandleMouseLook();
         HandleModeInput();
 
@@ -180,40 +180,6 @@ public class MainController : MonoBehaviour
         cameraPitch = Mathf.Clamp(cameraPitch, -80f, 80f);
 
         playerHead.rotation = Quaternion.Euler(cameraPitch, cameraYaw, 0f);
-    }
-
-    void RefreshVrMode()
-    {
-        bool nextVrMode = DetectVrMode();
-        if (nextVrMode == isVRMode)
-        {
-            return;
-        }
-
-        isVRMode = nextVrMode;
-        if (isVRMode)
-        {
-            ApplyDesktopCursorState(false);
-        }
-
-        Debug.Log("[MainController] Runtime mode changed: " + (isVRMode ? "VR" : "PC"));
-    }
-
-    bool DetectVrMode()
-    {
-        var xrDisplays = new List<XRDisplaySubsystem>();
-        SubsystemManager.GetSubsystems(xrDisplays);
-        for (int index = 0; index < xrDisplays.Count; index++)
-        {
-            if (xrDisplays[index] != null && xrDisplays[index].running)
-            {
-                return true;
-            }
-        }
-
-        List<InputDevice> headDevices = new List<InputDevice>();
-        InputDevices.GetDevicesWithCharacteristics(InputDeviceCharacteristics.HeadMounted, headDevices);
-        return headDevices.Count > 0;
     }
 
     void HandleModeInput()

@@ -231,140 +231,16 @@ namespace VRPublicSpeaking.AppShell.Editor
             if (dropdown.captionText != null)
             {
                 dropdown.captionText.color = AppShellEditorCommon.TextColor;
-                dropdown.captionText.fontSize = 15f;
-                dropdown.captionText.overflowMode = TextOverflowModes.Ellipsis;
+                dropdown.captionText.fontSize = 20f;
             }
 
             if (dropdown.itemText != null)
             {
                 dropdown.itemText.color = AppShellEditorCommon.TextColor;
-                dropdown.itemText.fontSize = 15f;
-                dropdown.itemText.overflowMode = TextOverflowModes.Ellipsis;
+                dropdown.itemText.fontSize = 18f;
             }
 
-            StyleDropdownTemplate(dropdown);
             return dropdown;
-        }
-
-        private static void StyleDropdownTemplate(TMP_Dropdown dropdown)
-        {
-            if (dropdown == null)
-            {
-                return;
-            }
-
-            Color textColor = AppShellEditorCommon.TextColor;
-            Color fieldColor = AppShellEditorCommon.TileSurfaceColor;
-            Color popupColor = new Color(0.10f, 0.15f, 0.22f, 1f);
-            Color optionColor = new Color(0.15f, 0.22f, 0.31f, 1f);
-
-            Image fieldImage = dropdown.GetComponent<Image>();
-            if (fieldImage != null)
-            {
-                AppShellEditorCommon.StyleSlicedImage(fieldImage, fieldColor);
-            }
-
-            ColorBlock dropdownColors = dropdown.colors;
-            dropdownColors.normalColor = Color.white;
-            dropdownColors.highlightedColor = new Color(0.86f, 0.94f, 1f, 1f);
-            dropdownColors.pressedColor = new Color(0.70f, 0.86f, 1f, 1f);
-            dropdownColors.selectedColor = Color.white;
-            dropdownColors.disabledColor = new Color(0.42f, 0.46f, 0.52f, 0.75f);
-            dropdownColors.fadeDuration = 0.08f;
-            dropdown.colors = dropdownColors;
-
-            RectTransform template = dropdown.template != null
-                ? dropdown.template
-                : dropdown.transform.Find("Template") as RectTransform;
-            if (template == null)
-            {
-                return;
-            }
-
-            Image templateImage = template.GetComponent<Image>();
-            if (templateImage != null)
-            {
-                AppShellEditorCommon.StyleSlicedImage(templateImage, popupColor);
-            }
-
-            Image[] images = template.GetComponentsInChildren<Image>(true);
-            for (int index = 0; index < images.Length; index++)
-            {
-                Image image = images[index];
-                if (image == null)
-                {
-                    continue;
-                }
-
-                if (image.name == "Item Background")
-                {
-                    image.color = optionColor;
-                }
-                else if (image.name == "Checkmark" || image.name == "Handle")
-                {
-                    image.color = AppShellEditorCommon.AccentColor;
-                }
-                else if (image.name == "Scrollbar" || image.name == "Sliding Area")
-                {
-                    image.color = new Color(0.05f, 0.07f, 0.10f, 1f);
-                }
-            }
-
-            TMP_Text[] labels = template.GetComponentsInChildren<TMP_Text>(true);
-            for (int index = 0; index < labels.Length; index++)
-            {
-                TMP_Text label = labels[index];
-                if (label == null)
-                {
-                    continue;
-                }
-
-                label.color = textColor;
-                label.fontSize = Mathf.Max(label.fontSize, 18f);
-                label.fontStyle = FontStyles.Bold;
-                label.overrideColorTags = true;
-                label.transform.SetAsLastSibling();
-            }
-
-            Toggle[] toggles = template.GetComponentsInChildren<Toggle>(true);
-            for (int index = 0; index < toggles.Length; index++)
-            {
-                Toggle toggle = toggles[index];
-                if (toggle == null)
-                {
-                    continue;
-                }
-
-                if (toggle.targetGraphic is Image targetImage)
-                {
-                    targetImage.color = optionColor;
-                }
-
-                ColorBlock toggleColors = toggle.colors;
-                toggleColors.normalColor = Color.white;
-                toggleColors.highlightedColor = Color.white;
-                toggleColors.pressedColor = Color.white;
-                toggleColors.selectedColor = Color.white;
-                toggleColors.disabledColor = new Color(0.36f, 0.39f, 0.44f, 0.75f);
-                toggleColors.fadeDuration = 0.08f;
-                toggle.colors = toggleColors;
-
-                TMP_Text[] toggleLabels = toggle.GetComponentsInChildren<TMP_Text>(true);
-                for (int labelIndex = 0; labelIndex < toggleLabels.Length; labelIndex++)
-                {
-                    TMP_Text label = toggleLabels[labelIndex];
-                    if (label == null)
-                    {
-                        continue;
-                    }
-
-                    label.color = textColor;
-                    label.fontSize = Mathf.Max(label.fontSize, 18f);
-                    label.fontStyle = FontStyles.Bold;
-                    label.overrideColorTags = true;
-                    label.transform.SetAsLastSibling();
-                }
-            }
         }
 
         internal static Toggle CreateToggle(Transform parent, string name, string label, bool defaultValue)

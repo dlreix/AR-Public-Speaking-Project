@@ -37,13 +37,11 @@ namespace VRPublicSpeaking.AppShell.Integration
             {
                 SessionConfig config = AppRuntimeState.Instance.CurrentSessionConfig;
                 
-                // Difficulty skor baskısını, Audience ise seyirci toleransını belirler.
-                StressLevel stressLevel = ConvertDifficultyToStress(config.DifficultyLevel);
-                AudienceTemperament temperament = ConvertAudienceToTemperament(config.AudiencePreset);
+                // Shell ayarlarini StressLevel'e donustur
+                StressLevel stressLevel = ConvertConfigToStress(config);
                 
                 behaviorController.ApplyScenario(stressLevel);
-                behaviorController.ChangeAudienceTemperament(temperament);
-                Debug.Log($"[AudienceIntegrationAdapter] Arda'nin seyirci sistemi Difficulty='{stressLevel}', Audience='{temperament}' modunda baslatildi.");
+                Debug.Log($"[AudienceIntegrationAdapter] Arda'nin seyirci sistemi '{stressLevel}' (Difficulty: {config.DifficultyLevel}, Preset: {config.AudiencePreset}) modunda baslatildi.");
             }
 
             // 2. PerformanceScoringEngine'i bulup, Arda'nin Reaction Engine'ine bagla
@@ -58,26 +56,21 @@ namespace VRPublicSpeaking.AppShell.Integration
             }
         }
 
-        private StressLevel ConvertDifficultyToStress(SessionDifficulty difficulty)
+        private StressLevel ConvertConfigToStress(SessionConfig config)
         {
-            if (difficulty == SessionDifficulty.Easy)
+            // Once Audience Preset onceliklidir. Hostile = Hard, Friendly = Easy.
+            if (config.AudiencePreset == AudiencePreset.Challenging) return StressLevel.Hard;
+            if (config.AudiencePreset == AudiencePreset.Supportive) return StressLevel.Easy;
+
+            // Eger Neutral ise, secilen oyun zorluguna (DifficultyLevel) gore ayarla:
+            if (config.DifficultyLevel == SessionDifficulty.Easy)
                 return StressLevel.Easy;
-            else if (difficulty == SessionDifficulty.Normal)
+            else if (config.DifficultyLevel == SessionDifficulty.Normal)
                 return StressLevel.Medium;
-            else if (difficulty == SessionDifficulty.Hard || difficulty == SessionDifficulty.Expert)
+            else if (config.DifficultyLevel == SessionDifficulty.Hard || config.DifficultyLevel == SessionDifficulty.Expert)
                 return StressLevel.Hard;
 
             return StressLevel.Medium;
-        }
-
-        private AudienceTemperament ConvertAudienceToTemperament(AudiencePreset audiencePreset)
-        {
-            if (audiencePreset == AudiencePreset.Supportive)
-                return AudienceTemperament.Supportive;
-            if (audiencePreset == AudiencePreset.Challenging)
-                return AudienceTemperament.Challenging;
-
-            return AudienceTemperament.Neutral;
         }
 
         // --- PAUSE & RESUME ---

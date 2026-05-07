@@ -62,7 +62,7 @@ namespace VRPublicSpeaking.AppShell.UI
                 return;
             }
 
-            SetNote("Dashboard is being connected for the final build. Latest summary is still available here.");
+            SetNote("Dashboard is being connected for the final demo. Latest summary is still available here.");
         }
 
         public void GoBack()
