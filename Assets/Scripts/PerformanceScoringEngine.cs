@@ -294,6 +294,11 @@ public class PerformanceScoringEngine : MonoBehaviour
         CalculateSessionScore(true);
     }
 
+    public void RefreshScoreSilently()
+    {
+        CalculateSessionScore(false);
+    }
+
     private void CalculateSessionScore(bool notifyListeners)
     {
         scoreBreakdown.speechScore  = CalculateSpeechScore();

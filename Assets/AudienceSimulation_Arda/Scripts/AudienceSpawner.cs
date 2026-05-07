@@ -349,6 +349,22 @@ public class AudienceSpawner : MonoBehaviour
     private List<GameObject> LoadCharacterPrefabs()
     {
         List<GameObject> prefabs = new List<GameObject>();
+        if (audiencePrefabs != null)
+        {
+            foreach (GameObject prefab in audiencePrefabs)
+            {
+                if (prefab != null && !prefabs.Contains(prefab))
+                {
+                    prefabs.Add(prefab);
+                }
+            }
+        }
+
+        if (prefabs.Count > 0)
+        {
+            return prefabs;
+        }
+
 #if UNITY_EDITOR
         string folder = "Assets/AudienceSimulation_Arda/Models";
         if (System.IO.Directory.Exists(Application.dataPath + "/" + folder.Replace("Assets/", "")))
@@ -374,9 +390,18 @@ public class AudienceSpawner : MonoBehaviour
     {
         switch (controller.currentStressLevel)
         {
-            case StressLevel.Easy: am.personalWpmTolerance = Random.Range(-40f, -10f); am.personalEyeContactTolerance = Random.Range(-0.2f, -0.05f); break;
-            case StressLevel.Medium: am.personalWpmTolerance = Random.Range(-10f, 10f); am.personalEyeContactTolerance = Random.Range(-0.08f, 0.08f); break;
-            case StressLevel.Hard: am.personalWpmTolerance = Random.Range(10f, 40f); am.personalEyeContactTolerance = Random.Range(0.1f, 0.3f); break;
+            case StressLevel.Easy:
+                am.personalWpmTolerance = Random.Range(10f, 40f);
+                am.personalEyeContactTolerance = Random.Range(0.08f, 0.20f);
+                break;
+            case StressLevel.Medium:
+                am.personalWpmTolerance = Random.Range(-10f, 10f);
+                am.personalEyeContactTolerance = Random.Range(-0.08f, 0.08f);
+                break;
+            case StressLevel.Hard:
+                am.personalWpmTolerance = Random.Range(-40f, -10f);
+                am.personalEyeContactTolerance = Random.Range(-0.22f, -0.08f);
+                break;
         }
     }
 
