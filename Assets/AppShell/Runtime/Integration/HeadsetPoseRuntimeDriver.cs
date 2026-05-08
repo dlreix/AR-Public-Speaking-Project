@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Unity.XR.CoreUtils;
 using UnityEngine;
 using UnityEngine.XR;
 
@@ -9,11 +10,16 @@ namespace VRPublicSpeaking.AppShell.Integration
     {
         [SerializeField] private bool applyPosition = true;
         [SerializeField] private bool applyRotation = true;
+        [SerializeField] private float cameraOnlyFallbackHeight = 1.6f;
+        [SerializeField] private float minimumValidHeadHeight = 0.35f;
 
         private readonly List<InputDevice> headDevices = new();
+        private XROrigin xrOrigin;
+        private PlayerController playerController;
 
         private void OnEnable()
         {
+            CacheSceneReferences();
             RefreshHeadDevices();
             Application.onBeforeRender += ApplyHeadsetPose;
         }
@@ -38,7 +44,7 @@ namespace VRPublicSpeaking.AppShell.Integration
             if (applyPosition &&
                 headDevice.TryGetFeatureValue(CommonUsages.devicePosition, out Vector3 position))
             {
-                transform.localPosition = position;
+                transform.localPosition = ResolveSafeLocalPosition(position);
             }
 
             if (applyRotation &&
@@ -46,6 +52,35 @@ namespace VRPublicSpeaking.AppShell.Integration
             {
                 transform.localRotation = rotation;
             }
+        }
+
+        private void CacheSceneReferences()
+        {
+            xrOrigin = GetComponentInParent<XROrigin>(true);
+            playerController = GetComponentInParent<PlayerController>(true);
+        }
+
+        private Vector3 ResolveSafeLocalPosition(Vector3 headsetLocalPosition)
+        {
+            if (xrOrigin != null || headsetLocalPosition.y >= minimumValidHeadHeight)
+            {
+                return headsetLocalPosition;
+            }
+
+            headsetLocalPosition.y = ResolveCameraOnlyFallbackHeight();
+            return headsetLocalPosition;
+        }
+
+        private float ResolveCameraOnlyFallbackHeight()
+        {
+            if (playerController == null)
+            {
+                playerController = GetComponentInParent<PlayerController>(true);
+            }
+
+            return playerController != null
+                ? Mathf.Max(minimumValidHeadHeight, playerController.playerHeight - 0.1f)
+                : Mathf.Max(minimumValidHeadHeight, cameraOnlyFallbackHeight);
         }
 
         private bool TryGetHeadDevice(out InputDevice headDevice)
