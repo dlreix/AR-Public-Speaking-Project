@@ -10,6 +10,7 @@ using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using Unity.XR.CoreUtils;
+using UnityEngine.XR.Interaction.Toolkit.Inputs;
 using VRPublicSpeaking.AppShell.Data;
 using VRPublicSpeaking.AppShell.Flow;
 using VRPublicSpeaking.AppShell.Integration;
@@ -26,7 +27,9 @@ namespace VRPublicSpeaking.AppShell.Editor
             "Assets/VRTemplateAssets/Prefabs/Setup/Complete XR Origin Set Up Variant.prefab"
         };
 
+        private const string XriDefaultInputActionsPath = "Assets/Samples/XR Interaction Toolkit/3.3.0/Starter Assets/XRI Default Input Actions.inputactions";
         private const string LegacySharedRigPrefabPath = "Assets/Prefabs/share.prefab";
+        private const float EnvironmentCameraYOffset = 1.62f;
         private const string HubSkyboxMaterialPath = "Assets/VRTemplateAssets/Materials/Skybox/Hub Skybox Blue 2.mat";
         private const string HubFloorMaterialPath = "Assets/VRTemplateAssets/Materials/Environment/Concrete Grey.mat";
         private const string HubWallMaterialPath = "Assets/VRTemplateAssets/Materials/Environment/Wall Default.mat";
@@ -236,6 +239,7 @@ namespace VRPublicSpeaking.AppShell.Editor
 
         private static void InstallBindingsInEnvironmentScene(Scene scene)
         {
+            PlayerController environmentPlayerController = EnsureEnvironmentVrLocomotion(scene);
             EnsureEventSystem(scene);
 
             GameObject bindingsRoot = AppShellEditorCommon.FindOrCreateSceneRoot(scene, "AppShellSceneBindings");
@@ -250,6 +254,7 @@ namespace VRPublicSpeaking.AppShell.Editor
             AppShellEditorCommon.SetField(installer, "playerRigAdapter", playerRigAdapter);
             AppShellEditorCommon.SetField(installer, "existingSceneFlowAdapter", flowAdapter);
             AppShellEditorCommon.SetField(flowAdapter, "scoringAdapter", scoringAdapter);
+            AppShellEditorCommon.SetField(playerRigAdapter, "playerController", environmentPlayerController);
 
             EnvironmentSessionOverlayController overlayController = BuildInSessionHud(bindingsRoot.transform, scene);
             AppShellEditorCommon.SetField(installer, "environmentSessionOverlayController", overlayController);
@@ -1089,6 +1094,273 @@ namespace VRPublicSpeaking.AppShell.Editor
             }
         }
 
+        private static PlayerController EnsureEnvironmentVrLocomotion(Scene scene)
+        {
+            XROrigin xrOrigin = FindSceneComponent<XROrigin>(scene);
+            bool needsXriRig = xrOrigin == null || xrOrigin.transform.Find("Locomotion") == null;
+            if (needsXriRig)
+            {
+                if (xrOrigin != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(xrOrigin.gameObject);
+                }
+
+                xrOrigin = InstantiateEnvironmentXrOrigin(scene);
+            }
+
+            if (xrOrigin == null)
+            {
+                GameObject fallbackRig = AppShellEditorCommon.FindOrCreateSceneRoot(scene, "XR Origin (VR)");
+                xrOrigin = AppShellEditorCommon.GetOrAddComponent<XROrigin>(fallbackRig);
+            }
+
+            GameObject rigRoot = xrOrigin.gameObject;
+            rigRoot.name = "XR Origin (VR)";
+            PlaceRigAtSpawn(rigRoot, scene);
+            EnsurePlayerRigSupport(rigRoot);
+
+            if (xrOrigin.Camera == null)
+            {
+                xrOrigin.Camera = rigRoot.GetComponentInChildren<Camera>(true);
+            }
+
+            EnsureEnvironmentInputActionManager(scene, rigRoot);
+            EnsureEnvironmentLocomotionState(xrOrigin);
+            NormalizeEnvironmentCameras(scene, xrOrigin.Camera);
+            DisableExternalPlayerControllers(scene, xrOrigin);
+
+            PlayerController playerController = rigRoot.GetComponent<PlayerController>();
+            AppShellEditorCommon.MarkDirty(rigRoot, xrOrigin, playerController);
+            return playerController;
+        }
+
+        private static XROrigin InstantiateEnvironmentXrOrigin(Scene scene)
+        {
+            for (int index = 0; index < RigPrefabCandidates.Length; index++)
+            {
+                GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(RigPrefabCandidates[index]);
+                if (prefab == null)
+                {
+                    continue;
+                }
+
+                GameObject instance = PrefabUtility.InstantiatePrefab(prefab, scene) as GameObject;
+                if (instance == null)
+                {
+                    continue;
+                }
+
+                instance.name = "XR Origin (VR)";
+                XROrigin xrOrigin = instance.GetComponent<XROrigin>() ?? instance.GetComponentInChildren<XROrigin>(true);
+                if (xrOrigin != null)
+                {
+                    return xrOrigin;
+                }
+
+                UnityEngine.Object.DestroyImmediate(instance);
+            }
+
+            return null;
+        }
+
+        private static void PlaceRigAtSpawn(GameObject rigRoot, Scene scene)
+        {
+            Transform spawnPoint = FindSpawnPoint(scene);
+            if (rigRoot == null || spawnPoint == null)
+            {
+                return;
+            }
+
+            rigRoot.transform.position = spawnPoint.position;
+            rigRoot.transform.rotation = spawnPoint.rotation;
+        }
+
+        private static Transform FindSpawnPoint(Scene scene)
+        {
+            string[] candidateNames = { "PlayerSpawnPoint", "SpawnPoint" };
+            for (int nameIndex = 0; nameIndex < candidateNames.Length; nameIndex++)
+            {
+                GameObject[] roots = scene.GetRootGameObjects();
+                for (int rootIndex = 0; rootIndex < roots.Length; rootIndex++)
+                {
+                    Transform match = AppShellEditorCommon.FindDescendant(roots[rootIndex].transform, candidateNames[nameIndex]);
+                    if (match != null)
+                    {
+                        return match;
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        private static void EnsureEnvironmentInputActionManager(Scene scene, GameObject host)
+        {
+            InputActionManager inputActionManager = FindSceneComponent<InputActionManager>(scene);
+            if (inputActionManager == null)
+            {
+                inputActionManager = AppShellEditorCommon.GetOrAddComponent<InputActionManager>(host);
+            }
+
+            InputActionAsset inputActionAsset = AssetDatabase.LoadAssetAtPath<InputActionAsset>(XriDefaultInputActionsPath);
+            if (inputActionAsset != null)
+            {
+                inputActionManager.actionAssets ??= new List<InputActionAsset>();
+                if (!inputActionManager.actionAssets.Contains(inputActionAsset))
+                {
+                    inputActionManager.actionAssets.Add(inputActionAsset);
+                }
+            }
+
+            inputActionManager.enabled = true;
+            AppShellEditorCommon.MarkDirty(inputActionManager);
+        }
+
+        private static void EnsureEnvironmentLocomotionState(XROrigin xrOrigin)
+        {
+            if (xrOrigin == null)
+            {
+                return;
+            }
+
+            CharacterController characterController = AppShellEditorCommon.GetOrAddComponent<CharacterController>(xrOrigin.gameObject);
+            characterController.height = 1.7f;
+            characterController.center = new Vector3(0f, 0.85f, 0f);
+            characterController.radius = 0.3f;
+            characterController.enabled = true;
+
+            xrOrigin.RequestedTrackingOriginMode = XROrigin.TrackingOriginMode.Device;
+            xrOrigin.CameraYOffset = EnvironmentCameraYOffset;
+            if (xrOrigin.CameraFloorOffsetObject != null)
+            {
+                Vector3 offsetPosition = xrOrigin.CameraFloorOffsetObject.transform.localPosition;
+                offsetPosition.y = EnvironmentCameraYOffset;
+                xrOrigin.CameraFloorOffsetObject.transform.localPosition = offsetPosition;
+                AppShellEditorCommon.MarkDirty(xrOrigin.CameraFloorOffsetObject);
+            }
+
+            SetNamedChildActive(xrOrigin.transform, "Locomotion", true);
+            SetNamedChildActive(xrOrigin.transform, "Teleportation", false);
+            SetNamedChildActive(xrOrigin.transform, "Gravity", true);
+
+            VrRigHeightSafety heightSafety = AppShellEditorCommon.GetOrAddComponent<VrRigHeightSafety>(xrOrigin.gameObject);
+            heightSafety.Configure(xrOrigin.Camera, xrOrigin);
+            heightSafety.ConfigureRuntimeHeight(
+                useFloorTracking: false,
+                deviceYOffset: EnvironmentCameraYOffset,
+                disableGravity: false);
+
+            AppShellEditorCommon.MarkDirty(xrOrigin, characterController, heightSafety);
+        }
+
+        private static void SetNamedChildActive(Transform root, string childName, bool active)
+        {
+            Transform child = root != null ? root.Find(childName) : null;
+            if (child != null)
+            {
+                child.gameObject.SetActive(active);
+                AppShellEditorCommon.MarkDirty(child.gameObject);
+            }
+        }
+
+        private static void NormalizeEnvironmentCameras(Scene scene, Camera rigCamera)
+        {
+            GameObject[] roots = scene.GetRootGameObjects();
+            for (int rootIndex = 0; rootIndex < roots.Length; rootIndex++)
+            {
+                ClearMainCameraTagOutsideRig(roots[rootIndex].transform, rigCamera);
+            }
+
+            Camera[] cameras = UnityEngine.Object.FindObjectsByType<Camera>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            for (int index = 0; index < cameras.Length; index++)
+            {
+                Camera camera = cameras[index];
+                if (camera == null || camera.gameObject.scene != scene)
+                {
+                    continue;
+                }
+
+                bool isRigCamera = rigCamera != null && camera == rigCamera;
+                camera.tag = isRigCamera ? "MainCamera" : "Untagged";
+                camera.enabled = isRigCamera;
+
+                AudioListener listener = camera.GetComponent<AudioListener>();
+                if (isRigCamera)
+                {
+                    if (listener == null)
+                    {
+                        listener = camera.gameObject.AddComponent<AudioListener>();
+                    }
+
+                    listener.enabled = true;
+                }
+                else if (listener != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(listener);
+                    listener = null;
+                }
+
+                AppShellEditorCommon.MarkDirty(camera, camera.gameObject);
+                if (listener != null)
+                {
+                    AppShellEditorCommon.MarkDirty(listener);
+                }
+            }
+        }
+
+        private static void ClearMainCameraTagOutsideRig(Transform root, Camera rigCamera)
+        {
+            if (root == null)
+            {
+                return;
+            }
+
+            if ((rigCamera == null || root.gameObject != rigCamera.gameObject) &&
+                root.gameObject.CompareTag("MainCamera"))
+            {
+                root.gameObject.tag = "Untagged";
+                AppShellEditorCommon.MarkDirty(root.gameObject);
+            }
+
+            for (int index = 0; index < root.childCount; index++)
+            {
+                ClearMainCameraTagOutsideRig(root.GetChild(index), rigCamera);
+            }
+        }
+
+        private static void DisableExternalPlayerControllers(Scene scene, XROrigin xrOrigin)
+        {
+            PlayerController[] controllers = UnityEngine.Object.FindObjectsByType<PlayerController>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            for (int index = 0; index < controllers.Length; index++)
+            {
+                PlayerController controller = controllers[index];
+                if (controller == null ||
+                    controller.gameObject.scene != scene ||
+                    controller.GetComponentInParent<XROrigin>(true) == xrOrigin)
+                {
+                    continue;
+                }
+
+                controller.enabled = false;
+                AppShellEditorCommon.MarkDirty(controller);
+            }
+        }
+
+        private static T FindSceneComponent<T>(Scene scene) where T : Component
+        {
+            T[] components = UnityEngine.Object.FindObjectsByType<T>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            for (int index = 0; index < components.Length; index++)
+            {
+                T component = components[index];
+                if (component != null && component.gameObject.scene == scene)
+                {
+                    return component;
+                }
+            }
+
+            return null;
+        }
+
         private static GameObject EnsurePlayerRig(Scene scene, string rigName)
         {
             GameObject existingRig = FindExistingRig(scene);
@@ -1282,7 +1554,15 @@ namespace VRPublicSpeaking.AppShell.Editor
             }
 
             var assignDefaultActionsMethod = inputSystemModule.GetType().GetMethod("AssignDefaultActions", Type.EmptyTypes);
-            assignDefaultActionsMethod?.Invoke(inputSystemModule, null);
+            try
+            {
+                assignDefaultActionsMethod?.Invoke(inputSystemModule, null);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning(
+                    $"[AppShellSceneGenerator] InputSystemUIInputModule default actions could not be assigned. Continuing scene upgrade. {exception.Message}");
+            }
         }
 
         private static Canvas EnsureWorldSpaceCanvas(Scene scene, string name, Vector2 size, Vector3 position, Vector3 scale)
