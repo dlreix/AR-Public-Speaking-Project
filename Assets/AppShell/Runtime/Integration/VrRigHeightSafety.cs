@@ -33,6 +33,58 @@ namespace VRPublicSpeaking.AppShell.Integration
             }
         }
 
+        public void ConfigureRuntimeHeight(
+            bool? useFloorTracking = null,
+            float? deviceYOffset = null,
+            bool? disableGravity = null)
+        {
+            if (useFloorTracking.HasValue)
+            {
+                useFloorTrackingWhenXrRunning = useFloorTracking.Value;
+            }
+
+            if (deviceYOffset.HasValue)
+            {
+                deviceCameraYOffset = Mathf.Max(0.1f, deviceYOffset.Value);
+            }
+
+            if (disableGravity.HasValue)
+            {
+                keepGravityDisabled = disableGravity.Value;
+            }
+
+            elapsed = 0f;
+            ApplyConfiguredDeviceHeightIfNeeded();
+        }
+
+        private void ApplyConfiguredDeviceHeightIfNeeded()
+        {
+            if (useFloorTrackingWhenXrRunning || xrOrigin == null)
+            {
+                return;
+            }
+
+            if (xrOrigin.RequestedTrackingOriginMode != XROrigin.TrackingOriginMode.Device)
+            {
+                xrOrigin.RequestedTrackingOriginMode = XROrigin.TrackingOriginMode.Device;
+            }
+
+            if (Mathf.Abs(xrOrigin.CameraYOffset - deviceCameraYOffset) > FloatEpsilon)
+            {
+                xrOrigin.CameraYOffset = deviceCameraYOffset;
+            }
+
+            if (xrOrigin.CameraFloorOffsetObject != null)
+            {
+                Vector3 offsetPosition = xrOrigin.CameraFloorOffsetObject.transform.localPosition;
+                if (Mathf.Abs(offsetPosition.y - deviceCameraYOffset) > FloatEpsilon)
+                {
+                    offsetPosition.y = deviceCameraYOffset;
+                    xrOrigin.CameraFloorOffsetObject.transform.localPosition = offsetPosition;
+                }
+            }
+        }
+
         private void Awake()
         {
             Configure(targetCamera, xrOrigin);
@@ -142,14 +194,15 @@ namespace VRPublicSpeaking.AppShell.Integration
         private bool ShouldFallbackToDeviceHeight(XROrigin.TrackingOriginMode trackingOriginMode)
         {
             if (trackingOriginMode != XROrigin.TrackingOriginMode.Floor ||
-                elapsed < floorTrackingFallbackDelay ||
                 xrOrigin == null ||
                 xrOrigin.Camera == null)
             {
                 return false;
             }
 
-            return xrOrigin.Camera.transform.localPosition.y < floorTrackingMinimumHeadHeight;
+            float headHeight = xrOrigin.Camera.transform.localPosition.y;
+            return headHeight <= FloatEpsilon ||
+                   (elapsed >= floorTrackingFallbackDelay && headHeight < floorTrackingMinimumHeadHeight);
         }
 
         private static XROrigin ResolveXrOrigin(Camera camera)

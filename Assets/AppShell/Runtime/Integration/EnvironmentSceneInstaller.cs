@@ -47,7 +47,11 @@ namespace VRPublicSpeaking.AppShell.Integration
             }
 
             SessionConfig config = runtimeState.GetSessionConfigCopy();
-            Camera sceneCamera = VrRigRuntimeUtility.EnsureSceneVrReady("[EnvironmentSceneInstaller]");
+            Camera sceneCamera = VrRigRuntimeUtility.EnsureSceneVrReady(
+                "[EnvironmentSceneInstaller]",
+                useFloorTrackingWhenXrRunning: false,
+                deviceCameraYOffset: 1.62f,
+                keepGravityDisabled: false);
             EnsureEnvironmentRuntimeStack(sceneCamera);
 
             playerRigAdapter ??= GetOrAdd<PlayerRigAdapter>();

@@ -6,7 +6,11 @@ namespace VRPublicSpeaking.AppShell.Integration
 {
     public static class VrRigRuntimeUtility
     {
-        public static Camera EnsureSceneVrReady(string context = null)
+        public static Camera EnsureSceneVrReady(
+            string context = null,
+            bool? useFloorTrackingWhenXrRunning = null,
+            float? deviceCameraYOffset = null,
+            bool? keepGravityDisabled = null)
         {
             Camera camera = ResolveSceneCamera();
             if (camera == null)
@@ -19,7 +23,11 @@ namespace VRPublicSpeaking.AppShell.Integration
             EnsureAudioListener(camera.gameObject);
             EnsureTrackedPoseDriver(camera);
             EnsureHeadsetPoseRuntimeDriver(camera);
-            EnsureHeightSafety(camera);
+            EnsureHeightSafety(
+                camera,
+                useFloorTrackingWhenXrRunning,
+                deviceCameraYOffset,
+                keepGravityDisabled);
             return camera;
         }
 
@@ -134,7 +142,11 @@ namespace VRPublicSpeaking.AppShell.Integration
             return action;
         }
 
-        private static void EnsureHeightSafety(Camera camera)
+        private static void EnsureHeightSafety(
+            Camera camera,
+            bool? useFloorTrackingWhenXrRunning,
+            float? deviceCameraYOffset,
+            bool? keepGravityDisabled)
         {
             if (camera == null)
             {
@@ -151,6 +163,15 @@ namespace VRPublicSpeaking.AppShell.Integration
             }
 
             safety.Configure(camera, xrOrigin);
+            if (useFloorTrackingWhenXrRunning.HasValue ||
+                deviceCameraYOffset.HasValue ||
+                keepGravityDisabled.HasValue)
+            {
+                safety.ConfigureRuntimeHeight(
+                    useFloorTrackingWhenXrRunning,
+                    deviceCameraYOffset,
+                    keepGravityDisabled);
+            }
         }
 
         private static void EnsureHeadsetPoseRuntimeDriver(Camera camera)
