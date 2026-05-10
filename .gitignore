@@ -33,3 +33,7 @@ sysinfo.txt
 # Speech Models (Do not push 1.8GB files to GitHub)
 Assets/StreamingAssets/vosk-model*
 !Assets/StreamingAssets/vosk-model-small*
+
+# Local OpenAI credentials
+Assets/StreamingAssets/OpenAI/openai_config.local.json
+Assets/StreamingAssets/OpenAI/openai_config.local.json.meta

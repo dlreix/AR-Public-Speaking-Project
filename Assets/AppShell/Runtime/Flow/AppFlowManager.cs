@@ -18,6 +18,7 @@ namespace VRPublicSpeaking.AppShell.Flow
         [SerializeField] private ProgressPanelPresenter progressPanelPresenter;
         [SerializeField] private SettingsPanelPresenter settingsPanelPresenter;
         [SerializeField] private ResultsSummaryPresenter resultsSummaryPresenter;
+        [SerializeField] private MainHubDashboardPresenter dashboardPresenter;
         [SerializeField] private SessionLaunchController sessionLaunchController;
         [SerializeField] private ShellSceneRigController shellSceneRigController;
         [SerializeField] private Canvas worldSpaceHubCanvas;
@@ -53,6 +54,7 @@ namespace VRPublicSpeaking.AppShell.Flow
                 readyPanelPresenter.RefreshSummary();
             }
 
+            EnsureDashboardPresenter();
             OpenRequestedStartupPanel();
             ConfigureShellSceneRigController();
             ConfigureTutorialHub();
@@ -96,6 +98,20 @@ namespace VRPublicSpeaking.AppShell.Flow
         {
             progressPanelPresenter?.Refresh();
             uiStateController?.ShowPanel(AppPanelType.Progress);
+        }
+
+        public void OpenDashboardPanel()
+        {
+            EnsureDashboardPresenter();
+            dashboardPresenter?.RefreshDashboard();
+
+            if (dashboardPresenter != null && dashboardPresenter.PanelView != null)
+            {
+                uiStateController?.ShowPanel(AppPanelType.Dashboard);
+                return;
+            }
+
+            Debug.LogWarning("[AppFlowManager] Dashboard panel could not be created because the hub canvas is missing.");
         }
 
         public void OpenSettingsPanel()
@@ -156,14 +172,21 @@ namespace VRPublicSpeaking.AppShell.Flow
 
         private void OpenRequestedStartupPanel()
         {
-            if (DataManager.Instance != null && DataManager.Instance.currentUser == "DefaultUser")
+            AppPanelType requestedPanel = runtimeState != null
+                ? runtimeState.CurrentRuntimeState.RequestedHubPanel
+                : AppPanelType.Home;
+            runtimeState?.ResetRequestedHubPanel();
+
+            bool shouldGateBehindLogin =
+                DataManager.Instance != null &&
+                DataManager.Instance.currentUser == "DefaultUser" &&
+                requestedPanel == AppPanelType.Home;
+
+            if (shouldGateBehindLogin)
             {
-                OpenLoginPanel(); // DEÐÝÞTÝ: Eskiden OpenHomePanel idi, artýk ilk Login açýlacak
+                OpenLoginPanel();
                 return;
             }
-
-            AppPanelType requestedPanel = runtimeState.CurrentRuntimeState.RequestedHubPanel;
-            runtimeState.ResetRequestedHubPanel();
 
             switch (requestedPanel)
             {
@@ -187,16 +210,20 @@ namespace VRPublicSpeaking.AppShell.Flow
                     OpenProgressPanel();
                     break;
 
+                case AppPanelType.Dashboard:
+                    OpenDashboardPanel();
+                    break;
+
                 case AppPanelType.Settings:
                     OpenSettingsPanel();
                     break;
 
                 case AppPanelType.Home:
-                    OpenHomePanel(); // Baþka bir ekrandan özel olarak Home'a dönmek istenirse
+                    OpenHomePanel();
                     break;
 
                 default:
-                    OpenLoginPanel(); // DEÐÝÞTÝ: Eskiden OpenHomePanel idi, artýk varsayýlanýmýz Login
+                    OpenLoginPanel();
                     break;
             }
         }
@@ -249,6 +276,31 @@ namespace VRPublicSpeaking.AppShell.Flow
             }
 
             tutorialController.Configure(canvas);
+        }
+
+        private void EnsureDashboardPresenter()
+        {
+            if (runtimeState == null)
+            {
+                runtimeState = AppRuntimeState.GetOrCreate();
+            }
+
+            if (dashboardPresenter == null)
+            {
+                dashboardPresenter = GetComponent<MainHubDashboardPresenter>();
+            }
+
+            if (dashboardPresenter == null)
+            {
+                dashboardPresenter = FindFirstObjectByType<MainHubDashboardPresenter>(FindObjectsInactive.Include);
+            }
+
+            if (dashboardPresenter == null)
+            {
+                dashboardPresenter = gameObject.AddComponent<MainHubDashboardPresenter>();
+            }
+
+            dashboardPresenter.Configure(ResolveHubCanvas(), uiStateController, this, runtimeState);
         }
 
         private Canvas ResolveHubCanvas()

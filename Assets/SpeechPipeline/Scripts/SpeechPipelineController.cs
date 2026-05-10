@@ -1,6 +1,10 @@
 using System.Collections;
 using System.Collections.Generic;
+using System;
 using System.IO;
+#if UNITY_ANDROID && !UNITY_EDITOR
+using System.IO.Compression;
+#endif
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -66,6 +70,7 @@ namespace SpeechPipeline
         public bool IsReady => _state == PipelineState.Ready;
         public bool IsRecording => _state == PipelineState.Recording;
         public bool IsPaused => _isPaused;
+        public event Action<string> FinalTranscriptReceived;
 
         // ── Subsystems ────────────────────────────────────────────────────────
 
@@ -123,7 +128,11 @@ namespace SpeechPipeline
         {
             AutoWireScoringTargets();
 
-            string modelPath = Path.Combine(Application.streamingAssetsPath, ModelFolder);
+            string modelPath = ResolveModelPath();
+#if UNITY_ANDROID && !UNITY_EDITOR
+            yield return ExtractAndroidStreamingModelIfNeeded();
+            modelPath = ResolveModelPath();
+#endif
             if (!IsUsableModelFolder(modelPath))
             {
                 _modelUnavailable = true;
@@ -472,6 +481,7 @@ namespace SpeechPipeline
             _sessionFillers += fillers.Count;
             _sessionFillerList.AddRange(fillers);
             _sessionTranscript.Add(text);
+            FinalTranscriptReceived?.Invoke(text);
             if (wpm > 0f) { _sessionWpmSum      += wpm; _sessionWpmCount++;   }
             if (sd  > 0f) { _sessionPitchStdSum += sd;  _sessionPitchCount++; }
 
@@ -547,6 +557,77 @@ namespace SpeechPipeline
             return Mathf.InverseLerp(10f, 55f, pitchStdHz) * 100f;
         }
 
+        private string ResolveModelPath()
+        {
+#if UNITY_ANDROID && !UNITY_EDITOR
+            return Path.Combine(Path.Combine(Application.persistentDataPath, "VoskModels"), ModelFolder);
+#else
+            return Path.Combine(Application.streamingAssetsPath, ModelFolder);
+#endif
+        }
+
+#if UNITY_ANDROID && !UNITY_EDITOR
+        private IEnumerator ExtractAndroidStreamingModelIfNeeded()
+        {
+            string targetPath = ResolveModelPath();
+            if (IsUsableModelFolder(targetPath))
+            {
+                yield break;
+            }
+
+            string sourcePrefix = $"assets/{ModelFolder.Trim('/', '\\')}/";
+            try
+            {
+                Directory.CreateDirectory(targetPath);
+                using FileStream apkStream = File.OpenRead(Application.dataPath);
+                using ZipArchive archive = new ZipArchive(apkStream, ZipArchiveMode.Read);
+                int extractedFiles = 0;
+
+                foreach (ZipArchiveEntry entry in archive.Entries)
+                {
+                    string entryName = entry.FullName.Replace('\\', '/');
+                    if (!entryName.StartsWith(sourcePrefix) || entryName.EndsWith("/"))
+                    {
+                        continue;
+                    }
+
+                    string relativePath = entryName.Substring(sourcePrefix.Length);
+                    if (string.IsNullOrWhiteSpace(relativePath))
+                    {
+                        continue;
+                    }
+
+                    string destinationPath = Path.Combine(
+                        targetPath,
+                        relativePath.Replace('/', Path.DirectorySeparatorChar));
+                    string destinationDirectory = Path.GetDirectoryName(destinationPath);
+                    if (!string.IsNullOrEmpty(destinationDirectory))
+                    {
+                        Directory.CreateDirectory(destinationDirectory);
+                    }
+
+                    using Stream sourceStream = entry.Open();
+                    using FileStream destinationStream = File.Create(destinationPath);
+                    sourceStream.CopyTo(destinationStream);
+                    extractedFiles++;
+                    if (extractedFiles % 12 == 0)
+                    {
+                        yield return null;
+                    }
+                }
+
+                if (extractedFiles == 0)
+                {
+                    Debug.LogError($"[SpeechPipeline] No Vosk model files were found in APK StreamingAssets under {sourcePrefix}.");
+                }
+            }
+            catch (System.Exception exception)
+            {
+                Debug.LogError($"[SpeechPipeline] Failed to extract Vosk model from Android StreamingAssets: {exception.Message}");
+            }
+        }
+#endif
+
         private static bool IsUsableModelFolder(string modelPath)
         {
             if (string.IsNullOrWhiteSpace(modelPath))
@@ -554,19 +635,12 @@ namespace SpeechPipeline
                 return false;
             }
 
-            // On Android, StreamingAssets lives inside a .jar so Directory.Exists always
-            // returns false. Trust that the model is present and let VoskSTTEngine report
-            // a load error if it isn't.
-#if UNITY_ANDROID && !UNITY_EDITOR
-            return true;
-#else
             if (!Directory.Exists(modelPath))
             {
                 return false;
             }
 
             return Directory.GetFiles(modelPath).Length > 0 || Directory.GetDirectories(modelPath).Length > 0;
-#endif
         }
 
         // ── Cleanup ───────────────────────────────────────────────────────────

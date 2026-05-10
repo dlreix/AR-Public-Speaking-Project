@@ -208,7 +208,12 @@ namespace VRPublicSpeaking.AppShell.Integration
         private static XROrigin ResolveXrOrigin(Camera camera)
         {
             XROrigin origin = camera != null ? camera.GetComponentInParent<XROrigin>(true) : null;
-            return origin != null ? origin : FindFirstObjectByType<XROrigin>(FindObjectsInactive.Include);
+            if (origin != null || camera != null)
+            {
+                return origin;
+            }
+
+            return FindFirstObjectByType<XROrigin>(FindObjectsInactive.Include);
         }
 
         private static bool IsXrDisplayRunning()

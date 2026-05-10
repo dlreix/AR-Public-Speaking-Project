@@ -81,6 +81,21 @@ namespace VRPublicSpeaking.AppShell.UI
             return panelLookup.TryGetValue(panelType, out panelView);
         }
 
+        public void RegisterPanel(AppPanelView panelView)
+        {
+            if (panelView == null)
+            {
+                return;
+            }
+
+            if (!panels.Contains(panelView))
+            {
+                panels.Add(panelView);
+            }
+
+            panelLookup[panelView.PanelType] = panelView;
+        }
+
         public void ShowDefaultPanel(bool rememberHistory = false)
         {
             ShowPanel(defaultPanel, rememberHistory);

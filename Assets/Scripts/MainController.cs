@@ -74,6 +74,7 @@ public class MainController : MonoBehaviour
     private bool xrPrimaryWasPressed;
     private bool xrSecondaryWasPressed;
     private bool xrGripWasPressed;
+    private bool xrMenuWasPressed;
     private float xrSecondaryPressStartedAt = -1f;
     private bool xrSecondaryLongPressHandled;
 
@@ -190,6 +191,7 @@ public class MainController : MonoBehaviour
         bool xrPrimary = GetXRButton(CommonUsages.primaryButton);
         bool xrSecondary = GetXRButton(CommonUsages.secondaryButton);
         bool xrGrip = GetXRButton(CommonUsages.gripButton);
+        bool xrMenu = GetXRButton(new InputFeatureUsage<bool>("menuButton"));
 
         bool mouseLeftClick = !isVRMode
                               && UnityEngine.InputSystem.Mouse.current != null
@@ -233,11 +235,12 @@ public class MainController : MonoBehaviour
         bool rPressed = keyboardPrimaryPressed || (xrPrimary && !xrPrimaryWasPressed);
         bool dPressed = keyboardDebugPressed || vrDebugPressed;
         bool cPressed = keyboardCirclePressed || (xrGrip && !xrGripWasPressed) || mouseLeftClick;
-        bool pausePressed = keyboardPausePressed || vrPauseTogglePressed;
+        bool pausePressed = keyboardPausePressed || vrPauseTogglePressed || (xrMenu && !xrMenuWasPressed);
 
         xrPrimaryWasPressed = xrPrimary;
         xrSecondaryWasPressed = xrSecondary;
         xrGripWasPressed = xrGrip;
+        xrMenuWasPressed = xrMenu;
 
         if (pausePressed && sessionRunning)
         {

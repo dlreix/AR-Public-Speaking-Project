@@ -49,6 +49,8 @@ namespace VRPublicSpeaking.AppShell.Data
         ResultsSummary = 6,
         Progress = 7,
         Settings = 8,
-        PauseOverlay = 9
+        PauseOverlay = 9,
+        Dashboard = 10,
+        AudienceQa = 11
     }
 }

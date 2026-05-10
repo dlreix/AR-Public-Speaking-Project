@@ -8,7 +8,7 @@ using VRPublicSpeaking.AppShell.Data;
 
 public class DashboardController : MonoBehaviour
 {
-    [Header("Overview Page (Genel Bakýþ)")]
+    [Header("Overview Page (Genel BakÄ±ÅŸ)")]
     public TextMeshProUGUI overviewScoreText;
     public TextMeshProUGUI overviewDateText;
 
@@ -17,7 +17,7 @@ public class DashboardController : MonoBehaviour
     public TextMeshProUGUI[] performanceTexts;
     public TextMeshProUGUI performanceDateText;
 
-    [Header("Performance Page (Yeni Detaylý Sütunlar)")]
+    [Header("Performance Page (Yeni DetaylÄ± SÃ¼tunlar)")]
     public TextMeshProUGUI wpmValueText;
     public TextMeshProUGUI fillerValueText;
     public TextMeshProUGUI pauseValueText;
@@ -36,7 +36,7 @@ public class DashboardController : MonoBehaviour
     public TextMeshProUGUI postureFeedbackSummary;
     public TextMeshProUGUI fullCoachNotes;
 
-    [Header("History Page (Geçmiþ ve Grafik)")]
+    [Header("History Page (GeÃ§miÅŸ ve Grafik)")]
     public LineRenderer chartLine;
     public TextMeshProUGUI[] cardScores;
     public TextMeshProUGUI[] cardDates;
@@ -53,10 +53,8 @@ public class DashboardController : MonoBehaviour
         }
     }
 
-    // YENÝ EKLENDÝ: Ekran her aktif olduðunda son veriyi çeker ve UI'ý günceller
     void OnEnable()
     {
-        ImportLatestAppShellResult();
         RefreshAllUI();
     }
 
@@ -70,11 +68,7 @@ public class DashboardController : MonoBehaviour
 
     public void HandleNewSessionData(FeedbackReport report)
     {
-        if (DataManager.Instance != null)
-        {
-            DataManager.Instance.SaveSession(report);
-            RefreshAllUI();
-        }
+        RefreshAllUI();
     }
 
     public void RefreshAllUI()
@@ -100,17 +94,17 @@ public class DashboardController : MonoBehaviour
 
     private void ImportLatestAppShellResult()
     {
-        Debug.Log("[DashboardController] Veri çekme (Import) iþlemi baþladý...");
+        Debug.Log("[DashboardController] Veri Ã§ekme (Import) iÅŸlemi baÅŸladÄ±...");
 
         if (DataManager.Instance == null)
         {
-            Debug.LogError("[DashboardController] HATA: DataManager bulunamadý!");
+            Debug.LogError("[DashboardController] HATA: DataManager bulunamadÄ±!");
             return;
         }
 
         if (!AppRuntimeState.HasInstance)
         {
-            Debug.LogError("[DashboardController] HATA: AppRuntimeState bulunamadý! Motor veriyi tutmuyor.");
+            Debug.LogError("[DashboardController] HATA: AppRuntimeState bulunamadÄ±! Motor veriyi tutmuyor.");
             return;
         }
 
@@ -118,19 +112,20 @@ public class DashboardController : MonoBehaviour
 
         if (latestSummary == null)
         {
-            Debug.LogWarning("[DashboardController] AppRuntimeState bulundu ama oturum verisi BOÞ (null).");
+            Debug.LogWarning("[DashboardController] AppRuntimeState bulundu ama oturum verisi BOÅž (null).");
             return;
         }
 
-        bool basarili = DataManager.Instance.SaveSession(latestSummary);
+        bool basarili = false;
+        RefreshAllUI();
 
         if (basarili)
         {
-            Debug.Log("<color=green>[DashboardController] MÜKEMMEL! Sahne geçiþinde konuþma verisi baþarýyla yakalandý ve kaydedildi!</color>");
+            Debug.Log("<color=green>[DashboardController] MÃœKEMMEL! Sahne geÃ§iÅŸinde konuÅŸma verisi baÅŸarÄ±yla yakalandÄ± ve kaydedildi!</color>");
         }
         else
         {
-            Debug.LogWarning("[DashboardController] Veri bulundu ancak DataManager kaydetmeyi reddetti (veri 0 veya ayný veri az önce kaydedildi).");
+            Debug.LogWarning("[DashboardController] Veri bulundu ancak DataManager kaydetmeyi reddetti (veri 0 veya aynÄ± veri az Ã¶nce kaydedildi).");
         }
     }
 
@@ -160,27 +155,25 @@ public class DashboardController : MonoBehaviour
 
         if (data.detailedReport != null)
         {
-            UpdateDetailedColumns(data.detailedReport, data.eyeContact);
+            UpdateDetailedColumns(data);
             UpdateAICoachPage(data.detailedReport);
         }
 
         if (historyDateText != null) historyDateText.text = data.date;
     }
 
-    private void UpdateDetailedColumns(FeedbackReport report, float eyeContactRaw)
+    private void UpdateDetailedColumns(SessionData data)
     {
-        var items = report.items;
+        if (wpmValueText != null) wpmValueText.text = FormatRawMetric(data.hasWpm, data.wpm, " WPM");
+        if (fillerValueText != null) fillerValueText.text = FormatRawMetric(data.hasFillerWordsPerMinute, data.fillerWordsPerMinute, " /min");
+        if (pauseValueText != null) pauseValueText.text = FormatRawMetric(data.hasAveragePauseDuration, data.averagePauseDuration, "s");
+        if (toneValueText != null) toneValueText.text = FormatRawMetric(data.hasToneVariationScore, data.toneVariationScore, "%");
 
-        if (wpmValueText != null) wpmValueText.text = GetMetricValue(items, "WPM") + " WPM";
-        if (fillerValueText != null) fillerValueText.text = GetMetricValue(items, "Filler Words") + " /min";
-        if (pauseValueText != null) pauseValueText.text = GetMetricValue(items, "Pause Duration") + "s";
-        if (toneValueText != null) toneValueText.text = "%" + GetMetricValue(items, "Tone Variation");
+        if (eyeRatioValueText != null) eyeRatioValueText.text = "%" + data.eyeContact.ToString("F0");
 
-        if (eyeRatioValueText != null) eyeRatioValueText.text = "%" + eyeContactRaw.ToString("F0");
-
-        if (slouchValueText != null) slouchValueText.text = GetMetricValue(items, "Slouching") + " /min";
-        if (swayValueText != null) swayValueText.text = "%" + GetMetricValue(items, "Swaying");
-        if (crossedArmsValueText != null) crossedArmsValueText.text = "%" + GetMetricValue(items, "Crossed Arms");
+        if (slouchValueText != null) slouchValueText.text = FormatRawMetric(data.hasHeadSpeedEventsPerMinute, data.headSpeedEventsPerMinute, " /min");
+        if (swayValueText != null) swayValueText.text = FormatRawMetric(data.hasHeadMovementPercent, data.headMovementPercent, "%");
+        if (crossedArmsValueText != null) crossedArmsValueText.text = FormatRawMetric(data.hasCrossedArmsPercent, data.crossedArmsPercent, "%");
     }
 
     private void UpdateAICoachPage(FeedbackReport report)
@@ -199,12 +192,12 @@ public class DashboardController : MonoBehaviour
             sb.AppendLine("<color=#00FF00><b>+ Strengths </b></color>");
             foreach (var item in report.items)
                 if (item.severity == FeedbackItem.Severity.Strength)
-                    sb.AppendLine("• " + item.message);
+                    sb.AppendLine("â€¢ " + item.message);
 
             sb.AppendLine("\n<color=#FF4444><b>- Weaknesses</b></color>");
             foreach (var item in report.items)
                 if (item.severity == FeedbackItem.Severity.Major || item.severity == FeedbackItem.Severity.Minor)
-                    sb.AppendLine("• " + item.message);
+                    sb.AppendLine("â€¢ " + item.message);
 
             fullCoachNotes.text = sb.ToString();
         }
@@ -214,6 +207,11 @@ public class DashboardController : MonoBehaviour
     {
         var item = items.Find(x => x.metric == metricName);
         return item != null ? item.score.ToString("F1") : "--";
+    }
+
+    private static string FormatRawMetric(bool hasValue, float value, string suffix)
+    {
+        return hasValue ? value.ToString("F1") + suffix : "--";
     }
 
     private string GetCategorySummary(List<FeedbackItem> items, string category)
@@ -292,7 +290,7 @@ public class DashboardController : MonoBehaviour
             if (overviewDateText != null) overviewDateText.text = "--/--/----";
             if (historyDateText != null) historyDateText.text = "--/--/----";
 
-            Debug.Log("Sistem Sýfýrlandý! Grafik temizlendi ve etiketler s1-s9 yapýldý.");
+            Debug.Log("Sistem SÄ±fÄ±rlandÄ±! Grafik temizlendi ve etiketler s1-s9 yapÄ±ldÄ±.");
         }
     }
 }

@@ -261,6 +261,13 @@ public class ViewModeSwitcher : MonoBehaviour
             return;
         }
 
+        if (PresentationDeckUsesThumbstickShortcuts())
+        {
+            leftThumbstickWasPressed = false;
+            rightThumbstickWasPressed = false;
+            return;
+        }
+
         bool leftThumbstickPressed = GetXrNodeButton(XRNode.LeftHand, UnityEngine.XR.CommonUsages.primary2DAxisClick);
         bool rightThumbstickPressed = GetXrNodeButton(XRNode.RightHand, UnityEngine.XR.CommonUsages.primary2DAxisClick);
 
@@ -276,6 +283,22 @@ public class ViewModeSwitcher : MonoBehaviour
 
         leftThumbstickWasPressed = leftThumbstickPressed;
         rightThumbstickWasPressed = rightThumbstickPressed;
+    }
+
+    static bool PresentationDeckUsesThumbstickShortcuts()
+    {
+        if (!VRPublicSpeaking.AppShell.Core.AppRuntimeState.HasInstance)
+            return false;
+
+        VRPublicSpeaking.AppShell.Core.AppRuntimeState runtimeState =
+            VRPublicSpeaking.AppShell.Core.AppRuntimeState.Instance;
+        VRPublicSpeaking.AppShell.Data.SessionRuntimeState runtime = runtimeState.CurrentRuntimeState;
+        VRPublicSpeaking.AppShell.Data.SessionConfig config = runtimeState.CurrentSessionConfig;
+
+        return config != null &&
+               config.HasPresentation &&
+               runtime != null &&
+               (runtime.SessionLaunchRequested || runtime.SessionRunning);
     }
 
     void ShowVrSelfViewCamera(int index)

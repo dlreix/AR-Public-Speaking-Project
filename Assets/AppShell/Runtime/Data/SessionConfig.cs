@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
+using VRPublicSpeaking.AppShell.Presentation;
 
 namespace VRPublicSpeaking.AppShell.Data
 {
@@ -27,6 +28,7 @@ namespace VRPublicSpeaking.AppShell.Data
         [SerializeField] private bool postureAnalysisEnabled = false;
         [SerializeField] private FeedbackLevel feedbackLevel = FeedbackLevel.Standard;
         [SerializeField] private bool autoStartOnSceneLoad = true;
+        [SerializeField] private PresentationDeckReference selectedPresentation = PresentationDeckReference.Empty();
 
         public PracticeMode PracticeMode
         {
@@ -118,8 +120,12 @@ namespace VRPublicSpeaking.AppShell.Data
             set => autoStartOnSceneLoad = value;
         }
 
+        public PresentationDeckReference SelectedPresentation =>
+            selectedPresentation != null ? selectedPresentation.Clone() : PresentationDeckReference.Empty();
+
         public bool HasSelectedEnvironment => !string.IsNullOrWhiteSpace(SelectedEnvironmentSceneName);
         public bool HasAnyScoringEnabled => gazeScoringEnabled || performanceScoringEnabled;
+        public bool HasPresentation => selectedPresentation != null && selectedPresentation.HasPages;
 
         public void ApplyEnvironment(AppEnvironmentDefinition environmentDefinition)
         {
@@ -140,7 +146,11 @@ namespace VRPublicSpeaking.AppShell.Data
 
         public SessionConfig Clone()
         {
-            return (SessionConfig)MemberwiseClone();
+            var clone = (SessionConfig)MemberwiseClone();
+            clone.selectedPresentation = selectedPresentation != null
+                ? selectedPresentation.Clone()
+                : PresentationDeckReference.Empty();
+            return clone;
         }
 
         public void Normalize()
@@ -149,6 +159,21 @@ namespace VRPublicSpeaking.AppShell.Data
                 sessionDurationSeconds <= 0f ? DefaultDurationSeconds : sessionDurationSeconds,
                 MinDurationSeconds,
                 MaxDurationSeconds);
+
+            if (selectedPresentation == null)
+            {
+                selectedPresentation = PresentationDeckReference.Empty();
+            }
+        }
+
+        public void SetPresentation(PresentationDeckReference deck)
+        {
+            selectedPresentation = deck != null ? deck.Clone() : PresentationDeckReference.Empty();
+        }
+
+        public void ClearPresentation()
+        {
+            selectedPresentation = PresentationDeckReference.Empty();
         }
 
         public string GetDurationDisplay()
@@ -205,6 +230,9 @@ namespace VRPublicSpeaking.AppShell.Data
             summary.AppendLine($"Audience: {AudiencePreset}");
             summary.AppendLine($"Feedback: {FeedbackLevel}");
             summary.AppendLine($"Systems: {GetEnabledSystemsSummary()}");
+            summary.AppendLine(HasPresentation
+                ? $"Presentation: {selectedPresentation.DisplayName} ({selectedPresentation.PageCount} slides)"
+                : "Presentation: None");
             return summary.ToString().TrimEnd();
         }
 
@@ -225,6 +253,7 @@ namespace VRPublicSpeaking.AppShell.Data
             postureAnalysisEnabled = false;
             feedbackLevel = FeedbackLevel.Standard;
             autoStartOnSceneLoad = true;
+            selectedPresentation = PresentationDeckReference.Empty();
         }
     }
 }

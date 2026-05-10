@@ -22,7 +22,7 @@ namespace VRPublicSpeaking.AppShell.Integration
             EnsureMainCameraTag(camera);
             EnsureAudioListener(camera.gameObject);
             EnsureTrackedPoseDriver(camera);
-            EnsureHeadsetPoseRuntimeDriver(camera);
+            EnsureHeadsetPoseRuntimeDriverFallback(camera);
             EnsureHeightSafety(
                 camera,
                 useFloorTrackingWhenXrRunning,
@@ -174,10 +174,21 @@ namespace VRPublicSpeaking.AppShell.Integration
             }
         }
 
-        private static void EnsureHeadsetPoseRuntimeDriver(Camera camera)
+        private static void EnsureHeadsetPoseRuntimeDriverFallback(Camera camera)
         {
             if (camera == null)
             {
+                return;
+            }
+
+            if (camera.GetComponent<UnityEngine.InputSystem.XR.TrackedPoseDriver>() != null)
+            {
+                HeadsetPoseRuntimeDriver duplicateDriver = camera.GetComponent<HeadsetPoseRuntimeDriver>();
+                if (duplicateDriver != null)
+                {
+                    Object.Destroy(duplicateDriver);
+                }
+
                 return;
             }
 
@@ -190,9 +201,12 @@ namespace VRPublicSpeaking.AppShell.Integration
         private static XROrigin ResolveXrOrigin(Camera camera)
         {
             XROrigin xrOrigin = camera != null ? camera.GetComponentInParent<XROrigin>(true) : null;
-            return xrOrigin != null
-                ? xrOrigin
-                : Object.FindFirstObjectByType<XROrigin>(FindObjectsInactive.Include);
+            if (xrOrigin != null || camera != null)
+            {
+                return xrOrigin;
+            }
+
+            return Object.FindFirstObjectByType<XROrigin>(FindObjectsInactive.Include);
         }
 
         private static string BuildMessage(string context, string message)

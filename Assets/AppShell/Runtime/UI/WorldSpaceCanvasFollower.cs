@@ -11,6 +11,7 @@ namespace VRPublicSpeaking.AppShell.UI
         [SerializeField] private float positionLerpSpeed = 10f;
         [SerializeField] private float rotationLerpSpeed = 10f;
         [SerializeField] private bool followContinuously = true;
+        [SerializeField] private float minimumTargetY;
 
         private bool hasSnappedToTarget;
 
@@ -46,6 +47,18 @@ namespace VRPublicSpeaking.AppShell.UI
         public void SetFollowContinuously(bool shouldFollowContinuously)
         {
             followContinuously = shouldFollowContinuously;
+            hasSnappedToTarget = false;
+        }
+
+        public void SetMinimumTargetY(float targetY)
+        {
+            float clampedTargetY = Mathf.Max(0f, targetY);
+            if (Mathf.Approximately(minimumTargetY, clampedTargetY))
+            {
+                return;
+            }
+
+            minimumTargetY = clampedTargetY;
             hasSnappedToTarget = false;
         }
 
@@ -121,15 +134,21 @@ namespace VRPublicSpeaking.AppShell.UI
                 up.Normalize();
             }
 
+            Vector3 targetPosition = target.position;
+            if (minimumTargetY > 0f && targetPosition.y < minimumTargetY)
+            {
+                targetPosition.y = minimumTargetY;
+            }
+
             Vector3 desiredPosition =
-                target.position +
+                targetPosition +
                 right * offset.x +
                 up * offset.y +
                 forward * offset.z;
 
             // World-space canvases render their readable face opposite the transform forward.
             // Looking away from the camera keeps the front side visible instead of mirrored.
-            Vector3 desiredLookDirection = desiredPosition - target.position;
+            Vector3 desiredLookDirection = desiredPosition - targetPosition;
             if (desiredLookDirection.sqrMagnitude < 0.0001f)
             {
                 desiredLookDirection = forward;

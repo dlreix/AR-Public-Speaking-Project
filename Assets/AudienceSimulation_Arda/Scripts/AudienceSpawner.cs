@@ -34,8 +34,13 @@ public class AudienceSpawner : MonoBehaviour
 
     public void SpawnAudience()
     {
-        foreach (var m in controller.audienceMembers) if (m != null) Destroy(m.gameObject);
-        controller.audienceMembers.Clear();
+        EnsureControllerReferences();
+        audiencePrefabs = LoadCharacterPrefabs();
+        if (audiencePrefabs.Count == 0)
+        {
+            Debug.LogWarning("[AudienceSpawner] No audience prefabs were found. Keeping existing scene audience in place.");
+            return;
+        }
 
         GameObject[] allObjects = FindObjectsByType<GameObject>(FindObjectsSortMode.None);
         foreach (var go in allObjects)
@@ -46,9 +51,8 @@ public class AudienceSpawner : MonoBehaviour
             }
         }
 
-        EnsureControllerReferences();
-        audiencePrefabs = LoadCharacterPrefabs();
-        if (audiencePrefabs.Count == 0) return;
+        foreach (var m in controller.audienceMembers) if (m != null) Destroy(m.gameObject);
+        controller.audienceMembers.Clear();
 
         List<GameObject> allSeats = FindAllSeats();
         if (allSeats.Count == 0) { SpawnGrid(); return; }
@@ -439,6 +443,16 @@ public class AudienceSpawner : MonoBehaviour
 
     private void EnsureControllerReferences()
     {
+        if (controller == null)
+        {
+            controller = FindFirstObjectByType<AudienceBehaviorController>(FindObjectsInactive.Include);
+        }
+
+        if (controller == null)
+        {
+            controller = gameObject.AddComponent<AudienceBehaviorController>();
+        }
+
 #if UNITY_EDITOR
         if (sharedAnimatorController == null) {
             string[] guids = AssetDatabase.FindAssets("AudienceAnimator t:RuntimeAnimatorController");

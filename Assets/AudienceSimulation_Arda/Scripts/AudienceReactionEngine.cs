@@ -23,6 +23,13 @@ public class AudienceReactionEngine : MonoBehaviour
 
     public ReactionFrame currentReaction = new ReactionFrame();
     private float nextScoreRefreshTime;
+    private readonly List<string> dominantFactors = new List<string>(8);
+    private readonly List<string> reactions = new List<string>(4);
+
+    private void Awake()
+    {
+        EnsureReactionLists();
+    }
 
     void Update()
     {
@@ -52,9 +59,10 @@ public class AudienceReactionEngine : MonoBehaviour
         else if (smoothedScore < 65f) performanceLevel = "MEDIUM";
         else performanceLevel = "HIGH";
 
+        EnsureReactionLists();
         currentReaction.performance_level = performanceLevel;
-        currentReaction.dominant_factors = new List<string>();
-        currentReaction.reactions = new List<string>();
+        currentReaction.dominant_factors.Clear();
+        currentReaction.reactions.Clear();
 
         // Analyze Speech
         if (scoringEngine.speechMetrics.wpm < scoringEngine.idealWpmMin)
@@ -150,5 +158,12 @@ public class AudienceReactionEngine : MonoBehaviour
         float target = Mathf.Clamp(Mathf.Lerp(min, max, normalizedScore) + noise, min, max);
         smoothedEngagement = Mathf.Lerp(smoothedEngagement, target, Time.deltaTime * smoothingSpeed);
         currentReaction.engagement_level = smoothedEngagement;
+    }
+
+    private void EnsureReactionLists()
+    {
+        currentReaction ??= new ReactionFrame();
+        currentReaction.dominant_factors ??= dominantFactors;
+        currentReaction.reactions ??= reactions;
     }
 }

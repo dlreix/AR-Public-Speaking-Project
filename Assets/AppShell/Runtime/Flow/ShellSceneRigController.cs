@@ -29,6 +29,8 @@ namespace VRPublicSpeaking.AppShell.Flow
         [SerializeField] private float floorTrackingMinimumHeadHeight = 0.35f;
 
         private const float FloatEpsilon = 0.0001f;
+        private const float MainHubMinimumCameraYOffset = 1.62f;
+        private const string MainHubBackdropName = "MainHubBackdrop";
 
         private WorldSpaceCanvasFollower shellCanvasFollower;
         private Vector3 initialOriginPosition;
@@ -81,7 +83,8 @@ namespace VRPublicSpeaking.AppShell.Flow
             float canvasRotationSpeed,
             bool lockRigInPlace,
             float stableCameraYOffset,
-            XROrigin.TrackingOriginMode trackingOriginMode)
+            XROrigin.TrackingOriginMode trackingOriginMode,
+            bool? useFloorTrackingInXr = null)
         {
             shellCanvas = targetCanvas;
             backdropRootName = targetBackdropRootName ?? string.Empty;
@@ -90,14 +93,29 @@ namespace VRPublicSpeaking.AppShell.Flow
             menuFollowPositionSpeed = canvasPositionSpeed;
             menuFollowRotationSpeed = canvasRotationSpeed;
             keepRigStationary = lockRigInPlace;
-            cameraYOffset = stableCameraYOffset;
             requestedTrackingOriginMode = trackingOriginMode;
+            cameraYOffset = string.Equals(backdropRootName, MainHubBackdropName, StringComparison.Ordinal)
+                ? Mathf.Max(MainHubMinimumCameraYOffset, stableCameraYOffset)
+                : stableCameraYOffset;
+
+            if (useFloorTrackingInXr.HasValue)
+            {
+                useFloorTrackingWhenXrRunning = useFloorTrackingInXr.Value;
+            }
+            else
+            {
+                useFloorTrackingWhenXrRunning = trackingOriginMode == XROrigin.TrackingOriginMode.Floor;
+            }
         }
 
         public void InitializeNow()
         {
             elapsed = 0f;
-            VrRigRuntimeUtility.EnsureSceneVrReady("[ShellSceneRigController]");
+            VrRigRuntimeUtility.EnsureSceneVrReady(
+                "[ShellSceneRigController]",
+                ShouldUseFloorTrackingInXr(),
+                cameraYOffset,
+                keepUnlockedRigGravityDisabled);
             EnsureBackdropSafety();
             EnsureCanvasFollower();
             ApplyStableRigState();
@@ -479,8 +497,9 @@ namespace VRPublicSpeaking.AppShell.Flow
             }
 
             bool xrRunning = IsXrDisplayRunning();
+            bool useFloorTrackingInXr = ShouldUseFloorTrackingInXr();
             XROrigin.TrackingOriginMode effectiveTrackingOriginMode =
-                xrRunning && useFloorTrackingWhenXrRunning
+                xrRunning && useFloorTrackingInXr
                     ? XROrigin.TrackingOriginMode.Floor
                     : requestedTrackingOriginMode;
             float effectiveCameraYOffset =
@@ -567,6 +586,22 @@ namespace VRPublicSpeaking.AppShell.Flow
             }
 
             return xrOrigin.Camera.transform.localPosition.y < floorTrackingMinimumHeadHeight;
+        }
+
+        private bool ShouldUseFloorTrackingInXr()
+        {
+            if (ShouldUseStableDeviceHeight())
+            {
+                return false;
+            }
+
+            return useFloorTrackingWhenXrRunning;
+        }
+
+        private bool ShouldUseStableDeviceHeight()
+        {
+            return keepRigStationary &&
+                   string.Equals(backdropRootName, MainHubBackdropName, StringComparison.Ordinal);
         }
 
         private bool TryResolveOrigin()

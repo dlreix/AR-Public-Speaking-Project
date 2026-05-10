@@ -1,4 +1,4 @@
-
+using System;
 using UnityEngine;
 using VRPublicSpeaking.AppShell.Data;
 
@@ -35,6 +35,8 @@ namespace VRPublicSpeaking.AppShell.Integration
 
             var summary = new SessionResultSummary();
             summary.Reset();
+            summary.SessionId = Guid.NewGuid().ToString("N");
+            summary.SessionTimestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
             summary.DurationSeconds = sessionDurationSeconds;
 
             // GazeScoringSystem reset edildiği için fallback öncelikli
@@ -81,11 +83,28 @@ namespace VRPublicSpeaking.AppShell.Integration
                     summary.WeakestArea = report.weakestArea;
                     summary.PerformanceBand = report.performanceBand;
                     summary.SetRecommendations(report.improvements);
+                    summary.SetDetailedReport(report);
 
                     float estimatedFillerWords =
                         performanceScoringEngine.speechMetrics.fillerWordsPerMinute *
                         Mathf.Max(0f, sessionDurationSeconds / 60f);
                     summary.FillerWordCount = estimatedFillerWords;
+
+                    summary.Wpm = performanceScoringEngine.speechMetrics.wpm;
+                    summary.HasWpm = true;
+                    summary.FillerWordsPerMinute = performanceScoringEngine.speechMetrics.fillerWordsPerMinute;
+                    summary.HasFillerWordsPerMinute = true;
+                    summary.AveragePauseDuration = performanceScoringEngine.speechMetrics.averagePauseDuration;
+                    summary.HasAveragePauseDuration = true;
+                    summary.ToneVariationScore = performanceScoringEngine.speechMetrics.toneVariationScore;
+                    summary.HasToneVariationScore = true;
+
+                    summary.HeadMovementPercent = performanceScoringEngine.postureMetrics.swayDurationPercent;
+                    summary.HasHeadMovementPercent = true;
+                    summary.HeadSpeedEventsPerMinute = performanceScoringEngine.postureMetrics.slouchEventsPerMinute;
+                    summary.HasHeadSpeedEventsPerMinute = true;
+                    summary.CrossedArmsPercent = performanceScoringEngine.postureMetrics.crossedArmsPercent;
+                    summary.HasCrossedArmsPercent = true;
                 }
             }
 

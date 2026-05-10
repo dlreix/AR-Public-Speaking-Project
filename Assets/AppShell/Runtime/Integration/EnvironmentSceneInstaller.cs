@@ -5,6 +5,8 @@ using UnityEngine;
 using SpeechPipeline;
 using VRPublicSpeaking.AppShell.Core;
 using VRPublicSpeaking.AppShell.Data;
+using VRPublicSpeaking.AppShell.Presentation;
+using VRPublicSpeaking.AppShell.PresentationQuestioning;
 using VRPublicSpeaking.AppShell.UI;
 #if UNITY_EDITOR
 using UnityEditor;
@@ -22,6 +24,7 @@ namespace VRPublicSpeaking.AppShell.Integration
         [SerializeField] private SpeechPipelineController speechPipelineController;
         [SerializeField] private ExistingSceneFlowAdapter existingSceneFlowAdapter;
         [SerializeField] private EnvironmentSessionOverlayController environmentSessionOverlayController;
+        [SerializeField] private PresentationQuestionSessionController presentationQuestionSessionController;
         [SerializeField] private bool installOnStart = true;
 
         private void Start()
@@ -59,16 +62,20 @@ namespace VRPublicSpeaking.AppShell.Integration
             scoringAdapter ??= GetOrAdd<ScoringAdapter>();
             existingSceneFlowAdapter ??= GetOrAdd<ExistingSceneFlowAdapter>();
             environmentSessionOverlayController ??= GetComponentInChildren<EnvironmentSessionOverlayController>(true);
+            presentationQuestionSessionController ??= EnsurePresentationQuestionSessionController();
             MainController resolvedMainController = FindFirstObjectByType<MainController>(FindObjectsInactive.Include);
 
             EnsureEventSystemSupport();
             EnsureOverlayInputSupport();
 
             bool movedToSpawn = playerRigAdapter.TryMoveToSpawn(config.SelectedSpawnPointName);
+            VrControllerLocomotion.EnsureForScene(sceneCamera);
+            PresentationBoardController.EnsureForScene(config, sceneCamera);
             trackingAdapter.Apply(config);
             scoringAdapter.AutoWireIfNeeded();
             EnsureSpeechSystem(config);
             existingSceneFlowAdapter.AutoWireIfNeeded();
+            existingSceneFlowAdapter.SetPresentationQuestionSessionController(presentationQuestionSessionController);
             existingSceneFlowAdapter.Configure(runtimeState, config);
             environmentSessionOverlayController?.Configure(
                 runtimeState,
@@ -132,6 +139,30 @@ namespace VRPublicSpeaking.AppShell.Integration
             speechPipelineController.SpeechAdapter = speechAdapter;
             speechPipelineController.ScoringEngine = scoringEngine;
             existingSceneFlowAdapter?.SetSpeechPipelineController(speechPipelineController);
+            presentationQuestionSessionController ??= EnsurePresentationQuestionSessionController();
+        }
+
+        private PresentationQuestionSessionController EnsurePresentationQuestionSessionController()
+        {
+            PresentationQuestionSessionController controller =
+                GetComponentInChildren<PresentationQuestionSessionController>(true);
+            if (controller != null)
+            {
+                return controller;
+            }
+
+            if (environmentSessionOverlayController != null)
+            {
+                controller = environmentSessionOverlayController.GetComponent<PresentationQuestionSessionController>();
+                if (controller == null)
+                {
+                    controller = environmentSessionOverlayController.gameObject.AddComponent<PresentationQuestionSessionController>();
+                }
+
+                return controller;
+            }
+
+            return GetComponent<PresentationQuestionSessionController>() ?? gameObject.AddComponent<PresentationQuestionSessionController>();
         }
 
         private void EnsureEnvironmentRuntimeStack(Camera sceneCamera)

@@ -1,22 +1,20 @@
 using UnityEngine;
+using Unity.XR.CoreUtils;
 
 namespace VRPublicSpeaking.AppShell.Integration
 {
     public class PlayerRigAdapter : MonoBehaviour
     {
         [SerializeField] private PlayerController playerController;
+        [SerializeField] private XROrigin xrOrigin;
         [SerializeField] private Transform explicitSpawnPoint;
 
         public bool TryMoveToSpawn(string requestedSpawnPointName = null)
         {
-            if (playerController == null)
+            Transform rigTransform = ResolveRigTransform();
+            if (rigTransform == null)
             {
-                playerController = FindFirstObjectByType<PlayerController>(FindObjectsInactive.Include);
-            }
-
-            if (playerController == null)
-            {
-                Debug.LogWarning("[PlayerRigAdapter] No PlayerController was found in the scene.");
+                Debug.LogWarning("[PlayerRigAdapter] No PlayerController or XROrigin was found in the scene.");
                 return false;
             }
 
@@ -28,14 +26,14 @@ namespace VRPublicSpeaking.AppShell.Integration
                 return false;
             }
 
-            CharacterController characterController = playerController.GetComponent<CharacterController>();
+            CharacterController characterController = rigTransform.GetComponent<CharacterController>();
             if (characterController != null)
             {
                 characterController.enabled = false;
             }
 
-            playerController.transform.position = spawnPoint.position;
-            playerController.transform.rotation = spawnPoint.rotation;
+            rigTransform.position = spawnPoint.position;
+            rigTransform.rotation = spawnPoint.rotation;
 
             if (characterController != null)
             {
@@ -71,6 +69,38 @@ namespace VRPublicSpeaking.AppShell.Integration
 
             GameObject spawnPoint = GameObject.Find("SpawnPoint");
             return spawnPoint != null ? spawnPoint.transform : null;
+        }
+
+        private Transform ResolveRigTransform()
+        {
+            if (xrOrigin == null)
+            {
+                Camera camera = VrRigRuntimeUtility.ResolveSceneCamera();
+                if (camera != null)
+                {
+                    xrOrigin = camera.GetComponentInParent<XROrigin>(true);
+                }
+            }
+
+            if (xrOrigin != null && xrOrigin.Origin != null)
+            {
+                return xrOrigin.Origin.transform;
+            }
+
+            if (playerController == null)
+            {
+                playerController = FindFirstObjectByType<PlayerController>(FindObjectsInactive.Include);
+            }
+
+            if (playerController != null)
+            {
+                return playerController.transform;
+            }
+
+            xrOrigin = FindFirstObjectByType<XROrigin>(FindObjectsInactive.Include);
+            return xrOrigin != null && xrOrigin.Origin != null
+                ? xrOrigin.Origin.transform
+                : null;
         }
     }
 }
