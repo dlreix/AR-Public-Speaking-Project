@@ -103,7 +103,7 @@ public class PlayerController : MonoBehaviour
                 break;
 
             case ControlMode.XRRuntime:
-                // XRIT (DynamicMoveProvider + GravityProvider) owns all locomotion in XR mode.
+                // VrControllerLocomotion owns all locomotion in XR mode.
                 // Do not call ApplyMotion here — two systems writing to the same
                 // CharacterController in the same frame causes broken movement and
                 // the "CharacterController.Move called on inactive controller" error.

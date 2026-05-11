@@ -27,15 +27,29 @@ namespace VRPublicSpeaking.AppShell.PresentationQuestioning
         [SerializeField] private float dimAlpha = 0.10f;
         [SerializeField] private float silenceStopSeconds = 2f;
         [SerializeField] private bool showAudienceQuestionBubble = true;
-        [SerializeField] private Vector3 qaPanelFollowOffset = new Vector3(0.50f, -0.54f, 1.05f);
-        [SerializeField] private float qaPanelMinimumTargetY = 1.25f;
+        [SerializeField] private Vector3 qaPanelFollowOffset = new Vector3(0f, -0.62f, 1.10f);
+        [SerializeField] private float qaPanelMinimumTargetY = 1.05f;
+
+        private enum SkipButtonMode
+        {
+            SkipQuestion,
+            RetryAnswer
+        }
+
+        private enum FinishButtonMode
+        {
+            FinishQa,
+            SkipQuestion
+        }
 
         private TMP_Text titleLabel;
         private TMP_Text progressLabel;
         private TMP_Text personaLabel;
         private TMP_Text questionLabel;
+        private TMP_Text scoreLabel;
         private TMP_Text statusLabel;
         private TMP_Text transcriptLabel;
+        private TMP_Text shortcutLabel;
         private TMP_InputField typedAnswerInput;
         private Button primaryButton;
         private Button skipButton;
@@ -43,10 +57,13 @@ namespace VRPublicSpeaking.AppShell.PresentationQuestioning
 
         private bool primaryRequested;
         private bool skipRequested;
+        private bool retryRequested;
         private bool finishRequested;
         private bool legacySubmitWasPressed;
         private bool legacySkipWasPressed;
         private bool currentQuestionUsesAudienceBubble;
+        private SkipButtonMode skipButtonMode = SkipButtonMode.SkipQuestion;
+        private FinishButtonMode finishButtonMode = FinishButtonMode.FinishQa;
         private WorldSpaceCanvasFollower qaPanelFollower;
 
         private static readonly List<UnityEngine.XR.InputDevice> LegacyControllers =
@@ -124,9 +141,12 @@ namespace VRPublicSpeaking.AppShell.PresentationQuestioning
 
             result.completedUnixTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
             result.status = result.HasMeaningfulAnswers ? "Completed" : "Skipped";
+            CalculateQaScores(result);
             result.summary = BuildResultSummary(result);
+            SetScore(BuildQaScoreText(result));
             SetStatus(result.summary);
-            yield return new WaitForSecondsRealtime(0.35f);
+            SetShortcutHint("Q&A is complete. The score shown here is not mixed into the dashboard score.");
+            yield return new WaitForSecondsRealtime(0.75f);
 
             HidePanel();
             completed?.Invoke(result);
@@ -138,99 +158,162 @@ namespace VRPublicSpeaking.AppShell.PresentationQuestioning
             int questionCount,
             PresentationQaResult result)
         {
-            primaryRequested = false;
-            skipRequested = false;
+            string transcript = string.Empty;
+            bool submittedForEvaluation = false;
             finishRequested = false;
 
-            if (typedAnswerInput != null)
+            while (!submittedForEvaluation && !finishRequested)
             {
-                typedAnswerInput.text = string.Empty;
-            }
+                ResetQuestionInputFlags();
+                transcript = string.Empty;
 
-            SetQuestion(question, questionNumber, questionCount);
-            SetPrimaryButtonLabel("Start Answer");
-            SetStatus("Listen to the audience question. Trigger/A or Enter starts your answer. B/Y skips.");
-            SetTranscript(string.Empty);
-
-            bool recording = false;
-            bool answerReady = false;
-            bool waitingForSpeechModel = false;
-            string transcript = string.Empty;
-
-            while (!answerReady && !skipRequested && !finishRequested)
-            {
-                if (WasSubmitPressedThisFrame() || primaryRequested)
+                if (typedAnswerInput != null)
                 {
-                    primaryRequested = false;
+                    typedAnswerInput.text = string.Empty;
+                }
+                SetTypedAnswerVisible(false);
+
+                SetQuestion(question, questionNumber, questionCount);
+                SetQuestionButtonInteractivity(true, true, true);
+                SetPrimaryButtonLabel("Start Answer");
+                SetSkipButtonMode(SkipButtonMode.SkipQuestion, "Skip Question");
+                SetFinishButtonMode(FinishButtonMode.FinishQa, "Finish Q&A");
+                SetScore(BuildQaScoreText(result));
+                SetStatus("Read the question in the bubble. Start when you are ready.");
+                SetShortcutHint("Trigger/A: start answer  |  B/Y: skip question  |  Menu: pause");
+                SetTranscript(string.Empty);
+
+                bool recording = false;
+                bool answerReady = false;
+                bool waitingForSpeechModel = false;
+
+                while (!answerReady && !skipRequested && !finishRequested)
+                {
+                    if (WasSubmitPressedThisFrame() || primaryRequested)
+                    {
+                        primaryRequested = false;
+                        if (recording)
+                        {
+                            transcript = StopRecording();
+                            recording = false;
+                            answerReady = true;
+                        }
+                        else if (HasTypedAnswer())
+                        {
+                            transcript = typedAnswerInput.text.Trim();
+                            answerReady = true;
+                        }
+                        else if (IsSpeechModelLoading())
+                        {
+                            waitingForSpeechModel = true;
+                            SetPrimaryButtonLabel("Waiting for Mic");
+                            SetStatus($"Speech model is loading ({SpeechPipelineController.DefaultModelFolder}). Wait for Mic ready or type an answer.");
+                            SetShortcutHint("Trigger/A waits for mic  |  Type answer if fallback appears  |  B/Y skips");
+                        }
+                        else
+                        {
+                            recording = StartRecording();
+                            if (!recording)
+                            {
+                                EnableTypedAnswerFallback();
+                            }
+                        }
+                    }
+
+                    if (WasSkipPressedThisFrame())
+                    {
+                        skipRequested = true;
+                    }
+
+                    if (waitingForSpeechModel && !recording)
+                    {
+                        if (IsSpeechModelUnavailable())
+                        {
+                            waitingForSpeechModel = false;
+                            EnableTypedAnswerFallback();
+                        }
+                        else if (speechPipelineController != null && speechPipelineController.IsReady)
+                        {
+                            waitingForSpeechModel = false;
+                            recording = StartRecording();
+                            if (!recording)
+                            {
+                                EnableTypedAnswerFallback();
+                            }
+                        }
+                    }
+
                     if (recording)
                     {
-                        transcript = StopRecording();
-                        recording = false;
-                        answerReady = true;
-                    }
-                    else if (HasTypedAnswer())
-                    {
-                        transcript = typedAnswerInput.text.Trim();
-                        answerReady = true;
-                    }
-                    else if (IsSpeechModelLoading())
-                    {
-                        waitingForSpeechModel = true;
-                        SetPrimaryButtonLabel("Waiting for Mic");
-                        SetStatus($"Speech model is loading ({SpeechPipelineController.DefaultModelFolder}). Wait for Mic ready or type an answer.");
-                    }
-                    else
-                    {
-                        recording = StartRecording();
-                        if (!recording)
+                        UpdateRecordingStatus();
+                        if (answerRecorder != null &&
+                            answerRecorder.HasTranscript &&
+                            Time.realtimeSinceStartup - answerRecorder.LastTranscriptTime >= silenceStopSeconds)
                         {
-                            EnableTypedAnswerFallback();
+                            transcript = StopRecording();
+                            recording = false;
+                            answerReady = true;
                         }
                     }
-                }
 
-                if (WasSkipPressedThisFrame())
-                {
-                    skipRequested = true;
-                }
-
-                if (waitingForSpeechModel && !recording)
-                {
-                    if (IsSpeechModelUnavailable())
-                    {
-                        waitingForSpeechModel = false;
-                        EnableTypedAnswerFallback();
-                    }
-                    else if (speechPipelineController != null && speechPipelineController.IsReady)
-                    {
-                        waitingForSpeechModel = false;
-                        recording = StartRecording();
-                        if (!recording)
-                        {
-                            EnableTypedAnswerFallback();
-                        }
-                    }
+                    yield return null;
                 }
 
                 if (recording)
                 {
-                    UpdateRecordingStatus();
-                    if (answerRecorder != null &&
-                        answerRecorder.HasTranscript &&
-                        Time.realtimeSinceStartup - answerRecorder.LastTranscriptTime >= silenceStopSeconds)
-                    {
-                        transcript = StopRecording();
-                        recording = false;
-                        answerReady = true;
-                    }
+                    transcript = StopRecording();
                 }
 
-                yield return null;
-            }
+                if (skipRequested || finishRequested || string.IsNullOrWhiteSpace(transcript))
+                {
+                    AddSkippedAnswer(question, result);
+                    SetStatus(finishRequested ? "Q&A will finish after this question." : "Question skipped.");
+                    yield return new WaitForSecondsRealtime(0.2f);
+                    yield break;
+                }
 
-            if (recording)
-            {
-                transcript = StopRecording();
+                SetTranscript(transcript);
+                SetPrimaryButtonLabel("Submit Answer");
+                SetSkipButtonMode(SkipButtonMode.RetryAnswer, "Retry");
+                SetFinishButtonMode(FinishButtonMode.SkipQuestion, "Skip Question");
+                SetStatus("Review your captured answer. Submit to evaluate, retry if the transcript is wrong, or skip this question.");
+                SetShortcutHint("Trigger/A: submit  |  Retry button: record again  |  B/Y: skip");
+                primaryRequested = false;
+                skipRequested = false;
+                retryRequested = false;
+
+                while (!primaryRequested && !skipRequested && !retryRequested)
+                {
+                    if (WasSubmitPressedThisFrame())
+                    {
+                        primaryRequested = true;
+                    }
+
+                    if (WasSkipPressedThisFrame())
+                    {
+                        skipRequested = true;
+                    }
+
+                    yield return null;
+                }
+
+                if (retryRequested)
+                {
+                    retryRequested = false;
+                    SetStatus("Retrying this answer.");
+                    yield return new WaitForSecondsRealtime(0.1f);
+                    continue;
+                }
+
+                if (skipRequested)
+                {
+                    AddSkippedAnswer(question, result);
+                    SetStatus("Question skipped.");
+                    yield return new WaitForSecondsRealtime(0.2f);
+                    yield break;
+                }
+
+                submittedForEvaluation = true;
             }
 
             var answer = new PresentationQaAnswer
@@ -242,23 +325,9 @@ namespace VRPublicSpeaking.AppShell.PresentationQuestioning
                 skipped = skipRequested || string.IsNullOrWhiteSpace(transcript)
             };
 
-            if (finishRequested && string.IsNullOrWhiteSpace(transcript))
-            {
-                answer.skipped = true;
-            }
-
             if (answer.skipped)
             {
-                answer.feedback = new PresentationAnswerFeedback
-                {
-                    accuracy = 0f,
-                    coverage = 0f,
-                    clarity = 0f,
-                    summary = "Question skipped or no answer was captured.",
-                    betterAnswer = question.expectedAnswer ?? string.Empty,
-                    status = "Skipped"
-                };
-                result.answers.Add(answer);
+                AddSkippedAnswer(question, result);
                 SetStatus("Question skipped.");
                 yield return new WaitForSecondsRealtime(0.2f);
                 yield break;
@@ -266,6 +335,9 @@ namespace VRPublicSpeaking.AppShell.PresentationQuestioning
 
             SetTranscript(answer.answerTranscript);
             SetStatus("Evaluating answer with LLM...");
+            SetShortcutHint("Evaluation is running. Controls are locked for a moment.");
+            SetPrimaryButtonLabel("Evaluating...");
+            SetQuestionButtonInteractivity(false, false, false);
             PresentationAnswerFeedback feedback = null;
             yield return PresentationAnswerEvaluationService.EvaluateAnswer(
                 question,
@@ -273,8 +345,66 @@ namespace VRPublicSpeaking.AppShell.PresentationQuestioning
                 value => feedback = value);
             answer.feedback = feedback;
             result.answers.Add(answer);
+            CalculateQaScores(result);
+            SetScore(BuildQaScoreText(result, feedback));
             SetStatus(feedback != null ? feedback.summary : "Evaluation unavailable.");
-            yield return new WaitForSecondsRealtime(0.35f);
+            SetPrimaryButtonLabel(questionNumber < questionCount ? "Next Question" : "Finish Q&A");
+            SetSkipButtonMode(SkipButtonMode.SkipQuestion, "Skip Question");
+            SetFinishButtonMode(FinishButtonMode.FinishQa, "Finish Q&A");
+            SetQuestionButtonInteractivity(true, false, questionNumber < questionCount);
+            SetShortcutHint(questionNumber < questionCount
+                ? "Trigger/A: next question  |  Finish Q&A button: end early"
+                : "Trigger/A: finish Q&A");
+            primaryRequested = false;
+            skipRequested = false;
+            retryRequested = false;
+
+            while (!primaryRequested && !finishRequested)
+            {
+                if (WasSubmitPressedThisFrame())
+                {
+                    primaryRequested = true;
+                }
+
+                yield return null;
+            }
+
+            SetQuestionButtonInteractivity(true, true, true);
+        }
+
+        private void ResetQuestionInputFlags()
+        {
+            primaryRequested = false;
+            skipRequested = false;
+            retryRequested = false;
+            legacySubmitWasPressed = IsLegacyControllerButtonPressed(UnityEngine.XR.CommonUsages.triggerButton) ||
+                                     IsLegacyControllerButtonPressed(UnityEngine.XR.CommonUsages.primaryButton);
+            legacySkipWasPressed = IsLegacyControllerButtonPressed(UnityEngine.XR.CommonUsages.secondaryButton);
+        }
+
+        private static void AddSkippedAnswer(PresentationQuestion question, PresentationQaResult result)
+        {
+            if (question == null || result == null)
+            {
+                return;
+            }
+
+            result.answers.Add(new PresentationQaAnswer
+            {
+                questionId = question.id,
+                question = question.question,
+                expectedAnswer = question.expectedAnswer,
+                skipped = true,
+                feedback = new PresentationAnswerFeedback
+                {
+                    accuracy = 0f,
+                    coverage = 0f,
+                    clarity = 0f,
+                    summary = "Question skipped or no answer was captured.",
+                    betterAnswer = question.expectedAnswer ?? string.Empty,
+                    status = "Skipped"
+                }
+            });
         }
 
         private bool StartRecording()
@@ -296,6 +426,7 @@ namespace VRPublicSpeaking.AppShell.PresentationQuestioning
             {
                 SetPrimaryButtonLabel("Stop Answer");
                 SetStatus("Recording answer...");
+                SetShortcutHint("Trigger/A: stop answer  |  Pause for 2 seconds: auto stop");
             }
 
             return started;
@@ -316,7 +447,9 @@ namespace VRPublicSpeaking.AppShell.PresentationQuestioning
             string modelFolder = speechPipelineController != null
                 ? speechPipelineController.ModelFolder
                 : SpeechPipelineController.DefaultModelFolder;
+            SetTypedAnswerVisible(true);
             SetStatus($"Speech capture is unavailable or still loading ({modelFolder}). Type an answer, then press Submit Answer.");
+            SetShortcutHint("Type answer  |  Trigger/A or Enter: submit  |  B/Y: skip");
             SetPrimaryButtonLabel("Submit Answer");
             FocusTypedInput();
         }
@@ -341,6 +474,7 @@ namespace VRPublicSpeaking.AppShell.PresentationQuestioning
             if (!string.IsNullOrWhiteSpace(transcript))
             {
                 SetStatus("Recording answer... pause for 2 seconds or press Trigger/A to stop.");
+                SetShortcutHint("Trigger/A: stop answer  |  Pause for 2 seconds: auto stop");
             }
         }
 
@@ -397,7 +531,7 @@ namespace VRPublicSpeaking.AppShell.PresentationQuestioning
             panelRect.anchorMin = new Vector2(0.5f, 0.5f);
             panelRect.anchorMax = new Vector2(0.5f, 0.5f);
             panelRect.pivot = new Vector2(0.5f, 0.5f);
-            panelRect.sizeDelta = new Vector2(940f, 500f);
+            panelRect.sizeDelta = new Vector2(860f, 450f);
             panelRect.anchoredPosition = Vector2.zero;
 
             Image panelImage = panelObject.GetComponent<Image>();
@@ -408,27 +542,30 @@ namespace VRPublicSpeaking.AppShell.PresentationQuestioning
             outline.effectDistance = new Vector2(1f, -1f);
 
             VerticalLayoutGroup layout = panelObject.GetComponent<VerticalLayoutGroup>();
-            layout.padding = new RectOffset(28, 28, 22, 22);
-            layout.spacing = 10f;
+            layout.padding = new RectOffset(26, 26, 22, 22);
+            layout.spacing = 8f;
             layout.childControlWidth = true;
             layout.childControlHeight = false;
             layout.childForceExpandWidth = true;
             layout.childForceExpandHeight = false;
 
-            titleLabel = CreateText(panelObject.transform, "QaTitle", "Audience Q&A", 32f, FontStyles.Bold, TextAlignmentOptions.Left, new Color(0.12f, 0.78f, 0.96f, 1f), 38f);
-            progressLabel = CreateText(panelObject.transform, "QaProgress", "Question 1 / 3", 18f, FontStyles.Bold, TextAlignmentOptions.Left, new Color(0.72f, 0.82f, 0.92f, 1f), 24f);
-            personaLabel = CreateText(panelObject.transform, "QaPersona", "Curious audience member", 17f, FontStyles.Italic, TextAlignmentOptions.Left, new Color(0.58f, 0.68f, 0.78f, 1f), 24f);
-            questionLabel = CreateText(panelObject.transform, "QaQuestion", string.Empty, 26f, FontStyles.Bold, TextAlignmentOptions.TopLeft, Color.white, 100f);
+            titleLabel = CreateText(panelObject.transform, "QaTitle", "Q&A Controls", 28f, FontStyles.Bold, TextAlignmentOptions.Left, new Color(0.12f, 0.78f, 0.96f, 1f), 34f);
+            progressLabel = CreateText(panelObject.transform, "QaProgress", "Question 1 / 3", 20f, FontStyles.Bold, TextAlignmentOptions.Left, new Color(0.72f, 0.82f, 0.92f, 1f), 28f);
+            personaLabel = CreateText(panelObject.transform, "QaPersona", "Curious audience member", 18f, FontStyles.Italic, TextAlignmentOptions.Left, new Color(0.58f, 0.68f, 0.78f, 1f), 26f);
+            questionLabel = CreateText(panelObject.transform, "QaQuestion", string.Empty, 30f, FontStyles.Bold, TextAlignmentOptions.TopLeft, Color.white, 178f);
+            scoreLabel = CreateText(panelObject.transform, "QaScore", "Q&A Score --", 23f, FontStyles.Bold, TextAlignmentOptions.Left, new Color(0.98f, 0.74f, 0.39f, 1f), 54f);
 
             typedAnswerInput = CreateInputField(panelObject.transform);
-            transcriptLabel = CreateText(panelObject.transform, "QaTranscript", string.Empty, 18f, FontStyles.Normal, TextAlignmentOptions.TopLeft, new Color(0.82f, 0.88f, 0.94f, 1f), 58f);
-            statusLabel = CreateText(panelObject.transform, "QaStatus", string.Empty, 18f, FontStyles.Normal, TextAlignmentOptions.TopLeft, new Color(0.92f, 0.95f, 0.98f, 1f), 58f);
+            SetTypedAnswerVisible(false);
+            transcriptLabel = CreateText(panelObject.transform, "QaTranscript", string.Empty, 19f, FontStyles.Normal, TextAlignmentOptions.TopLeft, new Color(0.82f, 0.88f, 0.94f, 1f), 72f);
+            statusLabel = CreateText(panelObject.transform, "QaStatus", string.Empty, 19f, FontStyles.Normal, TextAlignmentOptions.TopLeft, new Color(0.92f, 0.95f, 0.98f, 1f), 54f);
+            shortcutLabel = CreateText(panelObject.transform, "QaShortcuts", string.Empty, 18f, FontStyles.Bold, TextAlignmentOptions.Left, new Color(0.62f, 0.88f, 1f, 1f), 40f);
 
             GameObject buttonRow = new GameObject("QaButtonRow", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
             buttonRow.transform.SetParent(panelObject.transform, false);
             LayoutElement rowLayout = buttonRow.GetComponent<LayoutElement>();
-            rowLayout.minHeight = 64f;
-            rowLayout.preferredHeight = 64f;
+            rowLayout.minHeight = 68f;
+            rowLayout.preferredHeight = 68f;
             HorizontalLayoutGroup row = buttonRow.GetComponent<HorizontalLayoutGroup>();
             row.spacing = 14f;
             row.childControlWidth = true;
@@ -436,10 +573,10 @@ namespace VRPublicSpeaking.AppShell.PresentationQuestioning
             row.childForceExpandWidth = true;
 
             primaryButton = CreateButton(buttonRow.transform, "QaPrimaryButton", "Start Answer", () => primaryRequested = true, new Color(0.21f, 0.63f, 0.96f, 1f));
-            skipButton = CreateButton(buttonRow.transform, "QaSkipButton", "Skip", () => skipRequested = true, new Color(0.11f, 0.19f, 0.27f, 0.96f));
-            finishButton = CreateButton(buttonRow.transform, "QaFinishButton", "Finish Q&A", () => finishRequested = true, new Color(0.16f, 0.16f, 0.22f, 0.96f));
+            skipButton = CreateButton(buttonRow.transform, "QaSkipButton", "Skip Question", HandleSkipButtonPressed, new Color(0.11f, 0.19f, 0.27f, 0.96f));
+            finishButton = CreateButton(buttonRow.transform, "QaFinishButton", "Finish Q&A", HandleFinishButtonPressed, new Color(0.16f, 0.16f, 0.22f, 0.96f));
 
-            VrUiUsabilityUtility.ApplyReadablePanel(questionPanel, 20f, 60f, new Vector2(860f, 430f));
+            VrUiUsabilityUtility.ApplyReadablePanel(questionPanel, 18f, 68f, new Vector2(860f, 450f));
             questionPanel.Hide();
         }
 
@@ -449,12 +586,79 @@ namespace VRPublicSpeaking.AppShell.PresentationQuestioning
             progressLabel = FindText("QaProgress");
             personaLabel = FindText("QaPersona");
             questionLabel = FindText("QaQuestion");
+            scoreLabel = FindText("QaScore");
             statusLabel = FindText("QaStatus");
             transcriptLabel = FindText("QaTranscript");
+            shortcutLabel = FindText("QaShortcuts");
             typedAnswerInput = questionPanel.GetComponentInChildren<TMP_InputField>(true);
             primaryButton = FindButton("QaPrimaryButton");
             skipButton = FindButton("QaSkipButton");
             finishButton = FindButton("QaFinishButton");
+            EnsureControlPanelExtras();
+            WireQuestionButtons();
+        }
+
+        private void EnsureControlPanelExtras()
+        {
+            if (questionPanel == null)
+            {
+                return;
+            }
+
+            if (scoreLabel == null)
+            {
+                scoreLabel = CreateText(questionPanel.transform, "QaScore", "Q&A Score --", 23f, FontStyles.Bold, TextAlignmentOptions.Left, new Color(0.98f, 0.74f, 0.39f, 1f), 54f);
+                scoreLabel.transform.SetSiblingIndex(Mathf.Min(4, questionPanel.transform.childCount - 1));
+            }
+
+            if (shortcutLabel == null)
+            {
+                shortcutLabel = CreateText(questionPanel.transform, "QaShortcuts", string.Empty, 18f, FontStyles.Bold, TextAlignmentOptions.Left, new Color(0.62f, 0.88f, 1f, 1f), 40f);
+                shortcutLabel.transform.SetSiblingIndex(Mathf.Max(0, questionPanel.transform.childCount - 2));
+            }
+        }
+
+        private void WireQuestionButtons()
+        {
+            if (primaryButton != null)
+            {
+                primaryButton.onClick.RemoveAllListeners();
+                primaryButton.onClick.AddListener(() => primaryRequested = true);
+            }
+
+            if (skipButton != null)
+            {
+                skipButton.onClick.RemoveAllListeners();
+                skipButton.onClick.AddListener(HandleSkipButtonPressed);
+            }
+
+            if (finishButton != null)
+            {
+                finishButton.onClick.RemoveAllListeners();
+                finishButton.onClick.AddListener(HandleFinishButtonPressed);
+            }
+        }
+
+        private void HandleSkipButtonPressed()
+        {
+            if (skipButtonMode == SkipButtonMode.RetryAnswer)
+            {
+                retryRequested = true;
+                return;
+            }
+
+            skipRequested = true;
+        }
+
+        private void HandleFinishButtonPressed()
+        {
+            if (finishButtonMode == FinishButtonMode.SkipQuestion)
+            {
+                skipRequested = true;
+                return;
+            }
+
+            finishRequested = true;
         }
 
         private TMP_InputField CreateInputField(Transform parent)
@@ -543,8 +747,8 @@ namespace VRPublicSpeaking.AppShell.PresentationQuestioning
             GameObject buttonObject = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button), typeof(LayoutElement));
             buttonObject.transform.SetParent(parent, false);
             LayoutElement layout = buttonObject.GetComponent<LayoutElement>();
-            layout.minHeight = 60f;
-            layout.preferredHeight = 60f;
+            layout.minHeight = 64f;
+            layout.preferredHeight = 64f;
             layout.flexibleWidth = 1f;
 
             Image image = buttonObject.GetComponent<Image>();
@@ -561,7 +765,7 @@ namespace VRPublicSpeaking.AppShell.PresentationQuestioning
             colors.pressedColor = new Color(0.35f, 0.62f, 0.78f, 1f);
             button.colors = colors;
 
-            TMP_Text buttonText = CreateText(buttonObject.transform, "Label", label, 20f, FontStyles.Bold, TextAlignmentOptions.Center, Color.white, 60f);
+            TMP_Text buttonText = CreateText(buttonObject.transform, "Label", label, 20f, FontStyles.Bold, TextAlignmentOptions.Center, Color.white, 64f);
             RectTransform textRect = buttonText.transform as RectTransform;
             textRect.anchorMin = Vector2.zero;
             textRect.anchorMax = Vector2.one;
@@ -623,8 +827,8 @@ namespace VRPublicSpeaking.AppShell.PresentationQuestioning
             if (panelRect != null)
             {
                 panelRect.sizeDelta = audienceBubbleActive
-                    ? new Vector2(680f, 390f)
-                    : new Vector2(940f, 500f);
+                    ? new Vector2(860f, 450f)
+                    : new Vector2(1080f, 620f);
             }
 
             SetLabelVisible(progressLabel, !audienceBubbleActive);
@@ -681,11 +885,56 @@ namespace VRPublicSpeaking.AppShell.PresentationQuestioning
         }
 
         private void SetStatus(string value) => SetText(statusLabel, value);
+        private void SetScore(string value) => SetText(scoreLabel, value);
+        private void SetShortcutHint(string value) => SetText(shortcutLabel, value);
         private void SetTranscript(string value) => SetText(transcriptLabel, string.IsNullOrWhiteSpace(value) ? "Transcript will appear here after speech is captured." : value);
+
+        private void SetTypedAnswerVisible(bool visible)
+        {
+            if (typedAnswerInput != null && typedAnswerInput.gameObject.activeSelf != visible)
+            {
+                typedAnswerInput.gameObject.SetActive(visible);
+            }
+        }
 
         private void SetPrimaryButtonLabel(string value)
         {
-            TMP_Text label = primaryButton != null ? primaryButton.GetComponentInChildren<TMP_Text>(true) : null;
+            SetButtonLabel(primaryButton, value);
+        }
+
+        private void SetSkipButtonMode(SkipButtonMode mode, string label)
+        {
+            skipButtonMode = mode;
+            SetButtonLabel(skipButton, label);
+        }
+
+        private void SetFinishButtonMode(FinishButtonMode mode, string label)
+        {
+            finishButtonMode = mode;
+            SetButtonLabel(finishButton, label);
+        }
+
+        private void SetQuestionButtonInteractivity(bool primary, bool skip, bool finish)
+        {
+            if (primaryButton != null)
+            {
+                primaryButton.interactable = primary;
+            }
+
+            if (skipButton != null)
+            {
+                skipButton.interactable = skip;
+            }
+
+            if (finishButton != null)
+            {
+                finishButton.interactable = finish;
+            }
+        }
+
+        private static void SetButtonLabel(Button button, string value)
+        {
+            TMP_Text label = button != null ? button.GetComponentInChildren<TMP_Text>(true) : null;
             SetText(label, value);
         }
 
@@ -879,10 +1128,75 @@ namespace VRPublicSpeaking.AppShell.PresentationQuestioning
             }
 
             return evaluated > 0
-                ? $"Audience Q&A complete. Average answer accuracy: {accuracy / evaluated:0}/100."
+                ? $"Audience Q&A complete. Q&A readiness score: {result.qaScore:0}/100. Average answer accuracy: {accuracy / evaluated:0}/100."
                 : result.HasCapturedAnswers
                     ? "Audience Q&A complete. Answers were captured, but evaluation feedback was unavailable."
                     : "Audience Q&A skipped.";
+        }
+
+        private static void CalculateQaScores(PresentationQaResult result)
+        {
+            if (result == null || result.answers == null)
+            {
+                return;
+            }
+
+            int evaluated = 0;
+            float accuracy = 0f;
+            float coverage = 0f;
+            float clarity = 0f;
+
+            for (int index = 0; index < result.answers.Count; index++)
+            {
+                PresentationAnswerFeedback feedback = result.answers[index]?.feedback;
+                if (feedback == null ||
+                    !string.Equals(feedback.status, "Evaluated", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                evaluated++;
+                accuracy += Mathf.Clamp(feedback.accuracy, 0f, 100f);
+                coverage += Mathf.Clamp(feedback.coverage, 0f, 100f);
+                clarity += Mathf.Clamp(feedback.clarity, 0f, 100f);
+            }
+
+            if (evaluated <= 0)
+            {
+                result.qaScore = 0f;
+                result.averageAccuracy = 0f;
+                result.averageCoverage = 0f;
+                result.averageClarity = 0f;
+                return;
+            }
+
+            result.averageAccuracy = accuracy / evaluated;
+            result.averageCoverage = coverage / evaluated;
+            result.averageClarity = clarity / evaluated;
+            result.qaScore = Mathf.Clamp(
+                result.averageAccuracy * 0.5f +
+                result.averageCoverage * 0.3f +
+                result.averageClarity * 0.2f,
+                0f,
+                100f);
+        }
+
+        private static string BuildQaScoreText(PresentationQaResult result, PresentationAnswerFeedback latestFeedback = null)
+        {
+            if (result == null || !result.HasEvaluatedAnswers)
+            {
+                return "Q&A Score --";
+            }
+
+            string baseText =
+                $"Q&A Score {result.qaScore:0}/100  |  A {result.averageAccuracy:0}  C {result.averageCoverage:0}  Cl {result.averageClarity:0}";
+            if (latestFeedback == null ||
+                !string.Equals(latestFeedback.status, "Evaluated", StringComparison.OrdinalIgnoreCase))
+            {
+                return baseText;
+            }
+
+            return $"{baseText}\nLatest: A {latestFeedback.accuracy:0}  C {latestFeedback.coverage:0}  Cl {latestFeedback.clarity:0}";
         }
 
         private bool WasSubmitPressedThisFrame()

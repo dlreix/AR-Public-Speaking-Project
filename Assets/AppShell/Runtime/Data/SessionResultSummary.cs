@@ -350,7 +350,11 @@ namespace VRPublicSpeaking.AppShell.Data
                 deckName = result.deckName,
                 status = result.status,
                 summary = result.summary,
-                completedUnixTime = result.completedUnixTime
+                completedUnixTime = result.completedUnixTime,
+                qaScore = result.qaScore,
+                averageAccuracy = result.averageAccuracy,
+                averageCoverage = result.averageCoverage,
+                averageClarity = result.averageClarity
             };
 
             if (result.answers != null)

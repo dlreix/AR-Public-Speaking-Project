@@ -108,6 +108,19 @@ namespace VRPublicSpeaking.AppShell.UI
 
         private void CachePanels()
         {
+            AppPanelView[] discoveredPanels =
+                FindObjectsByType<AppPanelView>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            for (int index = 0; index < discoveredPanels.Length; index++)
+            {
+                AppPanelView discoveredPanel = discoveredPanels[index];
+                if (discoveredPanel != null &&
+                    discoveredPanel.gameObject.scene == gameObject.scene &&
+                    !panels.Contains(discoveredPanel))
+                {
+                    panels.Add(discoveredPanel);
+                }
+            }
+
             panelLookup.Clear();
 
             for (int index = 0; index < panels.Count; index++)

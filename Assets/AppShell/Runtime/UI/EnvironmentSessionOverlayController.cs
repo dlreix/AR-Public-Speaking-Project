@@ -15,6 +15,14 @@ namespace VRPublicSpeaking.AppShell.UI
 {
     public class EnvironmentSessionOverlayController : MonoBehaviour
     {
+        private enum PendingPauseAction
+        {
+            None,
+            Restart,
+            End,
+            Hub
+        }
+
         [SerializeField] private AppRuntimeState runtimeState;
         [SerializeField] private MainController mainController;
         [SerializeField] private InSessionHudPresenter hudPresenter;
@@ -59,6 +67,8 @@ namespace VRPublicSpeaking.AppShell.UI
         [SerializeField] private float vrNavigationRepeatDelay = 0.22f;
         [SerializeField] private float vrSelectedButtonScale = 1.08f;
         [SerializeField] private float vrCancelHoldSeconds = 0.6f;
+        [SerializeField] private float overlayInputGuardSeconds = 0.35f;
+        [SerializeField] private float pauseDestructiveConfirmSeconds = 4f;
 
         private MainController subscribedMainController;
         private int pausePanelShownFrame = -1;
@@ -77,6 +87,9 @@ namespace VRPublicSpeaking.AppShell.UI
         private float nextVrNavigationTime;
         private float vrNavigationFocusLockUntil;
         private float vrCancelHeldSeconds;
+        private float overlayInputLockedUntil;
+        private float pendingPauseActionExpiresAt;
+        private PendingPauseAction pendingPauseAction = PendingPauseAction.None;
         private static readonly List<UnityEngine.XR.InputDevice> LegacyVrControllers =
             new List<UnityEngine.XR.InputDevice>();
 
@@ -112,6 +125,11 @@ namespace VRPublicSpeaking.AppShell.UI
         private void Update()
         {
             ResolveUiInputSupport();
+            if (pendingPauseAction != PendingPauseAction.None &&
+                Time.unscaledTime > pendingPauseActionExpiresAt)
+            {
+                ClearPendingPauseAction();
+            }
 
             if (Keyboard.current != null)
             {
@@ -268,17 +286,27 @@ namespace VRPublicSpeaking.AppShell.UI
 
         public void ResumeSession()
         {
+            ClearPendingPauseAction();
             ClosePauseMenu();
         }
 
         public void RestartSession()
         {
+            if (RequirePauseActionConfirmation(
+                    PendingPauseAction.Restart,
+                    "Restart Session will cancel this run and start setup again. Press Restart again to confirm.",
+                    "Confirm Restart"))
+            {
+                return;
+            }
+
             if (resultsFlowController == null)
             {
                 UpdatePauseStatus("Restart route is unavailable because results flow is not wired.");
                 return;
             }
 
+            ClearPendingPauseAction();
             HideTransientPanels();
 
             if (mainController != null)
@@ -292,12 +320,21 @@ namespace VRPublicSpeaking.AppShell.UI
 
         public void EndSession()
         {
+            if (RequirePauseActionConfirmation(
+                    PendingPauseAction.End,
+                    "End Session will finalize the current run. Press End again to confirm.",
+                    "Confirm End"))
+            {
+                return;
+            }
+
             if (mainController == null || !mainController.IsSessionRunning)
             {
                 UpdatePauseStatus("End Session is unavailable because no active session is running.");
                 return;
             }
 
+            ClearPendingPauseAction();
             HidePausePanelInternal(updateRuntimeState: true);
             runtimeState?.MarkSessionResumed();
             mainController.StopSessionFromShell();
@@ -305,12 +342,21 @@ namespace VRPublicSpeaking.AppShell.UI
 
         public void ReturnToHub()
         {
+            if (RequirePauseActionConfirmation(
+                    PendingPauseAction.Hub,
+                    "Return To Hub will cancel this run and leave the room. Press Hub again to confirm.",
+                    "Confirm Hub"))
+            {
+                return;
+            }
+
             if (resultsFlowController == null)
             {
                 UpdatePauseStatus("Return route is unavailable because results flow is not wired.");
                 return;
             }
 
+            ClearPendingPauseAction();
             HideTransientPanels();
 
             if (mainController != null)
@@ -324,6 +370,7 @@ namespace VRPublicSpeaking.AppShell.UI
 
         public void HideTransientPanels()
         {
+            ClearPendingPauseAction();
             HidePausePanelInternal(updateRuntimeState: true);
             HideResultsPanelInternal(updateRuntimeState: true);
             HideDashboardPanelInternal(updateRuntimeState: true);
@@ -439,6 +486,7 @@ namespace VRPublicSpeaking.AppShell.UI
             }
 
             UpdatePauseStatus(pauseStatusText);
+            ClearPendingPauseAction();
             ApplyReadableOverlayDefaults(force: true);
             EnsurePauseButtonWiring();
             overlayFollower?.SnapToTarget();
@@ -447,6 +495,7 @@ namespace VRPublicSpeaking.AppShell.UI
             FocusFirstButton(pausePanel);
             ApplyDimmer(pauseDimAlpha);
             pausePanelShownFrame = Time.frameCount;
+            ArmOverlayInputGuard();
             runtimeState?.SetPauseMenuVisible(true);
             runtimeState?.SetResultsOverlayVisible(false);
             hudPresenter?.Refresh();
@@ -454,6 +503,7 @@ namespace VRPublicSpeaking.AppShell.UI
 
         private void HidePausePanelInternal(bool updateRuntimeState)
         {
+            ClearPendingPauseAction();
             pausePanel?.Hide();
             pausePanelShownFrame = -1;
 
@@ -567,15 +617,111 @@ namespace VRPublicSpeaking.AppShell.UI
             }
         }
 
+        private bool RequirePauseActionConfirmation(
+            PendingPauseAction action,
+            string message,
+            string confirmLabel)
+        {
+            bool pauseVisible =
+                pausePanel != null &&
+                pausePanel.gameObject.activeInHierarchy &&
+                runtimeState != null &&
+                runtimeState.CurrentRuntimeState.PauseMenuVisible;
+
+            if (!pauseVisible || action == PendingPauseAction.None)
+            {
+                return false;
+            }
+
+            if (pendingPauseAction == action && Time.unscaledTime <= pendingPauseActionExpiresAt)
+            {
+                ClearPendingPauseAction();
+                return false;
+            }
+
+            pendingPauseAction = action;
+            pendingPauseActionExpiresAt =
+                Time.unscaledTime + Mathf.Max(1f, pauseDestructiveConfirmSeconds);
+            ResetPauseActionButtonLabels();
+            SetPauseActionButtonLabel(action, confirmLabel);
+            UpdatePauseStatus(message);
+            ArmOverlayInputGuard(0.12f);
+            return true;
+        }
+
+        private void ClearPendingPauseAction()
+        {
+            if (pendingPauseAction == PendingPauseAction.None)
+            {
+                return;
+            }
+
+            pendingPauseAction = PendingPauseAction.None;
+            pendingPauseActionExpiresAt = 0f;
+            ResetPauseActionButtonLabels();
+        }
+
+        private void ResetPauseActionButtonLabels()
+        {
+            SetPauseButtonLabel("RestartButton", "Restart Session");
+            SetPauseButtonLabel("EndButton", "End Session");
+            SetPauseButtonLabel("HubButton", "Return To Hub");
+        }
+
+        private void SetPauseActionButtonLabel(PendingPauseAction action, string label)
+        {
+            switch (action)
+            {
+                case PendingPauseAction.Restart:
+                    SetPauseButtonLabel("RestartButton", label);
+                    break;
+                case PendingPauseAction.End:
+                    SetPauseButtonLabel("EndButton", label);
+                    break;
+                case PendingPauseAction.Hub:
+                    SetPauseButtonLabel("HubButton", label);
+                    break;
+            }
+        }
+
+        private void SetPauseButtonLabel(string buttonName, string label)
+        {
+            Button button = FindPanelButton(pausePanel, buttonName);
+            TMP_Text text = button != null ? button.GetComponentInChildren<TMP_Text>(true) : null;
+            if (text != null)
+            {
+                text.text = label;
+            }
+        }
+
+        private void ArmOverlayInputGuard(float? seconds = null)
+        {
+            overlayInputLockedUntil =
+                Time.unscaledTime + Mathf.Max(0.05f, seconds ?? overlayInputGuardSeconds);
+            CaptureCurrentVrClickState();
+        }
+
+        private bool IsOverlayInputGuardActive()
+        {
+            return Time.unscaledTime < overlayInputLockedUntil;
+        }
+
+        private void CaptureCurrentVrClickState()
+        {
+            legacyVrClickWasPressed =
+                IsLegacyControllerButtonPressed(UnityEngine.XR.CommonUsages.triggerButton) ||
+                IsLegacyControllerButtonPressed(UnityEngine.XR.CommonUsages.primaryButton);
+        }
+
         private static string BuildPauseStatusMessage(string message)
         {
             string baseMessage = message ?? string.Empty;
             if (Keyboard.current == null)
             {
-                return $"{baseMessage}\n\nOpen pause in VR: press controller Menu once, or hold B/Y (secondary) for 0.6s during a live session.\nIn this panel: thumbstick selects, trigger/A confirms, hold B/Y or Menu to go back.";
+                return $"{baseMessage}\n\nVR: thumbstick selects, trigger/A confirms. Menu or hold B/Y resumes. Restart, End, and Hub need a second press.";
             }
 
-            return $"{baseMessage}\n\nPC: Esc opens pause. Enter/1 Resume  R/2 Restart  E/3 End  H/4 Hub\nVR: Menu opens pause, or hold B/Y for 0.6s. Thumbstick selects, trigger/A confirms.";
+            return $"{baseMessage}\n\nPC: Enter/1 Resume  R/2 Restart  E/3 End  H/4 Hub. VR: thumbstick selects, trigger/A confirms.";
         }
 
         private void EnsureDashboardPanel()
@@ -1076,10 +1222,17 @@ namespace VRPublicSpeaking.AppShell.UI
                 return;
             }
 
-            SetTextObject(panel, "PauseActionLead", "VR: press Menu to pause/resume, or hold B/Y for 0.6s.\nThen use thumbstick + trigger/A.");
-            SetSummaryStrip(panel, "PauseRuleC", "VR INPUT", "Menu opens pause. Hold B/Y (secondary) for 0.6s as a backup.");
-            SetPreferredHeight(panel, "PauseActionLead", 104f);
-            SetPreferredHeight(panel, "PauseStatusLabel", 148f);
+            SetTextObject(panel, "PanelTitle", "Session Paused");
+            SetTextObject(panel, "PanelSubtitle", "Choose an action. Restart, End, and Hub require a second press.");
+            SetTextObject(panel, "PauseLead", "The room is still loaded. Resume safely or choose another route.");
+            SetTextObject(panel, "PauseActionLead", "VR: thumbstick selects, trigger/A confirms.\nMenu or hold B/Y resumes.");
+            SetSummaryStrip(panel, "PauseRuleC", "CONFIRM", "Restart, End, and Hub ask for one more press.");
+            SetPanelObjectActive(panel, "PauseRuleA", false);
+            SetPanelObjectActive(panel, "PauseRuleB", false);
+            SetPreferredHeight(panel, "PanelSubtitle", 48f);
+            SetPreferredHeight(panel, "PauseLead", 58f);
+            SetPreferredHeight(panel, "PauseActionLead", 72f);
+            SetPreferredHeight(panel, "PauseStatusLabel", 132f);
         }
 
         private void EnsurePauseButtonWiring()
@@ -1120,6 +1273,15 @@ namespace VRPublicSpeaking.AppShell.UI
             if (text != null)
             {
                 text.text = value;
+            }
+        }
+
+        private static void SetPanelObjectActive(AppPanelView panel, string name, bool active)
+        {
+            Transform target = FindPanelTransform(panel, name);
+            if (target != null && target.gameObject.activeSelf != active)
+            {
+                target.gameObject.SetActive(active);
             }
         }
 
@@ -1372,6 +1534,11 @@ namespace VRPublicSpeaking.AppShell.UI
 
         private void HandleDesktopOverlayShortcuts()
         {
+            if (IsOverlayInputGuardActive())
+            {
+                return;
+            }
+
             if (Keyboard.current == null)
             {
                 return;
@@ -1442,6 +1609,11 @@ namespace VRPublicSpeaking.AppShell.UI
 
         private void HandleDesktopOverlayPointerFallback()
         {
+            if (IsOverlayInputGuardActive())
+            {
+                return;
+            }
+
             AppPanelView activePanel = GetActiveInteractivePanel();
             if (activePanel == null)
             {
@@ -1463,6 +1635,12 @@ namespace VRPublicSpeaking.AppShell.UI
 
         private void HandleVrOverlayPointerFallback()
         {
+            if (IsOverlayInputGuardActive())
+            {
+                CaptureCurrentVrClickState();
+                return;
+            }
+
             AppPanelView activePanel = GetActiveInteractivePanel();
             if (activePanel == null || !WasVrOverlayClickPressedThisFrame())
             {
@@ -1530,6 +1708,12 @@ namespace VRPublicSpeaking.AppShell.UI
 
         private void HandleVrOverlayNavigation()
         {
+            if (IsOverlayInputGuardActive())
+            {
+                nextVrNavigationTime = 0f;
+                return;
+            }
+
             AppPanelView activePanel = GetActiveInteractivePanel();
             if (activePanel == null || !HasVrController())
             {
@@ -1555,6 +1739,12 @@ namespace VRPublicSpeaking.AppShell.UI
 
         private void HandleVrOverlayCancel()
         {
+            if (IsOverlayInputGuardActive())
+            {
+                ResetVrCancelHold();
+                return;
+            }
+
             AppPanelView activePanel = GetActiveInteractivePanel();
             if (activePanel == null || !HasVrController())
             {

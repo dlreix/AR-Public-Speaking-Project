@@ -6,7 +6,6 @@ using UnityEngine.UI;
 using VRPublicSpeaking.AppShell.Core;
 using VRPublicSpeaking.AppShell.Data;
 using VRPublicSpeaking.AppShell.Flow;
-using VRPublicSpeaking.AppShell.PresentationQuestioning;
 
 namespace VRPublicSpeaking.AppShell.UI
 {
@@ -670,21 +669,17 @@ namespace VRPublicSpeaking.AppShell.UI
 
         private void RefreshCoachAndHistory(FeedbackReport report, SessionData latestSession, SessionResultSummary summary)
         {
-            PresentationQaResult qaResult = latestSession != null && latestSession.qaResult != null
-                ? latestSession.qaResult
-                : summary.QaResult;
-
             if (report == null)
             {
                 SetText(coachSummaryLabel, "No coach feedback yet.");
-                SetText(coachNotesLabel, BuildQaNotesOrFallback(qaResult, "Complete a scored session to populate strengths, weaknesses, and practice notes."));
+                SetText(coachNotesLabel, "Complete a scored session to populate strengths, weaknesses, and practice notes.");
             }
             else
             {
                 SetText(
                     coachSummaryLabel,
                     $"{report.performanceBand}\nStrongest: {report.strongestArea}\nImprove: {report.weakestArea}\n\nSpeech: {GetCategorySummary(report, "Speech")}\nEye: {GetCategorySummary(report, "Eye Contact")}\nPosture: {GetCategorySummary(report, "Posture")}");
-                SetText(coachNotesLabel, AppendQaNotes(BuildCoachNotes(report), qaResult));
+                SetText(coachNotesLabel, BuildCoachNotes(report));
             }
 
             RefreshHistoryCards();
@@ -981,82 +976,6 @@ namespace VRPublicSpeaking.AppShell.UI
             }
 
             return builder.Length == 0 ? "No detailed notes yet." : builder.ToString().TrimEnd();
-        }
-
-        private static string BuildQaNotesOrFallback(PresentationQaResult qaResult, string fallback)
-        {
-            string qaNotes = BuildQaNotes(qaResult);
-            return string.IsNullOrWhiteSpace(qaNotes) ? fallback : qaNotes;
-        }
-
-        private static string AppendQaNotes(string existingNotes, PresentationQaResult qaResult)
-        {
-            string qaNotes = BuildQaNotes(qaResult);
-            if (string.IsNullOrWhiteSpace(qaNotes))
-            {
-                return existingNotes;
-            }
-
-            if (string.IsNullOrWhiteSpace(existingNotes))
-            {
-                return qaNotes;
-            }
-
-            return $"{existingNotes}\n\n{qaNotes}";
-        }
-
-        private static string BuildQaNotes(PresentationQaResult qaResult)
-        {
-            if (qaResult == null || !qaResult.HasMeaningfulAnswers)
-            {
-                return string.Empty;
-            }
-
-            StringBuilder builder = new StringBuilder();
-            builder.AppendLine("Q&A Feedback");
-            if (!string.IsNullOrWhiteSpace(qaResult.summary))
-            {
-                builder.AppendLine(qaResult.summary);
-            }
-
-            for (int index = 0; index < Mathf.Min(3, qaResult.answers.Count); index++)
-            {
-                PresentationQaAnswer answer = qaResult.answers[index];
-                if (answer == null)
-                {
-                    continue;
-                }
-
-                builder.Append("- ");
-                if (answer.feedback != null && answer.feedback.status == "Evaluated")
-                {
-                    builder.Append($"A:{answer.feedback.accuracy:0} C:{answer.feedback.coverage:0} Cl:{answer.feedback.clarity:0} - ");
-                    builder.AppendLine(CompactQaText(answer.feedback.summary, 96));
-                }
-                else if (answer.feedback != null)
-                {
-                    builder.AppendLine(CompactQaText(answer.feedback.summary, 110));
-                }
-                else
-                {
-                    builder.AppendLine(answer.skipped ? "Skipped." : CompactQaText(answer.answerTranscript, 110));
-                }
-            }
-
-            return builder.ToString().TrimEnd();
-        }
-
-        private static string CompactQaText(string value, int maxLength)
-        {
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                return string.Empty;
-            }
-
-            string trimmed = value.Trim();
-            return trimmed.Length <= maxLength
-                ? trimmed
-                : trimmed.Substring(0, Mathf.Max(0, maxLength - 3)).TrimEnd() + "...";
         }
 
         private static void AppendList(StringBuilder builder, string title, List<string> items)

@@ -178,8 +178,8 @@ namespace VRPublicSpeaking.AppShell.Flow
             runtimeState?.ResetRequestedHubPanel();
 
             bool shouldGateBehindLogin =
-                DataManager.Instance != null &&
-                DataManager.Instance.currentUser == "DefaultUser" &&
+                (DataManager.Instance == null ||
+                 DataManager.Instance.currentUser == "DefaultUser") &&
                 requestedPanel == AppPanelType.Home;
 
             if (shouldGateBehindLogin)

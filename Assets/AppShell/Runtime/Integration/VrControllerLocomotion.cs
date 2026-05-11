@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Unity.XR.CoreUtils;
 using UnityEngine;
@@ -20,6 +21,7 @@ namespace VRPublicSpeaking.AppShell.Integration
         [SerializeField] private float turnDeadzone = 0.72f;
         [SerializeField] private float snapTurnAmount = 45f;
         [SerializeField] private float snapTurnCooldown = 0.35f;
+        [SerializeField] private float minimumWorldY = 0.02f;
         [SerializeField] private bool blockWhenSessionOverlayVisible = true;
 
         private readonly List<InputDevice> leftControllers = new List<InputDevice>();
@@ -29,7 +31,6 @@ namespace VRPublicSpeaking.AppShell.Integration
         private MainController mainController;
         private float verticalVelocity;
         private float nextSnapTurnTime;
-        private bool competingMovementProvidersDisabled;
 
         public static VrControllerLocomotion EnsureForScene(Camera camera)
         {
@@ -152,12 +153,12 @@ namespace VRPublicSpeaking.AppShell.Integration
 
         private void DisableCompetingMovementProviders()
         {
-            if (competingMovementProvidersDisabled)
-            {
-                return;
-            }
-
             Transform root = xrOrigin != null ? xrOrigin.transform : transform;
+            DisableNamedChild(root, "Gravity");
+            DisableNamedChild(root, "Teleportation");
+            DisableNamedChild(root, "Locomotion");
+            DisableNamedChild(root, "Climb");
+
             Behaviour[] behaviours = root.GetComponentsInChildren<Behaviour>(true);
             for (int index = 0; index < behaviours.Length; index++)
             {
@@ -168,14 +169,72 @@ namespace VRPublicSpeaking.AppShell.Integration
                 }
 
                 string typeName = behaviour.GetType().FullName ?? string.Empty;
-                if (typeName.Contains("ContinuousMoveProvider") ||
-                    typeName.Contains("DynamicMoveProvider"))
+                if (IsCompetingMovementProvider(typeName))
                 {
                     behaviour.enabled = false;
                 }
             }
+        }
 
-            competingMovementProvidersDisabled = true;
+        private static bool IsCompetingMovementProvider(string typeName)
+        {
+            return ContainsOrdinal(typeName, "ContinuousMoveProvider") ||
+                   ContainsOrdinal(typeName, "DynamicMoveProvider") ||
+                   ContainsOrdinal(typeName, "ContinuousTurnProvider") ||
+                   ContainsOrdinal(typeName, "SnapTurnProvider") ||
+                   ContainsOrdinal(typeName, "GravityProvider") ||
+                   ContainsOrdinal(typeName, "GrabMoveProvider") ||
+                   ContainsOrdinal(typeName, "TwoHandedGrabMoveProvider") ||
+                   ContainsOrdinal(typeName, "ClimbProvider") ||
+                   ContainsOrdinal(typeName, "TeleportationProvider") ||
+                   ContainsOrdinal(typeName, "LocomotionProvider");
+        }
+
+        private static bool ContainsOrdinal(string value, string token)
+        {
+            return value.IndexOf(token, StringComparison.Ordinal) >= 0;
+        }
+
+        private static void DisableNamedChild(Transform root, string childName)
+        {
+            if (root == null)
+            {
+                return;
+            }
+
+            for (int index = 0; index < root.childCount; index++)
+            {
+                Transform child = FindChildRecursive(root.GetChild(index), childName);
+                if (child != null && child.gameObject.activeSelf)
+                {
+                    child.gameObject.SetActive(false);
+                    return;
+                }
+            }
+        }
+
+        private static Transform FindChildRecursive(Transform root, string childName)
+        {
+            if (root == null)
+            {
+                return null;
+            }
+
+            if (string.Equals(root.name, childName, StringComparison.OrdinalIgnoreCase))
+            {
+                return root;
+            }
+
+            for (int index = 0; index < root.childCount; index++)
+            {
+                Transform match = FindChildRecursive(root.GetChild(index), childName);
+                if (match != null)
+                {
+                    return match;
+                }
+            }
+
+            return null;
         }
 
         private bool ShouldProcessInput()
@@ -299,6 +358,7 @@ namespace VRPublicSpeaking.AppShell.Integration
                 Vector3 motion = horizontalVelocity;
                 motion.y = verticalVelocity;
                 characterController.Move(motion * deltaTime);
+                ClampRigToSafeHeight();
                 return;
             }
 
@@ -306,6 +366,7 @@ namespace VRPublicSpeaking.AppShell.Integration
             if (rigTransform != null)
             {
                 rigTransform.position += horizontalVelocity * deltaTime;
+                ClampRigToSafeHeight();
             }
         }
 
@@ -334,6 +395,37 @@ namespace VRPublicSpeaking.AppShell.Integration
             }
 
             nextSnapTurnTime = Time.unscaledTime + snapTurnCooldown;
+            if (verticalVelocity < 0f)
+            {
+                verticalVelocity = -2f;
+            }
+
+            ClampRigToSafeHeight();
+        }
+
+        private void ClampRigToSafeHeight()
+        {
+            Transform rigTransform = characterController != null ? characterController.transform : ResolveRigTransform();
+            if (rigTransform == null || rigTransform.position.y >= minimumWorldY)
+            {
+                return;
+            }
+
+            bool controllerWasEnabled = characterController != null && characterController.enabled;
+            if (controllerWasEnabled)
+            {
+                characterController.enabled = false;
+            }
+
+            Vector3 position = rigTransform.position;
+            position.y = minimumWorldY;
+            rigTransform.position = position;
+            verticalVelocity = 0f;
+
+            if (controllerWasEnabled)
+            {
+                characterController.enabled = true;
+            }
         }
 
         private Transform ResolveViewTransform()

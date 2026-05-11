@@ -53,6 +53,10 @@ namespace VRPublicSpeaking.AppShell.PresentationQuestioning
         public string status;
         public string summary;
         public long completedUnixTime;
+        public float qaScore;
+        public float averageAccuracy;
+        public float averageCoverage;
+        public float averageClarity;
         public List<PresentationQaAnswer> answers = new List<PresentationQaAnswer>();
 
         public bool HasAnswers => answers != null && answers.Count > 0;
