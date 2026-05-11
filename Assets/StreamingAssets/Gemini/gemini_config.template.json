@@ -1,0 +1,8 @@
+{
+  "provider": "gemini",
+  "apiKey": "",
+  "baseUrl": "https://generativelanguage.googleapis.com/v1beta",
+  "model": "gemini-2.5-flash-lite",
+  "requestTimeoutSeconds": 45,
+  "maxQuestions": 3
+}

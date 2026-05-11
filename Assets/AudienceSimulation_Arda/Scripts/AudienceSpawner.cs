@@ -318,13 +318,17 @@ public class AudienceSpawner : MonoBehaviour
             string n = go.name.ToLower();
             if (n.Contains("seat") || n.Contains("bench") || n.Contains("chair"))
             {
-                if (n.Contains("teacher") || n.Contains("instructor") || n.Contains("maindesk")) continue;
+                if (!IsSeatCandidate(go))
+                {
+                    continue;
+                }
+
                 if (!n.Contains("leg") && !n.Contains("side") && !n.Contains("back") && !n.Contains("frame"))
                 {
                     Renderer r = go.GetComponent<Renderer>();
                     if (r != null && r.bounds.size.x > 1.2f) { 
                         Transform existing = go.transform.Find("VirtualSeats");
-                        if (existing != null) { foreach (Transform child in existing) seats.Add(child.gameObject); }
+                        if (existing != null) { foreach (Transform child in existing) { RemoveSeatMarkerCollider(child.gameObject); seats.Add(child.gameObject); } }
                         else {
                             GameObject vsRoot = new GameObject("VirtualSeats"); vsRoot.transform.parent = go.transform; vsRoot.transform.localPosition = Vector3.zero;
                             float seatWidth = 0.65f; int count = Mathf.FloorToInt(r.bounds.size.x / seatWidth);
@@ -334,7 +338,7 @@ public class AudienceSpawner : MonoBehaviour
                                 GameObject vSeat = GameObject.CreatePrimitive(PrimitiveType.Cube); vSeat.name = "Seat_Virtual_" + i; vSeat.transform.parent = vsRoot.transform;
                                 vSeat.transform.position = new Vector3(startX + i * seatWidth, r.bounds.center.y, r.bounds.center.z);
                                 vSeat.transform.rotation = go.transform.rotation; vSeat.transform.localScale = new Vector3(seatWidth, r.bounds.size.y, r.bounds.size.z);
-                                vSeat.GetComponent<Renderer>().enabled = false; seats.Add(vSeat);
+                                vSeat.GetComponent<Renderer>().enabled = false; RemoveSeatMarkerCollider(vSeat); seats.Add(vSeat);
                             }
                         }
                     }
@@ -348,6 +352,65 @@ public class AudienceSpawner : MonoBehaviour
             }
         }
         return seats;
+    }
+
+    private bool IsSeatCandidate(GameObject go)
+    {
+        if (go == null)
+        {
+            return false;
+        }
+
+        string path = BuildTransformPath(go.transform);
+        if (path.Contains("teacher") ||
+            path.Contains("instructor") ||
+            path.Contains("maindesk") ||
+            path.Contains("teacherarea") ||
+            path.Contains("teacher desk") ||
+            path.Contains("teacherdesk") ||
+            path.Contains("frontdesk") ||
+            path.Contains("front desk") ||
+            path.Contains("podium") ||
+            path.Contains("lectern") ||
+            path.Contains("whiteboard") ||
+            path.Contains("blackboard") ||
+            path.Contains("smartboard") ||
+            path.Contains("projection") ||
+            path.Contains("screen") ||
+            path.Contains("presentation") ||
+            path.Contains("desk_surface") ||
+            path.Contains("desk_body") ||
+            path.Contains("monitor"))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private string BuildTransformPath(Transform transform)
+    {
+        System.Text.StringBuilder builder = new System.Text.StringBuilder();
+        for (Transform current = transform; current != null; current = current.parent)
+        {
+            if (builder.Length > 0)
+            {
+                builder.Append('/');
+            }
+
+            builder.Append(current.name.ToLowerInvariant());
+        }
+
+        return builder.ToString();
+    }
+
+    private void RemoveSeatMarkerCollider(GameObject seatMarker)
+    {
+        Collider collider = seatMarker != null ? seatMarker.GetComponent<Collider>() : null;
+        if (collider != null)
+        {
+            Destroy(collider);
+        }
     }
 
     private List<GameObject> LoadCharacterPrefabs()

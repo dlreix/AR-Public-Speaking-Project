@@ -217,7 +217,7 @@ namespace VRPublicSpeaking.AppShell.Data
 
         public FeedbackReport DetailedReport => detailedReport;
         public PresentationQaResult QaResult => qaResult;
-        public bool HasQaResult => qaResult != null && qaResult.HasAnswers;
+        public bool HasQaResult => qaResult != null && qaResult.HasMeaningfulAnswers;
 
         public IReadOnlyList<string> Recommendations => recommendations;
 

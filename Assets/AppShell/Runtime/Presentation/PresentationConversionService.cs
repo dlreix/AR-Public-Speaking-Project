@@ -13,6 +13,7 @@ namespace VRPublicSpeaking.AppShell.Presentation
     {
         private const int ConversionTimeoutMs = 180000;
         private const int RenderTimeoutMs = 180000;
+        private const int PdfRenderMaxPixels = 1600;
         private const string OutputPrefix = "page";
         private const string PageFilePattern = "page*.png";
 
@@ -120,7 +121,7 @@ namespace VRPublicSpeaking.AppShell.Presentation
 
             string pdftoppmPath = ResolvePdfToPngPath();
             string outputPrefix = Path.Combine(outputFolder, OutputPrefix);
-            string scaledArguments = $"-png -scale-to 2048 {Quote(pdfPath)} {Quote(outputPrefix)}";
+            string scaledArguments = $"-png -scale-to {PdfRenderMaxPixels} {Quote(pdfPath)} {Quote(outputPrefix)}";
 
             if (!RunProcess(
                     pdftoppmPath,

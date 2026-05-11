@@ -24,11 +24,14 @@ namespace SpeechPipeline
     [AddComponentMenu("Speech Pipeline/Controller")]
     public sealed class SpeechPipelineController : MonoBehaviour
     {
+        public const string DefaultModelFolder = "vosk-model-en-us-0.42-gigaspeech";
+        private const string LegacySmallEnglishModelFolder = "vosk-model-small-en-us-0.15";
+
         // ── Inspector ─────────────────────────────────────────────────────────
 
         [Header("STT")]
         [Tooltip("Subfolder name inside StreamingAssets")]
-        public string ModelFolder   = "vosk-model-small-en-us-0.15";
+        public string ModelFolder   = DefaultModelFolder;
         public int    SampleRate    = 16000;
 
         [Header("Pause Detection")]
@@ -68,8 +71,13 @@ namespace SpeechPipeline
         private bool _isPaused;
 
         public bool IsReady => _state == PipelineState.Ready;
+        public bool IsLoading => _state == PipelineState.Loading && !_modelUnavailable;
         public bool IsRecording => _state == PipelineState.Recording;
         public bool IsPaused => _isPaused;
+        public bool IsUnavailable => _modelUnavailable;
+        public string CurrentPartialTranscript => _currentPartial ?? string.Empty;
+        public string LatestFinalTranscript { get; private set; } = string.Empty;
+        public float LastTranscriptUpdateTime { get; private set; }
         public event Action<string> FinalTranscriptReceived;
 
         // ── Subsystems ────────────────────────────────────────────────────────
@@ -124,8 +132,14 @@ namespace SpeechPipeline
 
         // ── Unity lifecycle ───────────────────────────────────────────────────
 
+        private void Awake()
+        {
+            UseDefaultModelWhenUnsetOrLegacy();
+        }
+
         private IEnumerator Start()
         {
+            UseDefaultModelWhenUnsetOrLegacy();
             AutoWireScoringTargets();
 
             string modelPath = ResolveModelPath();
@@ -172,6 +186,15 @@ namespace SpeechPipeline
 
             ConsoleDisplay.LoadingModel();
             _stt = new VoskSTTEngine(modelPath, SampleRate);
+        }
+
+        public void UseDefaultModelWhenUnsetOrLegacy()
+        {
+            if (string.IsNullOrWhiteSpace(ModelFolder) ||
+                string.Equals(ModelFolder.Trim(), LegacySmallEnglishModelFolder, StringComparison.OrdinalIgnoreCase))
+            {
+                ModelFolder = DefaultModelFolder;
+            }
         }
 
         private void Update()
@@ -363,6 +386,8 @@ namespace SpeechPipeline
             _sessionFillers     = 0;
             _sessionFillerList.Clear();
             _sessionTranscript.Clear();
+            LatestFinalTranscript = string.Empty;
+            LastTranscriptUpdateTime = 0f;
             _sessionWpmSum      = 0f; _sessionWpmCount   = 0;
             _sessionPitchStdSum = 0f; _sessionPitchCount = 0;
 
@@ -427,6 +452,11 @@ namespace SpeechPipeline
                     bool isNew = p.Text != _currentPartial;
                     _currentPartial = p.Text;
                     if (isNew && !string.IsNullOrWhiteSpace(p.Text))
+                    {
+                        LastTranscriptUpdateTime = Time.realtimeSinceStartup;
+                    }
+
+                    if (isNew && !string.IsNullOrWhiteSpace(p.Text))
                         ConsoleDisplay.PartialTranscript(p.Text);
                 }
                 else if (result is VoskSTTEngine.FinalResult f)
@@ -481,12 +511,41 @@ namespace SpeechPipeline
             _sessionFillers += fillers.Count;
             _sessionFillerList.AddRange(fillers);
             _sessionTranscript.Add(text);
+            LatestFinalTranscript = text;
+            LastTranscriptUpdateTime = Time.realtimeSinceStartup;
             FinalTranscriptReceived?.Invoke(text);
             if (wpm > 0f) { _sessionWpmSum      += wpm; _sessionWpmCount++;   }
             if (sd  > 0f) { _sessionPitchStdSum += sd;  _sessionPitchCount++; }
 
             ConsoleDisplay.Utterance(m);
             ResetUtteranceAccumulators();
+        }
+
+        public string GetLiveTranscriptPreview(int maxCharacters = 140)
+        {
+            string finalText = _sessionTranscript.Count > 0
+                ? string.Join(" ", _sessionTranscript)
+                : string.Empty;
+            string partialText = _currentPartial ?? string.Empty;
+            string combined = string.IsNullOrWhiteSpace(partialText)
+                ? finalText
+                : string.IsNullOrWhiteSpace(finalText)
+                    ? partialText
+                    : $"{finalText} {partialText}";
+
+            return TailCompact(combined, maxCharacters);
+        }
+
+        private static string TailCompact(string value, int maxCharacters)
+        {
+            string text = (value ?? string.Empty).Trim();
+            int safeMax = Mathf.Max(12, maxCharacters);
+            if (text.Length <= safeMax)
+            {
+                return text;
+            }
+
+            return "..." + text.Substring(text.Length - safeMax + 3).TrimStart();
         }
 
         private void AutoWireScoringTargets()

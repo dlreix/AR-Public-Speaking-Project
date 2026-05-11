@@ -136,6 +136,7 @@ namespace VRPublicSpeaking.AppShell.Integration
                 speechPipelineController = speechRoot.AddComponent<SpeechPipelineController>();
             }
 
+            speechPipelineController.UseDefaultModelWhenUnsetOrLegacy();
             speechPipelineController.SpeechAdapter = speechAdapter;
             speechPipelineController.ScoringEngine = scoringEngine;
             existingSceneFlowAdapter?.SetSpeechPipelineController(speechPipelineController);

@@ -12,10 +12,11 @@ namespace VRPublicSpeaking.AppShell.Presentation
         private static readonly string[] BoardNameFallbacks =
         {
             "PresentationBoardAnchor",
-            "Whiteboard",
-            "WB_Surface",
+            "ProjectionScreen",
             "Screen",
-            "ProjectorScreen"
+            "ProjectorScreen",
+            "Whiteboard",
+            "WB_Surface"
         };
 
         private const string SurfaceObjectName = "PresentationSurface";
@@ -75,11 +76,12 @@ namespace VRPublicSpeaking.AppShell.Presentation
                 return;
             }
 
+            DisableDecorativePresentationColliders();
             boardTransform = ResolveBoardTransform();
             if (boardTransform == null)
             {
-                Debug.LogWarning("[PresentationBoardController] No board surface found. Session will continue without presentation slides.");
-                return;
+                boardTransform = CreateRuntimeBoardAnchor();
+                Debug.LogWarning("[PresentationBoardController] No board surface found. Created a runtime presentation board.");
             }
 
             if (!BindPresentationSurface(boardTransform))
@@ -167,6 +169,58 @@ namespace VRPublicSpeaking.AppShell.Presentation
             return null;
         }
 
+        private Transform CreateRuntimeBoardAnchor()
+        {
+            GameObject anchorObject = new GameObject("PresentationBoardAnchor");
+            Transform anchor = anchorObject.transform;
+
+            Vector3 cameraPosition = viewerCamera != null ? viewerCamera.transform.position : new Vector3(0f, 1.6f, 0f);
+            Vector3 cameraForward = viewerCamera != null ? viewerCamera.transform.forward : Vector3.forward;
+            cameraForward.y = 0f;
+            if (cameraForward.sqrMagnitude < 0.0001f)
+            {
+                cameraForward = Vector3.forward;
+            }
+
+            cameraForward.Normalize();
+            anchor.position = cameraPosition + cameraForward * 3.25f;
+            anchor.position = new Vector3(anchor.position.x, Mathf.Max(1.55f, cameraPosition.y), anchor.position.z);
+            anchor.rotation = Quaternion.LookRotation(-cameraForward, Vector3.up);
+
+            GameObject boardObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            boardObject.name = "PresentationFallbackBoard";
+            boardObject.transform.SetParent(anchor, false);
+            boardObject.transform.localPosition = Vector3.zero;
+            boardObject.transform.localRotation = Quaternion.identity;
+            boardObject.transform.localScale = new Vector3(2.45f, 1.38f, 0.035f);
+
+            Collider collider = boardObject.GetComponent<Collider>();
+            if (collider != null)
+            {
+                Destroy(collider);
+            }
+
+            Renderer renderer = boardObject.GetComponent<Renderer>();
+            if (renderer != null)
+            {
+                renderer.sharedMaterial = CreateFallbackBoardMaterial();
+            }
+
+            return anchor;
+        }
+
+        private static Material CreateFallbackBoardMaterial()
+        {
+            Shader shader =
+                Shader.Find("Universal Render Pipeline/Lit") ??
+                Shader.Find("Standard");
+            return new Material(shader)
+            {
+                name = "PresentationFallbackBoard_RuntimeMaterial",
+                color = new Color(0.08f, 0.11f, 0.14f, 1f)
+            };
+        }
+
         private bool BindPresentationSurface(Transform targetBoard)
         {
             ResolveBoardPose(targetBoard, out Vector3 position, out Quaternion rotation, out boardWidth, out boardHeight);
@@ -234,7 +288,11 @@ namespace VRPublicSpeaking.AppShell.Presentation
                 ? targetBoard.up
                 : Vector3.up;
 
-            surfacePosition = bounds.center + normal * 0.025f;
+            float halfDepthAlongNormal =
+                Mathf.Abs(normal.x) * bounds.extents.x +
+                Mathf.Abs(normal.y) * bounds.extents.y +
+                Mathf.Abs(normal.z) * bounds.extents.z;
+            surfacePosition = bounds.center + normal * (halfDepthAlongNormal + 0.015f);
             surfaceRotation = Quaternion.LookRotation(normal, up);
 
             Vector3 size = bounds.size;
@@ -275,6 +333,42 @@ namespace VRPublicSpeaking.AppShell.Presentation
             }
 
             return null;
+        }
+
+        private static void DisableDecorativePresentationColliders()
+        {
+            Collider[] colliders = FindObjectsByType<Collider>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            for (int index = 0; index < colliders.Length; index++)
+            {
+                Collider candidate = colliders[index];
+                if (candidate != null && IsDecorativePresentationCollider(candidate.transform))
+                {
+                    candidate.enabled = false;
+                }
+            }
+        }
+
+        private static bool IsDecorativePresentationCollider(Transform transform)
+        {
+            for (Transform current = transform; current != null; current = current.parent)
+            {
+                string name = current.name.ToLowerInvariant();
+                if (name == "presentationsurface" ||
+                    name == "presentationboardanchor" ||
+                    name.Contains("whiteboard") ||
+                    name.Contains("projection screen") ||
+                    name.Contains("projectionscreen") ||
+                    name.Contains("projectorscreen") ||
+                    name.StartsWith("wb_") ||
+                    name.Contains("screenframe") ||
+                    name.Contains("screenbox") ||
+                    name == "screen")
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private Material CreateSurfaceMaterial()

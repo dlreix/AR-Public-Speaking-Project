@@ -15,7 +15,7 @@ namespace VRPublicSpeaking.AppShell.Integration
         [SerializeField] private PlayerController playerController;
         [SerializeField] private float moveSpeed = 2.2f;
         [SerializeField] private float gravity = -9.81f;
-        [SerializeField] private bool useGravity;
+        [SerializeField] private bool useGravity = true;
         [SerializeField] private float moveDeadzone = 0.18f;
         [SerializeField] private float turnDeadzone = 0.72f;
         [SerializeField] private float snapTurnAmount = 45f;
@@ -29,6 +29,7 @@ namespace VRPublicSpeaking.AppShell.Integration
         private MainController mainController;
         private float verticalVelocity;
         private float nextSnapTurnTime;
+        private bool competingMovementProvidersDisabled;
 
         public static VrControllerLocomotion EnsureForScene(Camera camera)
         {
@@ -90,6 +91,8 @@ namespace VRPublicSpeaking.AppShell.Integration
                 xrOrigin = targetCamera.GetComponentInParent<XROrigin>(true);
             }
 
+            DisableCompetingMovementProviders();
+
             if (playerController == null && targetCamera != null)
             {
                 playerController = targetCamera.GetComponentInParent<PlayerController>(true);
@@ -145,6 +148,34 @@ namespace VRPublicSpeaking.AppShell.Integration
             characterController.height = height;
             characterController.radius = radius;
             characterController.center = new Vector3(0f, height * 0.5f, 0f);
+        }
+
+        private void DisableCompetingMovementProviders()
+        {
+            if (competingMovementProvidersDisabled)
+            {
+                return;
+            }
+
+            Transform root = xrOrigin != null ? xrOrigin.transform : transform;
+            Behaviour[] behaviours = root.GetComponentsInChildren<Behaviour>(true);
+            for (int index = 0; index < behaviours.Length; index++)
+            {
+                Behaviour behaviour = behaviours[index];
+                if (behaviour == null || behaviour == this)
+                {
+                    continue;
+                }
+
+                string typeName = behaviour.GetType().FullName ?? string.Empty;
+                if (typeName.Contains("ContinuousMoveProvider") ||
+                    typeName.Contains("DynamicMoveProvider"))
+                {
+                    behaviour.enabled = false;
+                }
+            }
+
+            competingMovementProvidersDisabled = true;
         }
 
         private bool ShouldProcessInput()

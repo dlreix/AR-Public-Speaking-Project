@@ -29,9 +29,9 @@ namespace VRPublicSpeaking.AppShell.PresentationQuestioning
             }
 
             OpenAiRuntimeConfig config = OpenAiRuntimeConfig.Load();
-            if (!config.HasApiKey)
+            if (config.TryGetConfigurationError(out string configError))
             {
-                completed?.Invoke(false, "Missing API key", null);
+                completed?.Invoke(false, configError, null);
                 yield break;
             }
 

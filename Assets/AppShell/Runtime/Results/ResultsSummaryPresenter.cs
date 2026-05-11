@@ -183,7 +183,7 @@ namespace VRPublicSpeaking.AppShell.Results
 
         private static void AppendQaFeedback(StringBuilder builder, PresentationQaResult qaResult)
         {
-            if (qaResult == null || !qaResult.HasAnswers)
+            if (qaResult == null || !qaResult.HasMeaningfulAnswers)
             {
                 return;
             }

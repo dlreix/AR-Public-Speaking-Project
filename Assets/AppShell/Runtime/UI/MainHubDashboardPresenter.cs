@@ -612,7 +612,7 @@ namespace VRPublicSpeaking.AppShell.UI
 
         private void RefreshOverview(SessionData latestSession, SessionResultSummary summary)
         {
-            bool hasScore = latestSession != null || summary.HasOverallScore;
+            bool hasScore = latestSession != null ? HasSessionOverallScore(latestSession) : summary.HasOverallScore;
             float totalScore = latestSession != null ? latestSession.overallScore : summary.TotalScore;
             string band = latestSession != null && latestSession.detailedReport != null
                 ? latestSession.detailedReport.performanceBand
@@ -650,10 +650,10 @@ namespace VRPublicSpeaking.AppShell.UI
 
         private void RefreshPerformance(SessionData latestSession, SessionResultSummary summary)
         {
-            SetMetricRow(performanceRows, 0, "Overall", latestSession != null ? latestSession.overallScore : summary.TotalScore, latestSession != null || summary.HasOverallScore);
-            SetMetricRow(performanceRows, 1, "Eye Contact", latestSession != null ? latestSession.eyeContact : summary.EyeContactScore, latestSession != null || summary.HasEyeContactScore);
-            SetMetricRow(performanceRows, 2, "Speech Pace", latestSession != null ? latestSession.pace : summary.SpeechPaceScore, latestSession != null || summary.HasSpeechPaceScore);
-            SetMetricRow(performanceRows, 3, "Posture", latestSession != null ? latestSession.posture : summary.PostureScore, latestSession != null || summary.HasPostureScore);
+            SetMetricRow(performanceRows, 0, "Overall", latestSession != null ? latestSession.overallScore : summary.TotalScore, latestSession != null ? HasSessionOverallScore(latestSession) : summary.HasOverallScore);
+            SetMetricRow(performanceRows, 1, "Eye Contact", latestSession != null ? latestSession.eyeContact : summary.EyeContactScore, latestSession != null ? HasSessionEyeContactScore(latestSession) : summary.HasEyeContactScore);
+            SetMetricRow(performanceRows, 2, "Speech Pace", latestSession != null ? latestSession.pace : summary.SpeechPaceScore, latestSession != null ? HasSessionSpeechPaceScore(latestSession) : summary.HasSpeechPaceScore);
+            SetMetricRow(performanceRows, 3, "Posture", latestSession != null ? latestSession.posture : summary.PostureScore, latestSession != null ? HasSessionPostureScore(latestSession) : summary.HasPostureScore);
         }
 
         private void RefreshDetails(FeedbackReport report, SessionResultSummary summary, SessionData latestSession)
@@ -700,7 +700,7 @@ namespace VRPublicSpeaking.AppShell.UI
                 if (dataIndex >= 0)
                 {
                     SessionData session = sessions[dataIndex];
-                    SetText(historyScoreLabels[index], session.overallScore.ToString("0"));
+                    SetText(historyScoreLabels[index], HasSessionOverallScore(session) ? session.overallScore.ToString("0") : "--");
                     SetText(historyDateLabels[index], session.date);
                 }
                 else
@@ -713,7 +713,7 @@ namespace VRPublicSpeaking.AppShell.UI
 
         private void RefreshChart()
         {
-            List<SessionData> sessions = GetSessions();
+            List<SessionData> sessions = GetScoredSessions();
             int count = Mathf.Min(sessions.Count, chartLabels.Count);
             int firstIndex = Mathf.Max(0, sessions.Count - count);
 
@@ -845,6 +845,59 @@ namespace VRPublicSpeaking.AppShell.UI
             return DataManager.Instance.history.allSessions;
         }
 
+        private static List<SessionData> GetScoredSessions()
+        {
+            List<SessionData> sessions = GetSessions();
+            var scoredSessions = new List<SessionData>();
+            for (int index = 0; index < sessions.Count; index++)
+            {
+                SessionData session = sessions[index];
+                if (HasSessionOverallScore(session))
+                {
+                    scoredSessions.Add(session);
+                }
+            }
+
+            return scoredSessions;
+        }
+
+        private static bool HasSessionOverallScore(SessionData session)
+        {
+            if (session == null)
+            {
+                return false;
+            }
+
+            if (session.hasOverallScore)
+            {
+                return true;
+            }
+
+            bool looksLikeQaOnly =
+                session.qaResult != null &&
+                session.qaResult.HasMeaningfulAnswers &&
+                Mathf.Abs(session.overallScore) < 0.01f &&
+                (session.detailedReport == null ||
+                    session.detailedReport.items == null ||
+                    session.detailedReport.items.Count == 0);
+            return !looksLikeQaOnly && (session.detailedReport != null || Mathf.Abs(session.overallScore) > 0.01f);
+        }
+
+        private static bool HasSessionEyeContactScore(SessionData session)
+        {
+            return session != null && (session.hasEyeContactScore || (HasSessionOverallScore(session) && Mathf.Abs(session.eyeContact) > 0.01f));
+        }
+
+        private static bool HasSessionSpeechPaceScore(SessionData session)
+        {
+            return session != null && (session.hasSpeechPaceScore || (HasSessionOverallScore(session) && Mathf.Abs(session.pace) > 0.01f));
+        }
+
+        private static bool HasSessionPostureScore(SessionData session)
+        {
+            return session != null && (session.hasPostureScore || (HasSessionOverallScore(session) && Mathf.Abs(session.posture) > 0.01f));
+        }
+
         private static string GetMetricValue(FeedbackReport report, string metricName)
         {
             if (report == null || report.items == null)
@@ -954,7 +1007,7 @@ namespace VRPublicSpeaking.AppShell.UI
 
         private static string BuildQaNotes(PresentationQaResult qaResult)
         {
-            if (qaResult == null || !qaResult.HasAnswers)
+            if (qaResult == null || !qaResult.HasMeaningfulAnswers)
             {
                 return string.Empty;
             }

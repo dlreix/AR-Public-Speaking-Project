@@ -182,7 +182,7 @@ namespace VRPublicSpeaking.AppShell.Integration
                     speechPipelineController,
                     result => qaResult = result);
 
-                if (qaResult != null && qaResult.HasAnswers)
+                if (qaResult != null && qaResult.HasMeaningfulAnswers)
                 {
                     summary.SetQaResult(qaResult);
                 }
@@ -410,6 +410,7 @@ namespace VRPublicSpeaking.AppShell.Integration
                 controller = speechRoot.AddComponent<SpeechPipelineController>();
             }
 
+            controller.UseDefaultModelWhenUnsetOrLegacy();
             controller.SpeechAdapter = speechAdapter;
             controller.ScoringEngine = scoringEngine;
             Debug.Log("[ExistingSceneFlowAdapter] Speech pipeline runtime binding is ready.");

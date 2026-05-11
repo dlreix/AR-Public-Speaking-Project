@@ -56,6 +56,55 @@ namespace VRPublicSpeaking.AppShell.PresentationQuestioning
         public List<PresentationQaAnswer> answers = new List<PresentationQaAnswer>();
 
         public bool HasAnswers => answers != null && answers.Count > 0;
+        public bool HasCapturedAnswers
+        {
+            get
+            {
+                if (answers == null)
+                {
+                    return false;
+                }
+
+                for (int index = 0; index < answers.Count; index++)
+                {
+                    PresentationQaAnswer answer = answers[index];
+                    if (answer != null &&
+                        !answer.skipped &&
+                        !string.IsNullOrWhiteSpace(answer.answerTranscript))
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+        }
+
+        public bool HasEvaluatedAnswers
+        {
+            get
+            {
+                if (answers == null)
+                {
+                    return false;
+                }
+
+                for (int index = 0; index < answers.Count; index++)
+                {
+                    PresentationAnswerFeedback feedback = answers[index]?.feedback;
+                    if (feedback != null &&
+                        string.Equals(feedback.status, "Evaluated", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+        }
+
+        public bool HasMeaningfulAnswers => HasCapturedAnswers || HasEvaluatedAnswers;
+        public bool AllAnswersSkipped => HasAnswers && !HasMeaningfulAnswers;
     }
 
     [Serializable]

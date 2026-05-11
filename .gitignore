@@ -34,6 +34,10 @@ sysinfo.txt
 Assets/StreamingAssets/vosk-model*
 !Assets/StreamingAssets/vosk-model-small*
 
-# Local OpenAI credentials
+# Local LLM credentials
+Assets/StreamingAssets/LLM/llm_config.local.json
+Assets/StreamingAssets/LLM/llm_config.local.json.meta
+Assets/StreamingAssets/Gemini/gemini_config.local.json
+Assets/StreamingAssets/Gemini/gemini_config.local.json.meta
 Assets/StreamingAssets/OpenAI/openai_config.local.json
 Assets/StreamingAssets/OpenAI/openai_config.local.json.meta

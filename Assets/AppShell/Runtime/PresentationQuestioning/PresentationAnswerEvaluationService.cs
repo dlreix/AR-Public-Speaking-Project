@@ -34,7 +34,11 @@ namespace VRPublicSpeaking.AppShell.PresentationQuestioning
 
             if (!OpenAiRuntimeConfig.HasUsableConfiguration())
             {
-                completed?.Invoke(BuildUnavailableFeedback("Evaluation unavailable: missing API key."));
+                OpenAiRuntimeConfig config = OpenAiRuntimeConfig.Load();
+                string message = config.TryGetConfigurationError(out string configError)
+                    ? $"Answer captured, but {configError}"
+                    : "Answer captured, but evaluation is unavailable.";
+                completed?.Invoke(BuildUnavailableFeedback(message));
                 yield break;
             }
 
@@ -55,7 +59,9 @@ namespace VRPublicSpeaking.AppShell.PresentationQuestioning
             if (!requestCompleted || !success)
             {
                 completed?.Invoke(BuildUnavailableFeedback(
-                    string.IsNullOrWhiteSpace(responseText) ? "Evaluation unavailable." : responseText));
+                    string.IsNullOrWhiteSpace(responseText)
+                        ? "Answer captured, but evaluation is unavailable."
+                        : responseText));
                 yield break;
             }
 

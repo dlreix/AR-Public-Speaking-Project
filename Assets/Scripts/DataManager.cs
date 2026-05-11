@@ -25,6 +25,10 @@ public class SessionData
     public float headMovementPercent;
     public float headSpeedEventsPerMinute;
     public float crossedArmsPercent;
+    public bool hasOverallScore;
+    public bool hasEyeContactScore;
+    public bool hasSpeechPaceScore;
+    public bool hasPostureScore;
     public bool hasWpm;
     public bool hasFillerWordsPerMinute;
     public bool hasAveragePauseDuration;
@@ -108,6 +112,10 @@ public class DataManager : MonoBehaviour
             eyeContact = report.eyeScore,
             pace = report.speechScore,
             posture = report.postureScore,
+            hasOverallScore = true,
+            hasEyeContactScore = true,
+            hasSpeechPaceScore = true,
+            hasPostureScore = true,
             detailedReport = CloneFeedbackReport(report)
         };
 
@@ -133,9 +141,14 @@ public class DataManager : MonoBehaviour
             return false;
         }
 
+        bool hasScoredMetrics =
+            summary.HasOverallScore ||
+            summary.HasEyeContactScore ||
+            summary.HasSpeechPaceScore ||
+            summary.HasPostureScore;
         FeedbackReport report = summary.DetailedReport != null
             ? CloneFeedbackReport(summary.DetailedReport)
-            : BuildFeedbackReport(summary);
+            : hasScoredMetrics ? BuildFeedbackReport(summary) : null;
         long timestamp = summary.SessionTimestamp > 0
             ? summary.SessionTimestamp
             : DateTimeOffset.UtcNow.ToUnixTimeSeconds();
@@ -145,10 +158,10 @@ public class DataManager : MonoBehaviour
             sessionId = string.IsNullOrWhiteSpace(summary.SessionId) ? Guid.NewGuid().ToString("N") : summary.SessionId,
             date = System.DateTime.Now.ToString("MMM dd | HH:mm", CultureInfo.InvariantCulture),
             sessionTimestamp = timestamp,
-            overallScore = summary.HasOverallScore ? summary.TotalScore : report.totalScore,
-            eyeContact = summary.HasEyeContactScore ? summary.EyeContactScore : report.eyeScore,
-            pace = summary.HasSpeechPaceScore ? summary.SpeechPaceScore : report.speechScore,
-            posture = summary.HasPostureScore ? summary.PostureScore : report.postureScore,
+            overallScore = summary.HasOverallScore ? summary.TotalScore : report != null ? report.totalScore : 0f,
+            eyeContact = summary.HasEyeContactScore ? summary.EyeContactScore : report != null ? report.eyeScore : 0f,
+            pace = summary.HasSpeechPaceScore ? summary.SpeechPaceScore : report != null ? report.speechScore : 0f,
+            posture = summary.HasPostureScore ? summary.PostureScore : report != null ? report.postureScore : 0f,
             durationSeconds = summary.DurationSeconds,
             fillerWordCount = summary.FillerWordCount,
             wpm = summary.Wpm,
@@ -158,6 +171,10 @@ public class DataManager : MonoBehaviour
             headMovementPercent = summary.HeadMovementPercent,
             headSpeedEventsPerMinute = summary.HeadSpeedEventsPerMinute,
             crossedArmsPercent = summary.CrossedArmsPercent,
+            hasOverallScore = summary.HasOverallScore,
+            hasEyeContactScore = summary.HasEyeContactScore,
+            hasSpeechPaceScore = summary.HasSpeechPaceScore,
+            hasPostureScore = summary.HasPostureScore,
             hasWpm = summary.HasWpm,
             hasFillerWordsPerMinute = summary.HasFillerWordsPerMinute,
             hasAveragePauseDuration = summary.HasAveragePauseDuration,

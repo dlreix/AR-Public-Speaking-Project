@@ -65,6 +65,22 @@ namespace VRPublicSpeaking.AppShell.Presentation
 
             try
             {
+                if (TryLoadCachedImport(
+                        sourcePath,
+                        extension,
+                        sourceHash,
+                        deckId,
+                        displayName,
+                        importFolder,
+                        importedFilePath,
+                        manifestPath,
+                        out deck,
+                        out statusMessage))
+                {
+                    Debug.Log($"[PresentationImportService] {statusMessage} Folder: {importFolder}");
+                    return true;
+                }
+
                 if (Directory.Exists(importFolder))
                 {
                     Directory.Delete(importFolder, true);
@@ -107,9 +123,11 @@ namespace VRPublicSpeaking.AppShell.Presentation
                         out string extractionMessage))
                 {
                     deck.SlideTextPath = slideTextPath;
-                    deck.QuestionStatus = PresentationQuestioning.OpenAiRuntimeConfig.HasUsableConfiguration()
-                        ? "Ready to generate"
-                        : "Missing API key";
+                    PresentationQuestioning.OpenAiRuntimeConfig config =
+                        PresentationQuestioning.OpenAiRuntimeConfig.Load();
+                    deck.QuestionStatus = config.TryGetConfigurationError(out string configError)
+                        ? configError
+                        : "Ready to generate";
                 }
                 else
                 {
@@ -153,6 +171,111 @@ namespace VRPublicSpeaking.AppShell.Presentation
             File.WriteAllText(deck.ManifestPath, JsonUtility.ToJson(manifest, true));
         }
 
+        private static bool TryLoadCachedImport(
+            string sourcePath,
+            string extension,
+            string sourceHash,
+            string deckId,
+            string displayName,
+            string importFolder,
+            string importedFilePath,
+            string manifestPath,
+            out PresentationDeckReference deck,
+            out string statusMessage)
+        {
+            deck = null;
+            statusMessage = string.Empty;
+
+            if (!Directory.Exists(importFolder) || !File.Exists(importedFilePath))
+            {
+                return false;
+            }
+
+            int pageCount = CountGeneratedPages(importFolder);
+            if (pageCount <= 0)
+            {
+                return false;
+            }
+
+            if (File.Exists(manifestPath))
+            {
+                try
+                {
+                    PresentationDeckManifest manifest =
+                        JsonUtility.FromJson<PresentationDeckManifest>(File.ReadAllText(manifestPath));
+                    if (manifest == null ||
+                        !string.Equals(manifest.sourceHash, sourceHash, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return false;
+                    }
+
+                    if (manifest.pageCount > 0)
+                    {
+                        pageCount = Mathf.Min(pageCount, manifest.pageCount);
+                    }
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogWarning($"[PresentationImportService] Cached manifest could not be read: {exception.Message}");
+                    return false;
+                }
+            }
+
+            string slideTextPath = Path.Combine(importFolder, "slide_text.json");
+            string questionSetPath = Path.Combine(importFolder, "question_set.json");
+            deck = new PresentationDeckReference
+            {
+                DeckId = deckId,
+                DisplayName = displayName,
+                SourceExtension = extension,
+                SourceHash = sourceHash,
+                SourceFilePath = sourcePath,
+                ImportedFilePath = importedFilePath,
+                ImportFolderPath = importFolder,
+                ManifestPath = manifestPath,
+                SlideTextPath = File.Exists(slideTextPath) ? slideTextPath : string.Empty,
+                QuestionSetPath = File.Exists(questionSetPath) ? questionSetPath : string.Empty,
+                PageCount = pageCount,
+                IsReady = true,
+                ErrorMessage = string.Empty
+            };
+
+            deck.QuestionStatus = ResolveCachedQuestionStatus(deck);
+            statusMessage = $"Using cached import for {displayName} ({pageCount} slide{(pageCount == 1 ? string.Empty : "s")}).";
+            return true;
+        }
+
+        private static int CountGeneratedPages(string importFolder)
+        {
+            return Directory.Exists(importFolder)
+                ? Directory.GetFiles(importFolder, "page_*.png", SearchOption.TopDirectoryOnly).Length
+                : 0;
+        }
+
+        private static string ResolveCachedQuestionStatus(PresentationDeckReference deck)
+        {
+            if (deck == null)
+            {
+                return "Not generated";
+            }
+
+            if (deck.HasQuestionSet)
+            {
+                return "Generated (cached)";
+            }
+
+            if (string.IsNullOrWhiteSpace(deck.SlideTextPath))
+            {
+                return "No readable slide text found";
+            }
+
+            PresentationQuestioning.OpenAiRuntimeConfig config =
+                PresentationQuestioning.OpenAiRuntimeConfig.Load();
+            return config.TryGetConfigurationError(out string configError)
+                ? configError
+                : "Ready to generate";
+        }
+
         private static string OpenPresentationFilePicker()
         {
 #if UNITY_EDITOR
@@ -179,7 +302,7 @@ namespace VRPublicSpeaking.AppShell.Presentation
             string hashPrefix = string.IsNullOrWhiteSpace(sourceHash)
                 ? Guid.NewGuid().ToString("N").Substring(0, 10)
                 : sourceHash.Substring(0, Math.Min(10, sourceHash.Length));
-            return $"{DateTime.UtcNow:yyyyMMddHHmmss}_{hashPrefix}";
+            return $"deck_{hashPrefix}";
         }
 
         private static void TryDeleteImportFolder(string importFolder)

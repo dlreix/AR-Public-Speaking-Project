@@ -23,8 +23,10 @@ namespace VRPublicSpeaking.AppShell.UI
         private RectTransform presentationControlsRoot;
         private TMP_Text presentationStatusLabel;
         private Button uploadPresentationButton;
+        private Button generateQuestionsButton;
         private Button removePresentationButton;
         private bool importInProgress;
+        private bool questionGenerationInProgress;
 
         private void OnEnable()
         {
@@ -60,6 +62,7 @@ namespace VRPublicSpeaking.AppShell.UI
                 $"Difficulty: {config.DifficultyLevel}  |  Audience: {config.AudiencePreset}\n" +
                 $"Feedback: {config.FeedbackLevel}\n" +
                 $"Systems: {config.GetEnabledSystemsSummary()}\n" +
+                $"Mic: {BuildMicrophoneStatus(config)}\n" +
                 presentationLine;
             RefreshEnvironmentPreview(environmentDefinition);
             RefreshPresentationControls(config);
@@ -76,9 +79,9 @@ namespace VRPublicSpeaking.AppShell.UI
 
         public void StartSession()
         {
-            if (importInProgress)
+            if (IsPresentationWorkInProgress)
             {
-                SetWarning("Presentation conversion is still running. Start will be available when it finishes.");
+                SetWarning("Presentation processing is still running. Start will be available when it finishes.");
                 return;
             }
 
@@ -127,6 +130,11 @@ namespace VRPublicSpeaking.AppShell.UI
                 warnings.Add("Eye Tracking is enabled while Gaze Scoring is off. Tracking can still run, but gaze-based scoring will not contribute to the score.");
             }
 
+            if (config.VoiceAnalysisEnabled && !HasAnyMicrophone())
+            {
+                warnings.Add("Voice Analysis is enabled, but no microphone device was detected. Q&A can still use typed answers.");
+            }
+
             if (warnings.Count == 0)
             {
                 return "No launch blockers detected. The current session setup is ready to start.";
@@ -144,7 +152,7 @@ namespace VRPublicSpeaking.AppShell.UI
 
             Transform parent = summaryLabel.transform.parent != null ? summaryLabel.transform.parent : transform;
 
-            GameObject rootObject = new GameObject("PresentationControls", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(LayoutElement));
+            GameObject rootObject = new GameObject("PresentationControls", typeof(RectTransform), typeof(Image), typeof(Outline), typeof(VerticalLayoutGroup), typeof(LayoutElement));
             rootObject.transform.SetParent(parent, false);
             rootObject.transform.SetSiblingIndex(summaryLabel.transform.GetSiblingIndex() + 1);
             presentationControlsRoot = rootObject.GetComponent<RectTransform>();
@@ -152,16 +160,24 @@ namespace VRPublicSpeaking.AppShell.UI
             presentationControlsRoot.anchorMax = new Vector2(1f, 0f);
             presentationControlsRoot.pivot = new Vector2(0.5f, 0f);
             presentationControlsRoot.anchoredPosition = new Vector2(0f, 18f);
-            presentationControlsRoot.sizeDelta = new Vector2(0f, 92f);
+            presentationControlsRoot.sizeDelta = new Vector2(0f, 150f);
+
+            Image rootBackground = rootObject.GetComponent<Image>();
+            rootBackground.color = new Color(0.03f, 0.10f, 0.15f, 0.88f);
+            rootBackground.raycastTarget = false;
+
+            Outline rootOutline = rootObject.GetComponent<Outline>();
+            rootOutline.effectColor = new Color(0.22f, 0.70f, 0.95f, 0.28f);
+            rootOutline.effectDistance = new Vector2(1f, -1f);
 
             LayoutElement rootLayout = rootObject.GetComponent<LayoutElement>();
-            rootLayout.minHeight = 116f;
-            rootLayout.preferredHeight = 126f;
+            rootLayout.minHeight = 168f;
+            rootLayout.preferredHeight = 178f;
             rootLayout.flexibleWidth = 1f;
 
             VerticalLayoutGroup verticalLayout = rootObject.GetComponent<VerticalLayoutGroup>();
-            verticalLayout.spacing = 8f;
-            verticalLayout.padding = new RectOffset(0, 0, 0, 0);
+            verticalLayout.spacing = 10f;
+            verticalLayout.padding = new RectOffset(18, 18, 14, 16);
             verticalLayout.childControlWidth = true;
             verticalLayout.childControlHeight = true;
             verticalLayout.childForceExpandWidth = true;
@@ -178,10 +194,13 @@ namespace VRPublicSpeaking.AppShell.UI
             rowLayout.childForceExpandWidth = true;
             rowLayout.childForceExpandHeight = false;
 
-            uploadPresentationButton = CreatePresentationButton(rowObject.transform, "Upload Presentation");
+            uploadPresentationButton = CreatePresentationButton(rowObject.transform, "Upload Slides");
             uploadPresentationButton.onClick.AddListener(HandleUploadPresentation);
 
-            removePresentationButton = CreatePresentationButton(rowObject.transform, "Remove");
+            generateQuestionsButton = CreatePresentationButton(rowObject.transform, "Generate Q&A");
+            generateQuestionsButton.onClick.AddListener(HandleGenerateQuestions);
+
+            removePresentationButton = CreatePresentationButton(rowObject.transform, "Remove Deck");
             removePresentationButton.onClick.AddListener(HandleRemovePresentation);
         }
 
@@ -190,9 +209,12 @@ namespace VRPublicSpeaking.AppShell.UI
             GameObject labelObject = new GameObject("PresentationStatusLabel", typeof(RectTransform), typeof(TextMeshProUGUI), typeof(LayoutElement));
             labelObject.transform.SetParent(parent, false);
             TMP_Text label = labelObject.GetComponent<TMP_Text>();
-            label.text = "Presentation: None";
+            label.text = "Slides: Not selected";
             label.color = new Color(0.85f, 0.93f, 1f, 1f);
-            label.fontSize = 20f;
+            label.fontSize = 21f;
+            label.enableAutoSizing = true;
+            label.fontSizeMax = 21f;
+            label.fontSizeMin = 15f;
             label.textWrappingMode = TextWrappingModes.Normal;
             label.alignment = TextAlignmentOptions.Left;
             if (summaryLabel != null && summaryLabel.font != null)
@@ -201,8 +223,8 @@ namespace VRPublicSpeaking.AppShell.UI
             }
 
             LayoutElement layoutElement = labelObject.GetComponent<LayoutElement>();
-            layoutElement.minHeight = 48f;
-            layoutElement.preferredHeight = 58f;
+            layoutElement.minHeight = 70f;
+            layoutElement.preferredHeight = 76f;
             return label;
         }
 
@@ -215,6 +237,7 @@ namespace VRPublicSpeaking.AppShell.UI
             background.color = new Color(0.02f, 0.09f, 0.13f, 0.95f);
 
             Button button = buttonObject.GetComponent<Button>();
+            button.targetGraphic = background;
             ColorBlock colors = button.colors;
             colors.normalColor = background.color;
             colors.highlightedColor = new Color(0.04f, 0.20f, 0.28f, 1f);
@@ -224,8 +247,8 @@ namespace VRPublicSpeaking.AppShell.UI
             button.colors = colors;
 
             LayoutElement layout = buttonObject.GetComponent<LayoutElement>();
-            layout.minHeight = 42f;
-            layout.preferredHeight = 48f;
+            layout.minHeight = 52f;
+            layout.preferredHeight = 56f;
             layout.flexibleWidth = 1f;
 
             GameObject textObject = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
@@ -240,6 +263,9 @@ namespace VRPublicSpeaking.AppShell.UI
             text.text = labelText;
             text.color = Color.white;
             text.fontSize = 20f;
+            text.enableAutoSizing = true;
+            text.fontSizeMax = 20f;
+            text.fontSizeMin = 14f;
             text.fontStyle = FontStyles.Bold;
             text.alignment = TextAlignmentOptions.Center;
             text.textWrappingMode = TextWrappingModes.NoWrap;
@@ -261,7 +287,14 @@ namespace VRPublicSpeaking.AppShell.UI
             PresentationDeckReference selectedDeck = config != null ? config.SelectedPresentation : null;
             if (importInProgress)
             {
-                presentationStatusLabel.text = "Presentation: converting selected file...";
+                presentationStatusLabel.text = "Slides\nConverting selected file...";
+            }
+            else if (questionGenerationInProgress)
+            {
+                string deckName = selectedDeck != null && !string.IsNullOrWhiteSpace(selectedDeck.DisplayName)
+                    ? selectedDeck.DisplayName
+                    : "selected presentation";
+                presentationStatusLabel.text = $"Slides ready: {deckName}\nQuestions: Generating";
             }
             else if (config != null && config.HasPresentation && selectedDeck != null)
             {
@@ -269,30 +302,41 @@ namespace VRPublicSpeaking.AppShell.UI
                     ? selectedDeck.HasQuestionSet ? "Generated" : "Not generated"
                     : selectedDeck.QuestionStatus;
                 presentationStatusLabel.text =
-                    $"Presentation ready: {selectedDeck.DisplayName} ({selectedDeck.PageCount} slide{(selectedDeck.PageCount == 1 ? string.Empty : "s")})\n" +
+                    $"Slides ready: {selectedDeck.DisplayName} ({selectedDeck.PageCount} slide{(selectedDeck.PageCount == 1 ? string.Empty : "s")})\n" +
                     $"Questions: {questionStatus}";
             }
             else
             {
-                presentationStatusLabel.text = "Presentation: None";
+                presentationStatusLabel.text = "Slides\nNo file selected";
             }
 
             if (uploadPresentationButton != null)
             {
-                uploadPresentationButton.interactable = !importInProgress;
+                uploadPresentationButton.interactable = !IsPresentationWorkInProgress;
+            }
+
+            if (generateQuestionsButton != null)
+            {
+                bool hasDeck = config != null && config.HasPresentation && selectedDeck != null;
+                bool hasSlideText = hasDeck && !string.IsNullOrWhiteSpace(selectedDeck.SlideTextPath);
+                bool hasKey = OpenAiRuntimeConfig.HasUsableConfiguration();
+                generateQuestionsButton.interactable = !IsPresentationWorkInProgress && hasSlideText && hasKey;
+                SetButtonLabel(
+                    generateQuestionsButton,
+                    hasDeck && selectedDeck.HasQuestionSet ? "Retry Q&A" : "Generate Q&A");
             }
 
             if (removePresentationButton != null)
             {
-                removePresentationButton.interactable = !importInProgress && config != null && config.HasPresentation;
+                removePresentationButton.interactable = !IsPresentationWorkInProgress && config != null && config.HasPresentation;
             }
 
-            SetLaunchButtonsInteractable(!importInProgress);
+            SetLaunchButtonsInteractable(!IsPresentationWorkInProgress);
         }
 
         private void HandleUploadPresentation()
         {
-            if (importInProgress)
+            if (IsPresentationWorkInProgress)
             {
                 return;
             }
@@ -322,50 +366,11 @@ namespace VRPublicSpeaking.AppShell.UI
                 config.SetPresentation(deck);
                 runtimeState?.ApplySessionConfig(config);
 
-                if (!string.IsNullOrWhiteSpace(deck.SlideTextPath) &&
-                    PresentationTextExtractionService.LoadSlideText(deck) != null)
-                {
-                    if (OpenAiRuntimeConfig.HasUsableConfiguration())
-                    {
-                        deck.QuestionStatus = "Generating";
-                        config.SetPresentation(deck);
-                        runtimeState?.ApplySessionConfig(config);
-                        RefreshSummary();
-                        SetWarning("Presentation imported. Generating audience questions...");
-
-                        bool questionGenerationCompleted = false;
-                        bool questionGenerationSucceeded = false;
-                        string questionMessage = string.Empty;
-                        yield return PresentationQuestionGenerationService.GenerateQuestionSet(
-                            deck,
-                            (ok, message, _) =>
-                            {
-                                questionGenerationSucceeded = ok;
-                                questionMessage = message;
-                                questionGenerationCompleted = true;
-                            });
-
-                        if (questionGenerationCompleted)
-                        {
-                            deck.QuestionStatus = questionGenerationSucceeded
-                                ? "Generated"
-                                : string.IsNullOrWhiteSpace(questionMessage) ? "Failed" : questionMessage;
-                            config.SetPresentation(deck);
-                            runtimeState?.ApplySessionConfig(config);
-
-                            if (!string.IsNullOrWhiteSpace(questionMessage))
-                            {
-                                statusMessage = $"{statusMessage} {questionMessage}".Trim();
-                            }
-                        }
-                    }
-                    else
-                    {
-                        deck.QuestionStatus = "Missing API key";
-                        config.SetPresentation(deck);
-                        runtimeState?.ApplySessionConfig(config);
-                    }
-                }
+                yield return GenerateQuestionsForDeckRoutine(
+                    deck,
+                    config,
+                    "Presentation imported. Generating audience questions...",
+                    message => statusMessage = $"{statusMessage} {message}".Trim());
             }
 
             importInProgress = false;
@@ -374,6 +379,112 @@ namespace VRPublicSpeaking.AppShell.UI
             if (!string.IsNullOrWhiteSpace(statusMessage) && !statusMessage.Contains("canceled"))
             {
                 SetWarning(statusMessage);
+            }
+        }
+
+        private void HandleGenerateQuestions()
+        {
+            if (IsPresentationWorkInProgress)
+            {
+                return;
+            }
+
+            StartCoroutine(GenerateQuestionsForCurrentDeckRoutine());
+        }
+
+        private IEnumerator GenerateQuestionsForCurrentDeckRoutine()
+        {
+            if (runtimeState == null)
+            {
+                runtimeState = AppRuntimeState.GetOrCreate();
+            }
+
+            SessionConfig config = runtimeState != null ? runtimeState.GetSessionConfigCopy() : new SessionConfig();
+            PresentationDeckReference deck = config.SelectedPresentation;
+            if (config == null || !config.HasPresentation || deck == null)
+            {
+                SetWarning("Select or upload a presentation before generating audience questions.");
+                RefreshPresentationControls(config);
+                yield break;
+            }
+
+            yield return GenerateQuestionsForDeckRoutine(
+                deck,
+                config,
+                "Generating audience questions...",
+                message => SetWarning(message));
+
+            RefreshSummary();
+        }
+
+        private IEnumerator GenerateQuestionsForDeckRoutine(
+            PresentationDeckReference deck,
+            SessionConfig config,
+            string progressMessage,
+            System.Action<string> completedMessage)
+        {
+            if (deck == null || config == null)
+            {
+                completedMessage?.Invoke("No presentation deck selected.");
+                yield break;
+            }
+
+            if (string.IsNullOrWhiteSpace(deck.SlideTextPath) ||
+                PresentationTextExtractionService.LoadSlideText(deck) == null)
+            {
+                deck.QuestionStatus = "No readable slide text found";
+                config.SetPresentation(deck);
+                runtimeState?.ApplySessionConfig(config);
+                completedMessage?.Invoke("No readable slide text found.");
+                yield break;
+            }
+
+            OpenAiRuntimeConfig llmConfig = OpenAiRuntimeConfig.Load();
+            if (!llmConfig.TryGetConfigurationError(out string configError))
+            {
+                deck.QuestionStatus = "Generating";
+                config.SetPresentation(deck);
+                runtimeState?.ApplySessionConfig(config);
+                questionGenerationInProgress = true;
+                RefreshSummary();
+                SetWarning(progressMessage);
+
+                bool questionGenerationCompleted = false;
+                bool questionGenerationSucceeded = false;
+                string questionMessage = string.Empty;
+                yield return PresentationQuestionGenerationService.GenerateQuestionSet(
+                    deck,
+                    (ok, message, _) =>
+                    {
+                        questionGenerationSucceeded = ok;
+                        questionMessage = message;
+                        questionGenerationCompleted = true;
+                    });
+
+                questionGenerationInProgress = false;
+                if (questionGenerationCompleted)
+                {
+                    deck.QuestionStatus = questionGenerationSucceeded
+                        ? "Generated"
+                        : string.IsNullOrWhiteSpace(questionMessage) ? "Failed" : questionMessage;
+                    config.SetPresentation(deck);
+                    runtimeState?.ApplySessionConfig(config);
+                    completedMessage?.Invoke(string.IsNullOrWhiteSpace(questionMessage) ? deck.QuestionStatus : questionMessage);
+                }
+                else
+                {
+                    deck.QuestionStatus = "Failed";
+                    config.SetPresentation(deck);
+                    runtimeState?.ApplySessionConfig(config);
+                    completedMessage?.Invoke("Question generation failed.");
+                }
+            }
+            else
+            {
+                deck.QuestionStatus = configError;
+                config.SetPresentation(deck);
+                runtimeState?.ApplySessionConfig(config);
+                completedMessage?.Invoke(configError);
             }
         }
 
@@ -396,7 +507,10 @@ namespace VRPublicSpeaking.AppShell.UI
             for (int index = 0; index < buttons.Length; index++)
             {
                 Button button = buttons[index];
-                if (button == null || button == uploadPresentationButton || button == removePresentationButton)
+                if (button == null ||
+                    button == uploadPresentationButton ||
+                    button == generateQuestionsButton ||
+                    button == removePresentationButton)
                 {
                     continue;
                 }
@@ -415,6 +529,35 @@ namespace VRPublicSpeaking.AppShell.UI
         {
             TMP_Text label = button != null ? button.GetComponentInChildren<TMP_Text>(true) : null;
             return label != null ? label.text : string.Empty;
+        }
+
+        private static void SetButtonLabel(Button button, string text)
+        {
+            TMP_Text label = button != null ? button.GetComponentInChildren<TMP_Text>(true) : null;
+            if (label != null)
+            {
+                label.text = text ?? string.Empty;
+            }
+        }
+
+        private bool IsPresentationWorkInProgress => importInProgress || questionGenerationInProgress;
+
+        private static string BuildMicrophoneStatus(SessionConfig config)
+        {
+            if (config == null || !config.VoiceAnalysisEnabled)
+            {
+                return "Voice analysis off";
+            }
+
+            int deviceCount = Microphone.devices != null ? Microphone.devices.Length : 0;
+            return deviceCount > 0
+                ? $"Detected ({deviceCount})"
+                : "Missing";
+        }
+
+        private static bool HasAnyMicrophone()
+        {
+            return Microphone.devices != null && Microphone.devices.Length > 0;
         }
 
         private void RefreshEnvironmentPreview(AppEnvironmentDefinition environmentDefinition)
