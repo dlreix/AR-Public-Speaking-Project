@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.XR;
+using VRPublicSpeaking.AppShell.Core;
 
 /// <summary>
 /// Main branch gaze controller with App Shell session, pause, and result routing hooks.
@@ -188,6 +189,9 @@ public class MainController : MonoBehaviour
         if (!allowRuntimeInput)
             return;
 
+        if (IsShellOverlayBlockingRuntimeInput())
+            return;
+
         bool xrPrimary = GetXRButton(CommonUsages.primaryButton);
         bool xrSecondary = GetXRButton(CommonUsages.secondaryButton);
         bool xrGrip = GetXRButton(CommonUsages.gripButton);
@@ -270,6 +274,15 @@ public class MainController : MonoBehaviour
                 circleEvent.ToggleEvent();
             }
         }
+    }
+
+    static bool IsShellOverlayBlockingRuntimeInput()
+    {
+        if (!AppRuntimeState.HasInstance)
+            return false;
+
+        var runtime = AppRuntimeState.Instance.CurrentRuntimeState;
+        return runtime != null && (runtime.PauseMenuVisible || runtime.ResultsOverlayVisible);
     }
 
     static bool GetXRButton(InputFeatureUsage<bool> usage)

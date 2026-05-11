@@ -177,8 +177,6 @@ namespace VRPublicSpeaking.AppShell.PresentationQuestioning
                     ? "Curious audience member"
                     : question.audiencePersona.Trim();
                 question.question = question.question.Trim();
-                question.expectedAnswer = (question.expectedAnswer ?? string.Empty).Trim();
-                question.rubric = (question.rubric ?? string.Empty).Trim();
                 questionSet.questions.Add(question);
             }
 
@@ -229,9 +227,11 @@ namespace VRPublicSpeaking.AppShell.PresentationQuestioning
             builder.AppendLine("You generate realistic audience questions for a public speaking practice app.");
             builder.AppendLine("Return only valid JSON. No markdown, no code fence.");
             builder.AppendLine("JSON schema:");
-            builder.AppendLine("{\"language\":\"detected language or English\",\"questions\":[{\"id\":\"q01\",\"slide\":1,\"audiencePersona\":\"curious stakeholder\",\"question\":\"...\",\"expectedAnswer\":\"...\",\"rubric\":\"...\"}]}");
+            builder.AppendLine("{\"language\":\"detected language or English\",\"questions\":[{\"id\":\"q01\",\"slide\":1,\"audiencePersona\":\"curious stakeholder\",\"question\":\"...\"}]}");
             builder.AppendLine($"Generate exactly {questionCount} questions, unless the slide text is too sparse.");
-            builder.AppendLine("Questions should be asked after the presentation, should reference the slide content, and should be answerable by the presenter.");
+            builder.AppendLine("Questions should be asked after the presentation, should reference the slide content, and should invite the presenter to answer aloud.");
+            builder.AppendLine("Keep every question short enough for a VR speech bubble: maximum 22 words or 160 characters.");
+            builder.AppendLine("Do not generate expected answers, scoring rubrics, feedback, or any answer-evaluation fields.");
             builder.AppendLine("Use the slide language. If the language is unclear, use English.");
             builder.AppendLine();
             builder.AppendLine($"Deck: {document.displayName}");

@@ -4,7 +4,6 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.Controls;
-using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using UnityEngine.XR;
 using VRPublicSpeaking.AppShell.Core;
@@ -48,10 +47,8 @@ namespace VRPublicSpeaking.AppShell.UI
         [SerializeField] private string pauseUnavailableStatusText =
             "Pause is available only while a live session is running.";
         [SerializeField] private bool applyVrReadabilityDefaults = true;
-        [SerializeField] private Vector3 readableOverlayOffset = new Vector3(0f, 0.02f, 1.05f);
+        [SerializeField] private Vector3 readableOverlayOffset = new Vector3(0f, -0.10f, 1.08f);
         [SerializeField] private float minimumVrOverlayTargetY = 1.62f;
-        [SerializeField] private Vector3 raisedSceneOverlayOffset = new Vector3(0f, 0.20f, 1.05f);
-        [SerializeField] private float raisedSceneMinimumVrOverlayTargetY = 1.92f;
         [SerializeField] private float pauseMinimumFontSize = 23f;
         [SerializeField] private float pauseMinimumButtonHeight = 94f;
         [SerializeField] private Vector2 pauseMinimumPanelSize = new Vector2(1120f, 800f);
@@ -1176,22 +1173,12 @@ namespace VRPublicSpeaking.AppShell.UI
 
         private Vector3 ResolveReadableOverlayOffset()
         {
-            return UsesRaisedVrPlacementForActiveScene()
-                ? raisedSceneOverlayOffset
-                : readableOverlayOffset;
+            return readableOverlayOffset;
         }
 
         private float ResolveMinimumOverlayTargetY()
         {
-            return UsesRaisedVrPlacementForActiveScene()
-                ? Mathf.Max(minimumVrOverlayTargetY, raisedSceneMinimumVrOverlayTargetY)
-                : minimumVrOverlayTargetY;
-        }
-
-        private static bool UsesRaisedVrPlacementForActiveScene()
-        {
-            string sceneName = SceneManager.GetActiveScene().name;
-            return sceneName.Contains("Conference") || sceneName.Contains("Meeting");
+            return minimumVrOverlayTargetY;
         }
 
         private static void ApplyResultsPanelCleanup(AppPanelView panel)

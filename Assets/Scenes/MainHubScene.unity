@@ -63648,7 +63648,7 @@ MonoBehaviour:
   menuFollowPositionSpeed: 14
   menuFollowRotationSpeed: 14
   keepHubRigStationary: 0
-  hubCameraYOffset: 1.36
+  hubCameraYOffset: 3
   mainHubSceneName: MainHubScene
   resultsSceneName: ResultsScene
   useWalkableTutorialHub: 1
@@ -63694,7 +63694,7 @@ MonoBehaviour:
   menuFollowRotationSpeed: 14
   keepRigStationary: 1
   requestedTrackingOriginMode: 1
-  cameraYOffset: 1.62
+  cameraYOffset: 3
   stabilizationDuration: 0
   useFloorTrackingWhenXrRunning: 1
   keepUnlockedRigGravityDisabled: 1
@@ -68148,7 +68148,7 @@ MonoBehaviour:
   m_OriginBaseGameObject: {fileID: 1717954561738086118}
   m_CameraFloorOffsetObject: {fileID: 1787433881}
   m_RequestedTrackingOriginMode: 0
-  m_CameraYOffset: 1.36144
+  m_CameraYOffset: 3
 --- !u!1 &1246816219711162500
 GameObject:
   m_ObjectHideFlags: 0

@@ -132,7 +132,7 @@ namespace VRPublicSpeaking.AppShell.UI
 
             if (config.VoiceAnalysisEnabled && !HasAnyMicrophone())
             {
-                warnings.Add("Voice Analysis is enabled, but no microphone device was detected. Q&A can still use typed answers.");
+                warnings.Add("Voice Analysis is enabled, but no microphone device was detected. Audience questions can still be shown.");
             }
 
             if (warnings.Count == 0)

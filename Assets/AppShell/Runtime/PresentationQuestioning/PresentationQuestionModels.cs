@@ -41,8 +41,6 @@ namespace VRPublicSpeaking.AppShell.PresentationQuestioning
         public int slide;
         public string audiencePersona;
         [TextArea] public string question;
-        [TextArea] public string expectedAnswer;
-        [TextArea] public string rubric;
     }
 
     [Serializable]

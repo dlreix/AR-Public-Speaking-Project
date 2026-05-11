@@ -2012,7 +2012,7 @@ namespace VRPublicSpeaking.AppShell.Editor
             AppShellEditorCommon.SetField(controller, "menuFollowRotationSpeed", 14f);
             AppShellEditorCommon.SetField(controller, "keepRigStationary", true);
             AppShellEditorCommon.SetField(controller, "requestedTrackingOriginMode", XROrigin.TrackingOriginMode.Device);
-            AppShellEditorCommon.SetField(controller, "cameraYOffset", 1.62f);
+            AppShellEditorCommon.SetField(controller, "cameraYOffset", 3.00f);
             AppShellEditorCommon.SetField(controller, "stabilizationDuration", 0f);
         }
 

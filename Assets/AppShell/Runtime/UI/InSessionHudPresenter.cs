@@ -303,7 +303,7 @@ namespace VRPublicSpeaking.AppShell.UI
             GameObject labelObject = new GameObject("LiveScoreLabel", typeof(RectTransform));
             labelObject.transform.SetParent(transform, false);
             liveScoreLabel = labelObject.AddComponent<TextMeshProUGUI>();
-            liveScoreLabel.text = "Score --";
+            liveScoreLabel.text = "Gaze --";
         }
 
         private void EnsureSpeechTranscriptLabel()
@@ -572,7 +572,7 @@ namespace VRPublicSpeaking.AppShell.UI
 
             if (!isActive)
             {
-                return "Score --";
+                return "Gaze --";
             }
 
             if (gazeScoringSystem == null)
@@ -581,8 +581,8 @@ namespace VRPublicSpeaking.AppShell.UI
             }
 
             return gazeScoringSystem != null
-                ? $"Score {gazeScoringSystem.GazeScore:0}"
-                : "Score --";
+                ? $"Gaze {gazeScoringSystem.GazeScore:0}"
+                : "Gaze --";
         }
 
         private static string BuildStatusText(

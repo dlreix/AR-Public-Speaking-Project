@@ -27,7 +27,7 @@ namespace VRPublicSpeaking.AppShell.Flow
         [SerializeField] private float menuFollowPositionSpeed = 14f;
         [SerializeField] private float menuFollowRotationSpeed = 14f;
         [SerializeField] private bool keepHubRigStationary = true;
-        [SerializeField] private float hubCameraYOffset = 1.36f;
+        [SerializeField] private float hubCameraYOffset = 3.00f;
         [SerializeField] private string mainHubSceneName = "MainHubScene";
         [SerializeField] private string resultsSceneName = string.Empty;
         [SerializeField] private bool useWalkableTutorialHub = true;
