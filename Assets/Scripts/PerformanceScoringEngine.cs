@@ -7,26 +7,26 @@ using System.Collections.Generic;
 public class SpeechMetrics
 {
     [Header("Raw Speech Inputs")]
-    public float wpm = 140f;
-    public float fillerWordsPerMinute = 2f;
-    public float averagePauseDuration = 0.8f;
-    [Range(0f, 100f)] public float toneVariationScore = 75f;
+    public float wpm;
+    public float fillerWordsPerMinute;
+    public float averagePauseDuration;
+    [Range(0f, 100f)] public float toneVariationScore;
 }
 
 [System.Serializable]
 public class EyeMetrics
 {
     [Header("Raw Eye Contact Inputs")]
-    [Range(0f, 1f)] public float eyeContactRatio = 0.65f;
+    [Range(0f, 1f)] public float eyeContactRatio;
 }
 
 [System.Serializable]
 public class PostureMetrics
 {
     [Header("Raw Posture Inputs")]
-    public float slouchEventsPerMinute = 1f;
-    [Range(0f, 100f)] public float swayDurationPercent = 10f;
-    [Range(0f, 100f)] public float crossedArmsPercent = 5f;
+    public float slouchEventsPerMinute;
+    [Range(0f, 100f)] public float swayDurationPercent;
+    [Range(0f, 100f)] public float crossedArmsPercent;
 }
 
 [System.Serializable]
@@ -335,6 +335,15 @@ public class PerformanceScoringEngine : MonoBehaviour
 
     private float CalculateSpeechScore()
     {
+        if (speechMetrics.wpm <= 0f)
+        {
+            scoreBreakdown.speechSubScores.wpmScore    = 0f;
+            scoreBreakdown.speechSubScores.fillerScore = 0f;
+            scoreBreakdown.speechSubScores.pauseScore  = 0f;
+            scoreBreakdown.speechSubScores.toneScore   = 0f;
+            return 0f;
+        }
+
         float wpmScore    = NormalizeWpm(speechMetrics.wpm);
         float fillerScore = NormalizeInverse(speechMetrics.fillerWordsPerMinute, idealFillerPerMin, maxFillerPerMin);
         float pauseScore  = NormalizePauseDuration(speechMetrics.averagePauseDuration);
@@ -358,6 +367,15 @@ public class PerformanceScoringEngine : MonoBehaviour
 
     private float CalculatePostureScore()
     {
+        // Henüz posture tracking başlamadıysa skor 0
+        if (!_postureTrackingActive)
+        {
+            scoreBreakdown.slouchScore      = 0f;
+            scoreBreakdown.swayScore        = 0f;
+            scoreBreakdown.crossedArmsScore = 0f;
+            return 0f;
+        }
+
         scoreBreakdown.slouchScore      = ClampScore(100f - slouchPenalty * postureMetrics.slouchEventsPerMinute);
         scoreBreakdown.swayScore        = ClampScore(100f - swayPenalty * postureMetrics.swayDurationPercent);
         scoreBreakdown.crossedArmsScore = ClampScore(100f - crossedArmsPenalty * postureMetrics.crossedArmsPercent);
