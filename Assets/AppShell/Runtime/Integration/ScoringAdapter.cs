@@ -39,22 +39,18 @@ namespace VRPublicSpeaking.AppShell.Integration
             summary.SessionTimestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
             summary.DurationSeconds = sessionDurationSeconds;
 
-            // GazeScoringSystem reset edildiği için fallback öncelikli
-            if (fallbackGazeScore >= 0f)
-            {
-                summary.EyeContactScore = fallbackGazeScore;
-                summary.HasEyeContactScore = true;
-            }
-            else if (gazeScoringSystem != null)
-            {
-                summary.EyeContactScore = gazeScoringSystem.GazeScore;
-                summary.HasEyeContactScore = true;
-            }
+            // Gaze skoru: fallback öncelikli, yoksa GazeScoringSystem'den al
+            float gazeScore = fallbackGazeScore >= 0f
+                ? fallbackGazeScore
+                : (gazeScoringSystem != null ? gazeScoringSystem.GazeScore : 0f);
 
-            // Eye skorunu PerformanceScoringEngine'e set et ki toplam skor doğru hesaplansın
-            if (fallbackGazeScore >= 0f && performanceScoringEngine != null)
+            summary.EyeContactScore    = gazeScore;
+            summary.HasEyeContactScore = true;
+
+            // PerformanceScoringEngine'e set et ki toplam skor doğru hesaplansın
+            if (performanceScoringEngine != null)
             {
-                performanceScoringEngine.SetEyeContactRatio(fallbackGazeScore / 100f);
+                performanceScoringEngine.SetEyeContactRatio(gazeScore / 100f);
             }
 
             if (performanceScoringEngine != null)
@@ -73,11 +69,7 @@ namespace VRPublicSpeaking.AppShell.Integration
                     summary.PostureScore = report.postureScore;
                     summary.HasPostureScore = true;
 
-                    if (!summary.HasEyeContactScore)
-                    {
-                        summary.EyeContactScore = report.eyeScore;
-                        summary.HasEyeContactScore = true;
-                    }
+                    // EyeContactScore zaten yukarıda set edildi
 
                     summary.StrongestArea = report.strongestArea;
                     summary.WeakestArea = report.weakestArea;
