@@ -33,3 +33,7 @@ sysinfo.txt
 # Speech Models (Do not push 1.8GB files to GitHub)
 Assets/StreamingAssets/vosk-model*
 !Assets/StreamingAssets/vosk-model-small*
+
+# UI Toolkit (auto-generated)
+Assets/UI Toolkit.meta
+Assets/UI Toolkit/
