@@ -81,6 +81,21 @@ namespace VRPublicSpeaking.AppShell.UI
             return panelLookup.TryGetValue(panelType, out panelView);
         }
 
+        public void RegisterPanel(AppPanelView panelView)
+        {
+            if (panelView == null)
+            {
+                return;
+            }
+
+            if (!panels.Contains(panelView))
+            {
+                panels.Add(panelView);
+            }
+
+            panelLookup[panelView.PanelType] = panelView;
+        }
+
         public void ShowDefaultPanel(bool rememberHistory = false)
         {
             ShowPanel(defaultPanel, rememberHistory);
@@ -93,6 +108,19 @@ namespace VRPublicSpeaking.AppShell.UI
 
         private void CachePanels()
         {
+            AppPanelView[] discoveredPanels =
+                FindObjectsByType<AppPanelView>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            for (int index = 0; index < discoveredPanels.Length; index++)
+            {
+                AppPanelView discoveredPanel = discoveredPanels[index];
+                if (discoveredPanel != null &&
+                    discoveredPanel.gameObject.scene == gameObject.scene &&
+                    !panels.Contains(discoveredPanel))
+                {
+                    panels.Add(discoveredPanel);
+                }
+            }
+
             panelLookup.Clear();
 
             for (int index = 0; index < panels.Count; index++)

@@ -9,7 +9,7 @@ namespace VRPublicSpeaking.AppShell.Flow
 {
     /// <summary>
     /// Presents tutorial panels one at a time in front of the user as a guided slideshow.
-    /// After the welcome panel dismisses, each tutorial step fades in centrally,
+    /// Each tutorial step fades in centrally,
     /// and the user advances with a "Continue" action (trigger, A button, or click).
     /// </summary>
     [DisallowMultipleComponent]
@@ -22,7 +22,6 @@ namespace VRPublicSpeaking.AppShell.Flow
 
         [Header("Timing")]
         [SerializeField] private float transitionDuration = 0.5f;
-        [SerializeField] private float autoShowDelayAfterWelcome = 1.2f;
 
         [Header("Colors")]
         // Yarı şeffaf, daha premium "glass" hissiyatı veren koyu lacivert

@@ -8,11 +8,14 @@ public class AudienceMember : MonoBehaviour
     public float reactionDelay = 0f;
     public float personalWpmTolerance;
     public float personalEyeContactTolerance;
+    [SerializeField] private Vector2 stateDwellSeconds = new Vector2(4f, 10f);
     private AudienceState _currentState = AudienceState.Idle;
     private Coroutine _stateRoutine;
     private int _stateVersion;
+    private float _nextStateChangeTime;
     
     public AudienceState CurrentState => _currentState;
+    public bool CanConsiderStateChange => Time.time >= _nextStateChangeTime;
 
     void Awake()
     {
@@ -32,9 +35,20 @@ public class AudienceMember : MonoBehaviour
 
     public void SetState(AudienceState newState)
     {
+        SetState(newState, false);
+    }
+
+    public void SetState(AudienceState newState, bool force)
+    {
         if (_currentState == newState) return;
+        if (!force && _currentState != AudienceState.Idle && Time.time < _nextStateChangeTime)
+        {
+            return;
+        }
+
         _currentState = newState;
         _stateVersion++;
+        _nextStateChangeTime = Time.time + GetDwellDuration(newState);
 
         if (_stateRoutine != null)
         {
@@ -44,6 +58,18 @@ public class AudienceMember : MonoBehaviour
 
         float delay = newState == AudienceState.Applauding ? 0f : reactionDelay;
         _stateRoutine = StartCoroutine(ApplyStateWithDelay(newState, delay, _stateVersion));
+    }
+
+    private float GetDwellDuration(AudienceState state)
+    {
+        if (state == AudienceState.Applauding)
+        {
+            return 0f;
+        }
+
+        float min = Mathf.Max(0.5f, stateDwellSeconds.x);
+        float max = Mathf.Max(min, stateDwellSeconds.y);
+        return Random.Range(min, max);
     }
 
     private IEnumerator ApplyStateWithDelay(AudienceState state, float delay, int version)

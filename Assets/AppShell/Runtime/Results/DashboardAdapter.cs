@@ -1,32 +1,19 @@
-using System;
-using System.Collections.Generic;
-using System.Reflection;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using VRPublicSpeaking.AppShell.Core;
+using VRPublicSpeaking.AppShell.Data;
 using VRPublicSpeaking.AppShell.Flow;
 
 namespace VRPublicSpeaking.AppShell.Results
 {
     public class DashboardAdapter : MonoBehaviour
     {
-        private const string DefaultDashboardSceneName = "Overview";
+        private const string DefaultMainHubSceneName = "MainHubScene";
 
-        [SerializeField] private MonoBehaviour dashboardController;
-        [SerializeField] private GameObject dashboardRoot;
-        [SerializeField] private string dashboardSceneName = DefaultDashboardSceneName;
+        [SerializeField] private string mainHubSceneName = DefaultMainHubSceneName;
         [SerializeField] private string dashboardLoadingMessage = "Opening dashboard...";
-        [SerializeField] private string openMessage = "Open";
-        [SerializeField] private string[] alternateOpenMessages =
-        {
-            "OpenDashboard",
-            "ShowDashboard",
-            "Show"
-        };
-        [SerializeField] private bool activateControllerGameObject = true;
 
-        public bool IsAvailable => dashboardRoot != null ||
-            HasControllerEntryPoint() ||
-            CanOpenDashboardScene();
+        public bool IsAvailable => HasHubFlowInScene() || CanOpenMainHubScene();
 
         public void OpenDashboard()
         {
@@ -35,105 +22,35 @@ namespace VRPublicSpeaking.AppShell.Results
 
         public bool TryOpenDashboard()
         {
-            bool opened = false;
-
-            if (dashboardRoot != null)
+            if (TryOpenDashboardInCurrentHub())
             {
-                dashboardRoot.SetActive(true);
-                opened = true;
-            }
-
-            if (dashboardController != null)
-            {
-                if (activateControllerGameObject && !dashboardController.gameObject.activeSelf)
-                {
-                    dashboardController.gameObject.SetActive(true);
-                    opened = true;
-                }
-
-                if (TryInvokeOpenMessage())
-                {
-                    opened = true;
-                }
-            }
-
-            if (!opened)
-            {
-                opened = TryOpenDashboardScene();
-            }
-
-            if (!opened)
-            {
-                Debug.LogWarning("[DashboardAdapter] No dashboard integration has been wired yet.");
-            }
-
-            return opened;
-        }
-
-        private bool HasControllerEntryPoint()
-        {
-            return dashboardController != null &&
-                (activateControllerGameObject || TryResolveOpenMethod(out _));
-        }
-
-        private bool TryInvokeOpenMessage()
-        {
-            if (!TryResolveOpenMethod(out MethodInfo method))
-            {
-                return false;
-            }
-
-            try
-            {
-                method.Invoke(dashboardController, null);
                 return true;
             }
-            catch (Exception exception)
-            {
-                Debug.LogWarning(
-                    $"[DashboardAdapter] Failed to invoke '{method.Name}' on '{dashboardController.GetType().Name}'. {exception.Message}");
-                return false;
-            }
-        }
 
-        private bool TryResolveOpenMethod(out MethodInfo method)
-        {
-            method = null;
-            if (dashboardController == null)
+            AppRuntimeState runtimeState = AppRuntimeState.GetOrCreate();
+            if (runtimeState == null)
             {
+                Debug.LogWarning("[DashboardAdapter] Runtime state is unavailable, so the dashboard cannot open.");
                 return false;
             }
 
-            Type controllerType = dashboardController.GetType();
-            foreach (string methodName in EnumerateOpenMessages())
-            {
-                method = controllerType.GetMethod(
-                    methodName,
-                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
-                    null,
-                    Type.EmptyTypes,
-                    null);
-
-                if (method != null)
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private bool TryOpenDashboardScene()
-        {
-            string sceneName = ResolveDashboardSceneName();
+            string sceneName = ResolveMainHubSceneName(runtimeState);
             if (string.IsNullOrWhiteSpace(sceneName))
             {
+                Debug.LogWarning("[DashboardAdapter] Main hub scene name is empty, so the dashboard cannot open.");
                 return false;
+            }
+
+            runtimeState.RequestHubPanel(AppPanelType.Dashboard);
+
+            if (SceneManager.GetActiveScene().name == sceneName)
+            {
+                return TryOpenDashboardInCurrentHub();
             }
 
             if (!Application.CanStreamedLevelBeLoaded(sceneName))
             {
-                Debug.LogWarning($"[DashboardAdapter] Dashboard scene '{sceneName}' is not in the build settings.");
+                Debug.LogWarning($"[DashboardAdapter] Main hub scene '{sceneName}' is not in the build settings.");
                 return false;
             }
 
@@ -150,43 +67,41 @@ namespace VRPublicSpeaking.AppShell.Results
             return true;
         }
 
-        private bool CanOpenDashboardScene()
+        private bool TryOpenDashboardInCurrentHub()
         {
-            string sceneName = ResolveDashboardSceneName();
+            AppFlowManager flowManager = FindFirstObjectByType<AppFlowManager>(FindObjectsInactive.Include);
+            if (flowManager == null)
+            {
+                return false;
+            }
+
+            flowManager.OpenDashboardPanel();
+            return true;
+        }
+
+        private static bool HasHubFlowInScene()
+        {
+            return FindFirstObjectByType<AppFlowManager>(FindObjectsInactive.Include) != null;
+        }
+
+        private bool CanOpenMainHubScene()
+        {
+            AppRuntimeState runtimeState = AppRuntimeState.GetOrCreate();
+            string sceneName = ResolveMainHubSceneName(runtimeState);
             return !string.IsNullOrWhiteSpace(sceneName) &&
-                Application.CanStreamedLevelBeLoaded(sceneName);
+                (SceneManager.GetActiveScene().name == sceneName || Application.CanStreamedLevelBeLoaded(sceneName));
         }
 
-        private string ResolveDashboardSceneName()
+        private string ResolveMainHubSceneName(AppRuntimeState runtimeState)
         {
-            return string.IsNullOrWhiteSpace(dashboardSceneName)
-                ? DefaultDashboardSceneName
-                : dashboardSceneName.Trim();
-        }
-
-        private IEnumerable<string> EnumerateOpenMessages()
-        {
-            var seen = new HashSet<string>(StringComparer.Ordinal);
-
-            string primaryMessage = openMessage?.Trim();
-            if (!string.IsNullOrWhiteSpace(primaryMessage) && seen.Add(primaryMessage))
+            if (runtimeState != null && !string.IsNullOrWhiteSpace(runtimeState.MainHubSceneName))
             {
-                yield return primaryMessage;
+                return runtimeState.MainHubSceneName.Trim();
             }
 
-            if (alternateOpenMessages == null)
-            {
-                yield break;
-            }
-
-            for (int index = 0; index < alternateOpenMessages.Length; index++)
-            {
-                string methodName = alternateOpenMessages[index]?.Trim();
-                if (!string.IsNullOrWhiteSpace(methodName) && seen.Add(methodName))
-                {
-                    yield return methodName;
-                }
-            }
+            return string.IsNullOrWhiteSpace(mainHubSceneName)
+                ? DefaultMainHubSceneName
+                : mainHubSceneName.Trim();
         }
     }
 }

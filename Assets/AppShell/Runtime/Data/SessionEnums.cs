@@ -40,14 +40,17 @@ namespace VRPublicSpeaking.AppShell.Data
     [Serializable]
     public enum AppPanelType
     {
-        Home = 0,
-        PracticeMode = 1,
-        EnvironmentSelection = 2,
-        SessionSetup = 3,
-        Ready = 4,
-        ResultsSummary = 5,
-        Progress = 6,
-        Settings = 7,
-        PauseOverlay = 8
+        Login = 0,
+        Home = 1,
+        PracticeMode = 2,
+        EnvironmentSelection = 3,
+        SessionSetup = 4,
+        Ready = 5,
+        ResultsSummary = 6,
+        Progress = 7,
+        Settings = 8,
+        PauseOverlay = 9,
+        Dashboard = 10,
+        AudienceQa = 11
     }
 }

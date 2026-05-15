@@ -19,8 +19,17 @@ public class AudienceReactionEngine : MonoBehaviour
 {
     public PerformanceScoringEngine scoringEngine;
     public EnvironmentType environmentType = EnvironmentType.classroom;
+    [SerializeField] private float scoreRefreshInterval = 0.5f;
 
     public ReactionFrame currentReaction = new ReactionFrame();
+    private float nextScoreRefreshTime;
+    private readonly List<string> dominantFactors = new List<string>(8);
+    private readonly List<string> reactions = new List<string>(4);
+
+    private void Awake()
+    {
+        EnsureReactionLists();
+    }
 
     void Update()
     {
@@ -31,10 +40,17 @@ public class AudienceReactionEngine : MonoBehaviour
     }
 
     private float smoothedScore = 50f;
+    private float smoothedEngagement = 50f;
     [SerializeField] private float smoothingSpeed = 1.5f;
 
     public void GenerateReactionFrame()
     {
+        if (Time.time >= nextScoreRefreshTime)
+        {
+            scoringEngine.RefreshScoreSilently();
+            nextScoreRefreshTime = Time.time + Mathf.Max(0.1f, scoreRefreshInterval);
+        }
+
         float rawScore = scoringEngine.GetFinalScore();
         smoothedScore = Mathf.Lerp(smoothedScore, rawScore, Time.deltaTime * smoothingSpeed);
         
@@ -43,9 +59,10 @@ public class AudienceReactionEngine : MonoBehaviour
         else if (smoothedScore < 65f) performanceLevel = "MEDIUM";
         else performanceLevel = "HIGH";
 
+        EnsureReactionLists();
         currentReaction.performance_level = performanceLevel;
-        currentReaction.dominant_factors = new List<string>();
-        currentReaction.reactions = new List<string>();
+        currentReaction.dominant_factors.Clear();
+        currentReaction.reactions.Clear();
 
         // Analyze Speech
         if (scoringEngine.speechMetrics.wpm < scoringEngine.idealWpmMin)
@@ -74,7 +91,7 @@ public class AudienceReactionEngine : MonoBehaviour
         // Determine Audience State and Enagagement Level
         if (performanceLevel == "LOW")
         {
-            currentReaction.engagement_level = Random.Range(10f, 35f);
+            SetSmoothedEngagement(10f, 35f);
             
             if (currentReaction.dominant_factors.Contains("eye_contact_low") || currentReaction.dominant_factors.Contains("monotone_voice"))
             {
@@ -98,7 +115,7 @@ public class AudienceReactionEngine : MonoBehaviour
         }
         else if (performanceLevel == "MEDIUM")
         {
-            currentReaction.engagement_level = Random.Range(45f, 75f);
+            SetSmoothedEngagement(45f, 75f);
             currentReaction.overall_audience_state = AudienceState.Neutral;
             currentReaction.real_time_adjustment = "Selective attention. Mixed engagement levels.";
 
@@ -118,7 +135,7 @@ public class AudienceReactionEngine : MonoBehaviour
         }
         else // HIGH
         {
-            currentReaction.engagement_level = Random.Range(80f, 100f);
+            SetSmoothedEngagement(80f, 100f);
             currentReaction.overall_audience_state = AudienceState.Attentive;
             currentReaction.real_time_adjustment = "Audience is highly engaged.";
 
@@ -132,5 +149,21 @@ public class AudienceReactionEngine : MonoBehaviour
             if (currentReaction.dominant_factors.Contains("good_eye_contact"))
                 currentReaction.real_time_adjustment += " Strong connection established via eye contact.";
         }
+    }
+
+    private void SetSmoothedEngagement(float min, float max)
+    {
+        float normalizedScore = Mathf.InverseLerp(0f, 100f, smoothedScore);
+        float noise = (Mathf.PerlinNoise(Time.time * 0.18f, environmentType.GetHashCode() * 3.17f) - 0.5f) * 8f;
+        float target = Mathf.Clamp(Mathf.Lerp(min, max, normalizedScore) + noise, min, max);
+        smoothedEngagement = Mathf.Lerp(smoothedEngagement, target, Time.deltaTime * smoothingSpeed);
+        currentReaction.engagement_level = smoothedEngagement;
+    }
+
+    private void EnsureReactionLists()
+    {
+        currentReaction ??= new ReactionFrame();
+        currentReaction.dominant_factors ??= dominantFactors;
+        currentReaction.reactions ??= reactions;
     }
 }

@@ -34,8 +34,13 @@ public class AudienceSpawner : MonoBehaviour
 
     public void SpawnAudience()
     {
-        foreach (var m in controller.audienceMembers) if (m != null) Destroy(m.gameObject);
-        controller.audienceMembers.Clear();
+        EnsureControllerReferences();
+        audiencePrefabs = LoadCharacterPrefabs();
+        if (audiencePrefabs.Count == 0)
+        {
+            Debug.LogWarning("[AudienceSpawner] No audience prefabs were found. Keeping existing scene audience in place.");
+            return;
+        }
 
         GameObject[] allObjects = FindObjectsByType<GameObject>(FindObjectsSortMode.None);
         foreach (var go in allObjects)
@@ -46,9 +51,8 @@ public class AudienceSpawner : MonoBehaviour
             }
         }
 
-        EnsureControllerReferences();
-        audiencePrefabs = LoadCharacterPrefabs();
-        if (audiencePrefabs.Count == 0) return;
+        foreach (var m in controller.audienceMembers) if (m != null) Destroy(m.gameObject);
+        controller.audienceMembers.Clear();
 
         List<GameObject> allSeats = FindAllSeats();
         if (allSeats.Count == 0) { SpawnGrid(); return; }
@@ -314,13 +318,17 @@ public class AudienceSpawner : MonoBehaviour
             string n = go.name.ToLower();
             if (n.Contains("seat") || n.Contains("bench") || n.Contains("chair"))
             {
-                if (n.Contains("teacher") || n.Contains("instructor") || n.Contains("maindesk")) continue;
+                if (!IsSeatCandidate(go))
+                {
+                    continue;
+                }
+
                 if (!n.Contains("leg") && !n.Contains("side") && !n.Contains("back") && !n.Contains("frame"))
                 {
                     Renderer r = go.GetComponent<Renderer>();
                     if (r != null && r.bounds.size.x > 1.2f) { 
                         Transform existing = go.transform.Find("VirtualSeats");
-                        if (existing != null) { foreach (Transform child in existing) seats.Add(child.gameObject); }
+                        if (existing != null) { foreach (Transform child in existing) { RemoveSeatMarkerCollider(child.gameObject); seats.Add(child.gameObject); } }
                         else {
                             GameObject vsRoot = new GameObject("VirtualSeats"); vsRoot.transform.parent = go.transform; vsRoot.transform.localPosition = Vector3.zero;
                             float seatWidth = 0.65f; int count = Mathf.FloorToInt(r.bounds.size.x / seatWidth);
@@ -330,7 +338,7 @@ public class AudienceSpawner : MonoBehaviour
                                 GameObject vSeat = GameObject.CreatePrimitive(PrimitiveType.Cube); vSeat.name = "Seat_Virtual_" + i; vSeat.transform.parent = vsRoot.transform;
                                 vSeat.transform.position = new Vector3(startX + i * seatWidth, r.bounds.center.y, r.bounds.center.z);
                                 vSeat.transform.rotation = go.transform.rotation; vSeat.transform.localScale = new Vector3(seatWidth, r.bounds.size.y, r.bounds.size.z);
-                                vSeat.GetComponent<Renderer>().enabled = false; seats.Add(vSeat);
+                                vSeat.GetComponent<Renderer>().enabled = false; RemoveSeatMarkerCollider(vSeat); seats.Add(vSeat);
                             }
                         }
                     }
@@ -346,9 +354,84 @@ public class AudienceSpawner : MonoBehaviour
         return seats;
     }
 
+    private bool IsSeatCandidate(GameObject go)
+    {
+        if (go == null)
+        {
+            return false;
+        }
+
+        string path = BuildTransformPath(go.transform);
+        if (path.Contains("teacher") ||
+            path.Contains("instructor") ||
+            path.Contains("maindesk") ||
+            path.Contains("teacherarea") ||
+            path.Contains("teacher desk") ||
+            path.Contains("teacherdesk") ||
+            path.Contains("frontdesk") ||
+            path.Contains("front desk") ||
+            path.Contains("podium") ||
+            path.Contains("lectern") ||
+            path.Contains("whiteboard") ||
+            path.Contains("blackboard") ||
+            path.Contains("smartboard") ||
+            path.Contains("projection") ||
+            path.Contains("screen") ||
+            path.Contains("presentation") ||
+            path.Contains("desk_surface") ||
+            path.Contains("desk_body") ||
+            path.Contains("monitor"))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private string BuildTransformPath(Transform transform)
+    {
+        System.Text.StringBuilder builder = new System.Text.StringBuilder();
+        for (Transform current = transform; current != null; current = current.parent)
+        {
+            if (builder.Length > 0)
+            {
+                builder.Append('/');
+            }
+
+            builder.Append(current.name.ToLowerInvariant());
+        }
+
+        return builder.ToString();
+    }
+
+    private void RemoveSeatMarkerCollider(GameObject seatMarker)
+    {
+        Collider collider = seatMarker != null ? seatMarker.GetComponent<Collider>() : null;
+        if (collider != null)
+        {
+            Destroy(collider);
+        }
+    }
+
     private List<GameObject> LoadCharacterPrefabs()
     {
         List<GameObject> prefabs = new List<GameObject>();
+        if (audiencePrefabs != null)
+        {
+            foreach (GameObject prefab in audiencePrefabs)
+            {
+                if (prefab != null && !prefabs.Contains(prefab))
+                {
+                    prefabs.Add(prefab);
+                }
+            }
+        }
+
+        if (prefabs.Count > 0)
+        {
+            return prefabs;
+        }
+
 #if UNITY_EDITOR
         string folder = "Assets/AudienceSimulation_Arda/Models";
         if (System.IO.Directory.Exists(Application.dataPath + "/" + folder.Replace("Assets/", "")))
@@ -374,9 +457,18 @@ public class AudienceSpawner : MonoBehaviour
     {
         switch (controller.currentStressLevel)
         {
-            case StressLevel.Easy: am.personalWpmTolerance = Random.Range(-40f, -10f); am.personalEyeContactTolerance = Random.Range(-0.2f, -0.05f); break;
-            case StressLevel.Medium: am.personalWpmTolerance = Random.Range(-10f, 10f); am.personalEyeContactTolerance = Random.Range(-0.08f, 0.08f); break;
-            case StressLevel.Hard: am.personalWpmTolerance = Random.Range(10f, 40f); am.personalEyeContactTolerance = Random.Range(0.1f, 0.3f); break;
+            case StressLevel.Easy:
+                am.personalWpmTolerance = Random.Range(10f, 40f);
+                am.personalEyeContactTolerance = Random.Range(0.08f, 0.20f);
+                break;
+            case StressLevel.Medium:
+                am.personalWpmTolerance = Random.Range(-10f, 10f);
+                am.personalEyeContactTolerance = Random.Range(-0.08f, 0.08f);
+                break;
+            case StressLevel.Hard:
+                am.personalWpmTolerance = Random.Range(-40f, -10f);
+                am.personalEyeContactTolerance = Random.Range(-0.22f, -0.08f);
+                break;
         }
     }
 
@@ -414,6 +506,16 @@ public class AudienceSpawner : MonoBehaviour
 
     private void EnsureControllerReferences()
     {
+        if (controller == null)
+        {
+            controller = FindFirstObjectByType<AudienceBehaviorController>(FindObjectsInactive.Include);
+        }
+
+        if (controller == null)
+        {
+            controller = gameObject.AddComponent<AudienceBehaviorController>();
+        }
+
 #if UNITY_EDITOR
         if (sharedAnimatorController == null) {
             string[] guids = AssetDatabase.FindAssets("AudienceAnimator t:RuntimeAnimatorController");

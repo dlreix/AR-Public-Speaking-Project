@@ -37,10 +37,10 @@ namespace VRPublicSpeaking.AppShell.Integration
             {
                 SessionConfig config = AppRuntimeState.Instance.CurrentSessionConfig;
                 
-                // Shell ayarlarini StressLevel'e donustur
-                StressLevel stressLevel = ConvertConfigToStress(config);
+                StressLevel stressLevel = ConvertDifficultyToStress(config);
                 
                 behaviorController.ApplyScenario(stressLevel);
+                ApplyAudiencePresetTuning(config.AudiencePreset);
                 Debug.Log($"[AudienceIntegrationAdapter] Arda'nin seyirci sistemi '{stressLevel}' (Difficulty: {config.DifficultyLevel}, Preset: {config.AudiencePreset}) modunda baslatildi.");
             }
 
@@ -56,13 +56,8 @@ namespace VRPublicSpeaking.AppShell.Integration
             }
         }
 
-        private StressLevel ConvertConfigToStress(SessionConfig config)
+        private StressLevel ConvertDifficultyToStress(SessionConfig config)
         {
-            // Once Audience Preset onceliklidir. Hostile = Hard, Friendly = Easy.
-            if (config.AudiencePreset == AudiencePreset.Challenging) return StressLevel.Hard;
-            if (config.AudiencePreset == AudiencePreset.Supportive) return StressLevel.Easy;
-
-            // Eger Neutral ise, secilen oyun zorluguna (DifficultyLevel) gore ayarla:
             if (config.DifficultyLevel == SessionDifficulty.Easy)
                 return StressLevel.Easy;
             else if (config.DifficultyLevel == SessionDifficulty.Normal)
@@ -71,6 +66,28 @@ namespace VRPublicSpeaking.AppShell.Integration
                 return StressLevel.Hard;
 
             return StressLevel.Medium;
+        }
+
+        private void ApplyAudiencePresetTuning(AudiencePreset preset)
+        {
+            if (behaviorController == null)
+            {
+                return;
+            }
+
+            switch (preset)
+            {
+                case AudiencePreset.Supportive:
+                    behaviorController.ConfigureAudienceTuning(8f, 0.75f, 1.25f);
+                    break;
+                case AudiencePreset.Challenging:
+                    behaviorController.ConfigureAudienceTuning(-8f, 1.25f, 0.85f);
+                    break;
+                case AudiencePreset.Neutral:
+                default:
+                    behaviorController.ConfigureAudienceTuning(0f, 1f, 1f);
+                    break;
+            }
         }
 
         // --- PAUSE & RESUME ---

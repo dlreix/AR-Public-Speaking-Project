@@ -3,6 +3,7 @@ using TMPro;
 using UnityEngine;
 using VRPublicSpeaking.AppShell.Core;
 using VRPublicSpeaking.AppShell.Data;
+using VRPublicSpeaking.AppShell.PresentationQuestioning;
 
 namespace VRPublicSpeaking.AppShell.Results
 {
@@ -56,7 +57,11 @@ namespace VRPublicSpeaking.AppShell.Results
             {
                 if (summary.Recommendations.Count == 0)
                 {
-                    recommendationsLabel.text = "No coach notes yet. Complete a session to populate recommendations.";
+                    var builder = new StringBuilder();
+                    AppendQaFeedback(builder, summary.QaResult);
+                    recommendationsLabel.text = builder.Length > 0
+                        ? builder.ToString().TrimEnd()
+                        : "No coach notes yet. Complete a session to populate recommendations.";
                 }
                 else
                 {
@@ -72,6 +77,7 @@ namespace VRPublicSpeaking.AppShell.Results
                         builder.Append($"+{summary.Recommendations.Count - visibleRecommendations} more insight(s).");
                     }
 
+                    AppendQaFeedback(builder, summary.QaResult);
                     recommendationsLabel.text = builder.ToString().TrimEnd();
                 }
             }
@@ -173,6 +179,43 @@ namespace VRPublicSpeaking.AppShell.Results
             }
 
             return trimmed.Substring(0, maxLength - 3).TrimEnd() + "...";
+        }
+
+        private static void AppendQaFeedback(StringBuilder builder, PresentationQaResult qaResult)
+        {
+            if (qaResult == null || !qaResult.HasMeaningfulAnswers)
+            {
+                return;
+            }
+
+            if (builder.Length > 0)
+            {
+                builder.AppendLine();
+                builder.AppendLine();
+            }
+
+            builder.AppendLine("Q&A Feedback");
+            int visibleAnswers = Mathf.Min(2, qaResult.answers.Count);
+            for (int index = 0; index < visibleAnswers; index++)
+            {
+                PresentationQaAnswer answer = qaResult.answers[index];
+                if (answer == null)
+                {
+                    continue;
+                }
+
+                string status = answer.feedback != null && !string.IsNullOrWhiteSpace(answer.feedback.status)
+                    ? answer.feedback.status
+                    : answer.skipped ? "Skipped" : "Captured";
+                string summary = answer.feedback != null && !string.IsNullOrWhiteSpace(answer.feedback.summary)
+                    ? answer.feedback.summary
+                    : answer.answerTranscript;
+
+                builder.Append("- ");
+                builder.Append(CompactText(status, 18));
+                builder.Append(": ");
+                builder.AppendLine(CompactText(summary, 72));
+            }
         }
     }
 }

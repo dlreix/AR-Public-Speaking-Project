@@ -2,17 +2,38 @@ using UnityEngine;
 using System.IO;
 using System.Collections.Generic;
 using System.Globalization;
+using System;
 using VRPublicSpeaking.AppShell.Data;
+using VRPublicSpeaking.AppShell.PresentationQuestioning;
+
 [System.Serializable]
 public class SessionData
 {
+    public string sessionId;
     public string date;
+    public long sessionTimestamp;
     public float overallScore;
     public float eyeContact;
     public float pace;
     public float posture;
     public float durationSeconds;
-    public FeedbackReport detailedReport; // Tak�m arkada��n�n yazd��� AI Raporu
+    public float fillerWordCount;
+    public float wpm;
+    public float fillerWordsPerMinute;
+    public float averagePauseDuration;
+    public float toneVariationScore;
+    public float headMovementPercent;
+    public float headSpeedEventsPerMinute;
+    public float crossedArmsPercent;
+    public bool hasWpm;
+    public bool hasFillerWordsPerMinute;
+    public bool hasAveragePauseDuration;
+    public bool hasToneVariationScore;
+    public bool hasHeadMovementPercent;
+    public bool hasHeadSpeedEventsPerMinute;
+    public bool hasCrossedArmsPercent;
+    public FeedbackReport detailedReport;
+    public PresentationQaResult qaResult;
 }
 
 [System.Serializable]
@@ -26,37 +47,70 @@ public class DataManager : MonoBehaviour
     public static DataManager Instance;
     public SessionHistory history = new SessionHistory();
     private string filePath;
+    public string currentUser = "DefaultUser";
 
     void Awake()
     {
-        if (Instance == null)
+        if (Instance != null && Instance != this)
         {
-            Instance = this;
-            filePath = Application.persistentDataPath + "/history_v3.json";
-            LoadData();
-        }
-        else
-        {
+            Debug.Log($"[DataManager] Zaten bir yönetici var ({Instance.currentUser}). Bu kopya ({gameObject.name}) yok ediliyor.");
             Destroy(gameObject);
+            return;
         }
+
+        Instance = this;
+        transform.SetParent(null);
+        DontDestroyOnLoad(gameObject);
+
+        Debug.Log("[DataManager] Ölümsüz DataManager başarıyla oluşturuldu!");
+
+        UpdateFilePath();
+        LoadData();
     }
 
-    // Engine'den gelen raporu eski sistemle birlestirip kaydeder
+    private void UpdateFilePath()
+    {
+        filePath = Application.persistentDataPath + $"/history_{currentUser}.json";
+        Debug.Log($"[DataManager] JSON yolu: {filePath}");
+    }
+
+    // ── YENİ: JSON dosyasının tam yolunu döndürür ──
+    // Windows: C:\Users\[user]\AppData\LocalLow\[Company]\[Product]\history_DefaultUser.json
+    public string GetJsonPath() => filePath;
+
+    public void SetUser(string username)
+    {
+        currentUser = username;
+        UpdateFilePath();
+        LoadData();
+
+        // Dashboard'u bul ve yenile
+        VRPublicSpeaking.AppShell.UI.MainHubDashboardPresenter presenter =
+            FindFirstObjectByType<VRPublicSpeaking.AppShell.UI.MainHubDashboardPresenter>();
+        if (presenter != null) presenter.RefreshDashboard();
+
+        Debug.Log($"<color=green>[DataManager] GİRİŞ BAŞARILI! Aktif kullanıcı: {currentUser}</color>");
+    }
+
     public bool SaveSession(FeedbackReport report)
     {
         if (report == null)
         {
+            Debug.LogWarning("[DataManager] Kayıt iptal: Rapor boş (null).");
             return false;
         }
 
+        long timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         SessionData newSession = new SessionData
         {
-            date = System.DateTime.Now.ToString("MMM dd | HH:mm", CultureInfo.InvariantCulture),
+            sessionId = Guid.NewGuid().ToString("N"),
+            date = DateTime.Now.ToString("MMM dd | HH:mm", CultureInfo.InvariantCulture),
+            sessionTimestamp = timestamp,
             overallScore = report.totalScore,
             eyeContact = report.eyeScore,
             pace = report.speechScore,
             posture = report.postureScore,
-            detailedReport = report
+            detailedReport = CloneFeedbackReport(report)
         };
 
         return SaveSessionData(newSession);
@@ -64,26 +118,61 @@ public class DataManager : MonoBehaviour
 
     public bool SaveSession(SessionResultSummary summary)
     {
-        if (summary == null ||
-            (!summary.HasOverallScore &&
-             !summary.HasEyeContactScore &&
-             !summary.HasSpeechPaceScore &&
-             !summary.HasPostureScore))
+        if (summary == null)
         {
+            Debug.LogWarning("[DataManager] Kayıt iptal: SessionResultSummary boş (null).");
             return false;
         }
 
-        FeedbackReport report = BuildFeedbackReport(summary);
+        if (!summary.HasOverallScore &&
+            !summary.HasEyeContactScore &&
+            !summary.HasSpeechPaceScore &&
+            !summary.HasPostureScore &&
+            !summary.HasQaResult)
+        {
+            Debug.LogWarning("[DataManager] Kayıt iptal: Tüm metrikler 0 veya algılanmamış.");
+            return false;
+        }
+
+        FeedbackReport report = summary.DetailedReport != null
+            ? CloneFeedbackReport(summary.DetailedReport)
+            : BuildFeedbackReport(summary);
+
+        long timestamp = summary.SessionTimestamp > 0
+            ? summary.SessionTimestamp
+            : DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+
         SessionData newSession = new SessionData
         {
-            date = System.DateTime.Now.ToString("MMM dd | HH:mm", CultureInfo.InvariantCulture),
+            sessionId = string.IsNullOrWhiteSpace(summary.SessionId) ? Guid.NewGuid().ToString("N") : summary.SessionId,
+            date = DateTime.Now.ToString("MMM dd | HH:mm", CultureInfo.InvariantCulture),
+            sessionTimestamp = timestamp,
             overallScore = summary.HasOverallScore ? summary.TotalScore : report.totalScore,
             eyeContact = summary.HasEyeContactScore ? summary.EyeContactScore : report.eyeScore,
             pace = summary.HasSpeechPaceScore ? summary.SpeechPaceScore : report.speechScore,
             posture = summary.HasPostureScore ? summary.PostureScore : report.postureScore,
             durationSeconds = summary.DurationSeconds,
-            detailedReport = report
+            fillerWordCount = summary.FillerWordCount,
+            wpm = summary.Wpm,
+            fillerWordsPerMinute = summary.FillerWordsPerMinute,
+            averagePauseDuration = summary.AveragePauseDuration,
+            toneVariationScore = summary.ToneVariationScore,
+            headMovementPercent = summary.HeadMovementPercent,
+            headSpeedEventsPerMinute = summary.HeadSpeedEventsPerMinute,
+            crossedArmsPercent = summary.CrossedArmsPercent,
+            hasWpm = summary.HasWpm,
+            hasFillerWordsPerMinute = summary.HasFillerWordsPerMinute,
+            hasAveragePauseDuration = summary.HasAveragePauseDuration,
+            hasToneVariationScore = summary.HasToneVariationScore,
+            hasHeadMovementPercent = summary.HasHeadMovementPercent,
+            hasHeadSpeedEventsPerMinute = summary.HasHeadSpeedEventsPerMinute,
+            hasCrossedArmsPercent = summary.HasCrossedArmsPercent,
+            detailedReport = report,
+            qaResult = CloneQaResult(summary.QaResult)
         };
+
+        if (newSession.detailedReport != null && newSession.detailedReport.sessionTimestamp <= 0)
+            newSession.detailedReport.sessionTimestamp = timestamp;
 
         return SaveSessionData(newSession);
     }
@@ -92,14 +181,19 @@ public class DataManager : MonoBehaviour
     {
         if (IsDuplicateLatestSession(newSession))
         {
+            Debug.LogWarning("[DataManager] Kayıt iptal: Kopya veri (aynı session zaten kaydedilmiş).");
             return false;
         }
 
+        history ??= new SessionHistory();
+        history.allSessions ??= new List<SessionData>();
         history.allSessions.Add(newSession);
 
         string json = JsonUtility.ToJson(history, true);
         File.WriteAllText(filePath, json);
-        Debug.Log("Dosya Konumu: <color=yellow>" + Application.persistentDataPath + "</color>");
+
+        Debug.Log($"<color=cyan>[DataManager] Kaydedildi! Kullanıcı: {currentUser} | " +
+                  $"Toplam: {history.allSessions.Count} session | Dosya: {filePath}</color>");
         return true;
     }
 
@@ -111,41 +205,56 @@ public class DataManager : MonoBehaviour
             history = JsonUtility.FromJson<SessionHistory>(json);
             history ??= new SessionHistory();
             history.allSessions ??= new List<SessionData>();
+            Debug.Log($"[DataManager] {currentUser} için {history.allSessions.Count} session yüklendi. Dosya: {filePath}");
+        }
+        else
+        {
+            history = new SessionHistory { allSessions = new List<SessionData>() };
+            Debug.Log($"[DataManager] {currentUser} için yeni profil oluşturuldu. Dosya: {filePath}");
         }
     }
 
     public void DeleteAllData()
     {
-        if (File.Exists(filePath))
-        {
-            File.Delete(filePath);
-            history = new SessionHistory();
-            Debug.Log("T�m ge�mi� veriler temizlendi!");
-        }
+        if (File.Exists(filePath)) File.Delete(filePath);
+        history = new SessionHistory { allSessions = new List<SessionData>() };
+        Debug.Log($"[DataManager] {currentUser} tüm veriler silindi.");
     }
+
     private bool IsDuplicateLatestSession(SessionData candidate)
     {
-        if (candidate == null || history == null || history.allSessions == null || history.allSessions.Count == 0)
+        if (candidate == null || history?.allSessions == null || history.allSessions.Count == 0)
+            return false;
+
+        // sessionId ile karşılaştır
+        if (!string.IsNullOrWhiteSpace(candidate.sessionId))
         {
+            foreach (SessionData existing in history.allSessions)
+            {
+                if (existing != null && existing.sessionId == candidate.sessionId)
+                    return true;
+            }
             return false;
         }
 
+        // sessionId yoksa metrik benzerliğine bak
         SessionData latest = history.allSessions[history.allSessions.Count - 1];
         return Mathf.Abs(latest.overallScore - candidate.overallScore) < 0.01f &&
-            Mathf.Abs(latest.eyeContact - candidate.eyeContact) < 0.01f &&
-            Mathf.Abs(latest.pace - candidate.pace) < 0.01f &&
-            Mathf.Abs(latest.posture - candidate.posture) < 0.01f &&
-            Mathf.Abs(latest.durationSeconds - candidate.durationSeconds) < 0.1f;
+               Mathf.Abs(latest.eyeContact - candidate.eyeContact) < 0.01f &&
+               Mathf.Abs(latest.pace - candidate.pace) < 0.01f &&
+               Mathf.Abs(latest.posture - candidate.posture) < 0.01f &&
+               Mathf.Abs(latest.durationSeconds - candidate.durationSeconds) < 0.1f;
     }
+
+    // ── HELPERS ──────────────────────────────────────────────────────────────
 
     private static FeedbackReport BuildFeedbackReport(SessionResultSummary summary)
     {
         float speechScore = summary.HasSpeechPaceScore ? summary.SpeechPaceScore : 0f;
         float eyeScore = summary.HasEyeContactScore ? summary.EyeContactScore : 0f;
         float postureScore = summary.HasPostureScore ? summary.PostureScore : 0f;
-        float totalScore = summary.HasOverallScore
-            ? summary.TotalScore
-            : Mathf.Max(speechScore, eyeScore, postureScore);
+        float totalScore = summary.HasOverallScore ? summary.TotalScore
+                           : Mathf.Max(speechScore, eyeScore, postureScore);
 
         FeedbackReport report = new FeedbackReport
         {
@@ -153,67 +262,45 @@ public class DataManager : MonoBehaviour
             speechScore = speechScore,
             eyeScore = eyeScore,
             postureScore = postureScore,
-            performanceBand = string.IsNullOrWhiteSpace(summary.PerformanceBand)
-                ? ResolvePerformanceBand(totalScore)
-                : summary.PerformanceBand,
-            strongestArea = string.IsNullOrWhiteSpace(summary.StrongestArea)
-                ? ResolveStrongestArea(speechScore, eyeScore, postureScore)
-                : summary.StrongestArea,
-            weakestArea = string.IsNullOrWhiteSpace(summary.WeakestArea)
-                ? ResolveWeakestArea(speechScore, eyeScore, postureScore)
-                : summary.WeakestArea,
-            sessionTimestamp = System.DateTimeOffset.UtcNow.ToUnixTimeSeconds()
+            performanceBand = string.IsNullOrWhiteSpace(summary.PerformanceBand) ? ResolvePerformanceBand(totalScore) : summary.PerformanceBand,
+            strongestArea = string.IsNullOrWhiteSpace(summary.StrongestArea) ? ResolveStrongestArea(speechScore, eyeScore, postureScore) : summary.StrongestArea,
+            weakestArea = string.IsNullOrWhiteSpace(summary.WeakestArea) ? ResolveWeakestArea(speechScore, eyeScore, postureScore) : summary.WeakestArea,
+            sessionTimestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
         };
 
-        AddFeedbackItem(report, "Speech", "WPM", speechScore, "Speech pace supported the delivery.");
-        AddFeedbackItem(report, "Eye Contact", "Gaze Ratio", eyeScore, "Eye contact supported audience connection.");
-        AddFeedbackItem(report, "Posture", "Slouching", postureScore, "Posture supported a confident delivery.");
+        if (summary.HasWpm) AddFeedbackItem(report, "Speech", "WPM", summary.Wpm, "Speech pace supported the delivery.");
+        if (summary.HasFillerWordsPerMinute) AddFeedbackItem(report, "Speech", "Filler Words", summary.FillerWordsPerMinute, "Filler usage supported the delivery.");
+        if (summary.HasAveragePauseDuration) AddFeedbackItem(report, "Speech", "Pause Duration", summary.AveragePauseDuration, "Pauses supported the delivery.");
+        if (summary.HasToneVariationScore) AddFeedbackItem(report, "Speech", "Tone Variation", summary.ToneVariationScore, "Tone variation supported the delivery.");
+        if (summary.HasEyeContactScore) AddFeedbackItem(report, "Eye Contact", "Gaze Ratio", eyeScore, "Eye contact supported audience connection.");
+        if (summary.HasHeadSpeedEventsPerMinute) AddFeedbackItem(report, "Posture", "Head Speed", summary.HeadSpeedEventsPerMinute, "Posture supported a confident delivery.");
+        if (summary.HasHeadMovementPercent) AddFeedbackItem(report, "Posture", "Head Movement", summary.HeadMovementPercent, "Head movement supported the delivery.");
+        if (summary.HasCrossedArmsPercent) AddFeedbackItem(report, "Posture", "Crossed Arms", summary.CrossedArmsPercent, "Open posture supported the delivery.");
 
-        foreach (string recommendation in summary.Recommendations)
-        {
-            if (!string.IsNullOrWhiteSpace(recommendation))
-            {
-                report.improvements.Add(recommendation);
-            }
-        }
+        foreach (string rec in summary.Recommendations)
+            if (!string.IsNullOrWhiteSpace(rec)) report.improvements.Add(rec);
 
         return report;
     }
 
     private static void AddFeedbackItem(FeedbackReport report, string category, string metric, float score, string strengthMessage)
     {
-        FeedbackItem.Severity severity = score >= 75f
-            ? FeedbackItem.Severity.Strength
-            : score >= 50f
-                ? FeedbackItem.Severity.Minor
-                : FeedbackItem.Severity.Major;
-
+        FeedbackItem.Severity severity = score >= 75f ? FeedbackItem.Severity.Strength
+                                       : score >= 50f ? FeedbackItem.Severity.Minor
+                                       : FeedbackItem.Severity.Major;
         string message = severity == FeedbackItem.Severity.Strength
             ? strengthMessage
             : $"{category} needs attention ({score:F0}/100).";
-
         report.items.Add(new FeedbackItem(category, metric, severity, message, score));
-        if (severity == FeedbackItem.Severity.Strength)
-        {
-            report.strengths.Add($"[{category}] {metric}");
-        }
-        else if (severity == FeedbackItem.Severity.Major)
-        {
-            report.improvements.Add($"[{category}] {metric}");
-        }
+        if (severity == FeedbackItem.Severity.Strength) report.strengths.Add($"[{category}] {metric}");
+        else if (severity == FeedbackItem.Severity.Major) report.improvements.Add($"[{category}] {metric}");
     }
 
-    private static string ResolveStrongestArea(float speechScore, float eyeScore, float postureScore)
-    {
-        float max = Mathf.Max(speechScore, eyeScore, postureScore);
-        return max == speechScore ? "Speech" : max == eyeScore ? "Eye Contact" : "Posture";
-    }
+    private static string ResolveStrongestArea(float s, float e, float p)
+    { float m = Mathf.Max(s, e, p); return m == s ? "Speech" : m == e ? "Eye Contact" : "Posture"; }
 
-    private static string ResolveWeakestArea(float speechScore, float eyeScore, float postureScore)
-    {
-        float min = Mathf.Min(speechScore, eyeScore, postureScore);
-        return min == speechScore ? "Speech" : min == eyeScore ? "Eye Contact" : "Posture";
-    }
+    private static string ResolveWeakestArea(float s, float e, float p)
+    { float m = Mathf.Min(s, e, p); return m == s ? "Speech" : m == e ? "Eye Contact" : "Posture"; }
 
     private static string ResolvePerformanceBand(float score)
     {
@@ -223,4 +310,71 @@ public class DataManager : MonoBehaviour
         return "Weak Performance";
     }
 
+    private static FeedbackReport CloneFeedbackReport(FeedbackReport report)
+    {
+        if (report == null) return null;
+
+        FeedbackReport clone = new FeedbackReport
+        {
+            totalScore = report.totalScore,
+            speechScore = report.speechScore,
+            eyeScore = report.eyeScore,
+            postureScore = report.postureScore,
+            performanceBand = report.performanceBand,
+            strongestArea = report.strongestArea,
+            weakestArea = report.weakestArea,
+            sessionTimestamp = report.sessionTimestamp
+        };
+
+        if (report.items != null)
+            foreach (FeedbackItem item in report.items)
+                if (item != null)
+                    clone.items.Add(new FeedbackItem(item.category, item.metric, item.severity, item.message, item.score));
+
+        if (report.strengths != null) clone.strengths.AddRange(report.strengths);
+        if (report.improvements != null) clone.improvements.AddRange(report.improvements);
+
+        return clone;
+    }
+
+    private static PresentationQaResult CloneQaResult(PresentationQaResult result)
+    {
+        if (result == null) return null;
+
+        PresentationQaResult clone = new PresentationQaResult
+        {
+            deckId = result.deckId,
+            deckName = result.deckName,
+            status = result.status,
+            summary = result.summary,
+            completedUnixTime = result.completedUnixTime
+        };
+
+        if (result.answers != null)
+        {
+            foreach (PresentationQaAnswer answer in result.answers)
+            {
+                if (answer == null) continue;
+                clone.answers.Add(new PresentationQaAnswer
+                {
+                    questionId = answer.questionId,
+                    question = answer.question,
+                    expectedAnswer = answer.expectedAnswer,
+                    answerTranscript = answer.answerTranscript,
+                    skipped = answer.skipped,
+                    feedback = answer.feedback == null ? null : new PresentationAnswerFeedback
+                    {
+                        accuracy = answer.feedback.accuracy,
+                        coverage = answer.feedback.coverage,
+                        clarity = answer.feedback.clarity,
+                        summary = answer.feedback.summary,
+                        betterAnswer = answer.feedback.betterAnswer,
+                        status = answer.feedback.status
+                    }
+                });
+            }
+        }
+
+        return clone;
+    }
 }

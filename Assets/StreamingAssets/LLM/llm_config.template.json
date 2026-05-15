@@ -1,0 +1,11 @@
+{
+  "provider": "gemini",
+  "geminiApiKey": "",
+  "geminiBaseUrl": "https://generativelanguage.googleapis.com/v1beta",
+  "geminiModel": "gemini-2.5-flash-lite",
+  "openAiApiKey": "",
+  "openAiBaseUrl": "https://api.openai.com/v1/responses",
+  "openAiModel": "gpt-4.1-mini",
+  "requestTimeoutSeconds": 45,
+  "maxQuestions": 3
+}

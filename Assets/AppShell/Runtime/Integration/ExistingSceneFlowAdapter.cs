@@ -5,6 +5,7 @@ using SpeechPipeline;
 using VRPublicSpeaking.AppShell.Core;
 using VRPublicSpeaking.AppShell.Data;
 using VRPublicSpeaking.AppShell.Flow;
+using VRPublicSpeaking.AppShell.PresentationQuestioning;
 using VRPublicSpeaking.AppShell.UI;
 
 namespace VRPublicSpeaking.AppShell.Integration
@@ -15,6 +16,7 @@ namespace VRPublicSpeaking.AppShell.Integration
         [SerializeField] private ScoringAdapter scoringAdapter;
         [SerializeField] private SpeechPipelineController speechPipelineController;
         [SerializeField] private EnvironmentSessionOverlayController environmentSessionOverlayController;
+        [SerializeField] private PresentationQuestionSessionController presentationQuestionSessionController;
         [SerializeField] private bool routeAfterSessionEnd = true;
         [SerializeField] private float autoStartDelay = 0.35f;
         [SerializeField] private string resultsLoadingMessage = "Loading results...";
@@ -160,17 +162,45 @@ namespace VRPublicSpeaking.AppShell.Integration
                 summary.DurationSeconds = durationSeconds;
             }
 
+            StartCoroutine(CompleteSessionEndRoutine(summary));
+        }
+
+        private IEnumerator CompleteSessionEndRoutine(SessionResultSummary summary)
+        {
+            if (presentationQuestionSessionController == null)
+            {
+                AutoWireIfNeeded();
+            }
+
+            if (presentationQuestionSessionController != null &&
+                activeConfig != null &&
+                presentationQuestionSessionController.CanRun(activeConfig, out _))
+            {
+                PresentationQaResult qaResult = null;
+                yield return presentationQuestionSessionController.Run(
+                    activeConfig,
+                    speechPipelineController,
+                    result => qaResult = result);
+
+                if (qaResult != null && qaResult.HasMeaningfulAnswers)
+                {
+                    summary.SetQaResult(qaResult);
+                }
+            }
+
             runtimeState.StoreResult(summary);
+            EnsureDataManager();
+            DataManager.Instance?.SaveSession(summary);
 
             if (!routeAfterSessionEnd)
             {
-                return;
+                yield break;
             }
 
             if (environmentSessionOverlayController != null &&
-                environmentSessionOverlayController.ShowResultsOverlay())
+                environmentSessionOverlayController.ShowDashboardPanel())
             {
-                return;
+                yield break;
             }
 
             if (!RouteToResults())
@@ -255,6 +285,12 @@ namespace VRPublicSpeaking.AppShell.Integration
                 speechPipelineController = FindFirstObjectByType<SpeechPipelineController>(FindObjectsInactive.Include);
             }
 
+            if (presentationQuestionSessionController == null)
+            {
+                presentationQuestionSessionController =
+                    FindFirstObjectByType<PresentationQuestionSessionController>(FindObjectsInactive.Include);
+            }
+
             if (mainController == null)
             {
                 Debug.LogWarning("[ExistingSceneFlowAdapter] No MainController was found in the active environment scene.");
@@ -266,6 +302,11 @@ namespace VRPublicSpeaking.AppShell.Integration
         public void SetSpeechPipelineController(SpeechPipelineController controller)
         {
             speechPipelineController = controller;
+        }
+
+        public void SetPresentationQuestionSessionController(PresentationQuestionSessionController controller)
+        {
+            presentationQuestionSessionController = controller;
         }
 
         private void AttachToMainController(MainController controller)
@@ -369,10 +410,21 @@ namespace VRPublicSpeaking.AppShell.Integration
                 controller = speechRoot.AddComponent<SpeechPipelineController>();
             }
 
+            controller.UseDefaultModelWhenUnsetOrLegacy();
             controller.SpeechAdapter = speechAdapter;
             controller.ScoringEngine = scoringEngine;
             Debug.Log("[ExistingSceneFlowAdapter] Speech pipeline runtime binding is ready.");
             return controller;
+        }
+
+        private static void EnsureDataManager()
+        {
+            if (DataManager.Instance != null)
+            {
+                return;
+            }
+
+            new GameObject("DataManager_Auto").AddComponent<DataManager>();
         }
 
         private void DetachEvents()

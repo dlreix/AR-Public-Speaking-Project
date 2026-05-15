@@ -22,14 +22,13 @@ namespace VRPublicSpeaking.AppShell.Flow
         [SerializeField] private bool enableProgressTracking = true;
         [SerializeField] private bool enablePanelAnimations = true;
         [SerializeField] private bool enableAmbientLighting = true;
-        [SerializeField] private bool enableWelcomePanel = true;
         [SerializeField] private bool enableProgressHud = false;
         [SerializeField] private bool enableFloorGuides = true;
         [SerializeField] private bool enableCompletionCelebration = true;
         [SerializeField] private bool enableSequentialReveal = true;
 
         [Header("Sequential Tutorial Mode")]
-        [Tooltip("When enabled, tutorial panels appear one at a time in front of the user after the welcome screen.")]
+        [Tooltip("When enabled, tutorial panels appear one at a time in front of the user.")]
         [SerializeField] private bool enableSequentialMode = true;
         [SerializeField] private float sequentialStartDelay = 1.5f;
 
@@ -40,7 +39,6 @@ namespace VRPublicSpeaking.AppShell.Flow
 
         private TutorialProgressTracker progressTracker;
         private TutorialAmbientLighting ambientLighting;
-        private TutorialWelcomePanel welcomePanel;
         private TutorialProgressHud progressHud;
         private TutorialFloorGuideSystem floorGuideSystem;
         private TutorialCompletionCelebration completionCelebration;
@@ -97,7 +95,7 @@ namespace VRPublicSpeaking.AppShell.Flow
                 root,
                 "MovementTutorialPanel",
                 "Movement & UI",
-                "Left stick: move around the hub.\nRight stick: turn your view.\nAim the controller ray at a menu item.\nTrigger: select buttons and cards.",
+                "Left stick: move.\nRight stick: snap turn.\nController ray: aim at menu items.\nTrigger: select.",
                 "Walk to the wall menu when you are ready to start.",
                 new Vector3(-5.78f, 2.25f, 1.05f),
                 new Vector3(0f, -90f, 0f));
@@ -106,7 +104,7 @@ namespace VRPublicSpeaking.AppShell.Flow
                 root,
                 "SessionControlsTutorialPanel",
                 "Session Controls",
-                "A / X: start or stop the active session.\nB / Y tap: toggle debug guidance.\nB / Y hold: pause or resume during a session.\nGrip: trigger the circle event while recording.",
+                "A / X: start or stop.\nB / Y tap: debug guidance.\nB / Y hold: pause or resume.\nGrip: circle event.",
                 "These controls apply after you launch a practice room.",
                 new Vector3(5.78f, 2.25f, 1.05f),
                 new Vector3(0f, 90f, 0f));
@@ -115,7 +113,7 @@ namespace VRPublicSpeaking.AppShell.Flow
                 root,
                 "DesktopTestingTutorialPanel",
                 "Desktop Testing",
-                "WASD: move.\nMouse: look around.\nR: start or stop.\nD: debug.\nEsc: pause.\nC or left click: circle event.",
+                "WASD: move.\nMouse: look.\nR: start or stop.\nD: debug.\nEsc: pause.",
                 "Use this when checking the flow without a headset.",
                 new Vector3(-2.25f, 2.2f, -1.48f),
                 new Vector3(0f, 180f, 0f));
@@ -149,60 +147,41 @@ namespace VRPublicSpeaking.AppShell.Flow
 
             // Register slides with the sequential presenter
             sequentialPresenter.AddSlide(
+                "Welcome",
+                "- Move and select from the wall menu\n- Review session setup before launch\n- Start a practice room\n- Open results and dashboard after the run",
+                "This guide is now part of the tutorial flow, so you can begin faster.",
+                string.Empty);
+
+            sequentialPresenter.AddSlide(
                 "Movement & UI",
-                "◆  Left stick: move around the hub\n◆  Right stick: turn your view\n◆  Aim the controller ray at a menu item\n◆  Trigger: select buttons and cards",
+                "- Left stick: move around the hub\n- Right stick: snap turn\n- Aim the controller ray at menu items\n- Trigger: select buttons and cards",
                 "Walk to the wall menu when you are ready to start.",
-                "🎮");
+                string.Empty);
 
             sequentialPresenter.AddSlide(
                 "Session Controls",
-                "◆  A / X: start or stop the active session\n◆  B / Y tap: toggle debug guidance\n◆  B / Y hold: pause or resume during a session\n◆  Grip: trigger the circle event while recording",
+                "- A / X: start or stop the active session\n- B / Y tap: toggle debug guidance\n- B / Y hold: pause or resume\n- Grip: trigger the circle event",
                 "These controls apply after you launch a practice room.",
-                "🎯");
+                string.Empty);
 
             sequentialPresenter.AddSlide(
                 "Desktop Testing",
-                "◆  WASD: move\n◆  Mouse: look around\n◆  R: start or stop\n◆  D: debug mode\n◆  Esc: pause\n◆  C or left click: circle event",
+                "- WASD: move\n- Mouse: look around\n- R: start or stop\n- D: debug mode\n- Esc: pause\n- C or left click: circle event",
                 "Use this when checking the flow without a headset.",
-                "💻");
+                string.Empty);
 
             sequentialPresenter.AddSlide(
                 "Practice Flow",
                 "1. Choose Practice Mode\n2. Pick a room\n3. Review setup\n4. Start Session\n5. Read Results and recommendations",
                 "The wall menu stays available as your main launch board.",
-                "📋");
+                string.Empty);
 
             // Wire events
             sequentialPresenter.AllSlidesCompleted += OnSequentialCompleted;
             sequentialPresenter.TutorialSkipped += OnSequentialSkipped;
             sequentialPresenter.SlideShown += OnSequentialSlideShown;
 
-            // Start after welcome panel delay
-            float startDelay = enableWelcomePanel ? sequentialStartDelay + 12f : sequentialStartDelay;
-            // If welcome panel is enabled, wait for it to dismiss first
-            if (enableWelcomePanel && welcomePanel != null)
-            {
-                StartCoroutine(StartSequentialAfterWelcome());
-            }
-            else
-            {
-                sequentialPresenter.StartPresentationDelayed(startDelay);
-            }
-        }
-
-        private System.Collections.IEnumerator StartSequentialAfterWelcome()
-        {
-            // Wait until welcome panel is no longer showing
-            while (welcomePanel != null && welcomePanel.IsShowing)
-            {
-                yield return null;
-            }
-
-            yield return new WaitForSeconds(sequentialStartDelay);
-            if (sequentialPresenter != null)
-            {
-                sequentialPresenter.StartPresentation();
-            }
+            sequentialPresenter.StartPresentationDelayed(sequentialStartDelay);
         }
 
         private void OnSequentialCompleted()
@@ -255,14 +234,6 @@ namespace VRPublicSpeaking.AppShell.Flow
                 if (ambientLighting == null)
                     ambientLighting = gameObject.AddComponent<TutorialAmbientLighting>();
                 ambientLighting.Initialize();
-            }
-
-            if (enableWelcomePanel)
-            {
-                welcomePanel = GetComponent<TutorialWelcomePanel>();
-                if (welcomePanel == null)
-                    welcomePanel = gameObject.AddComponent<TutorialWelcomePanel>();
-                welcomePanel.Show();
             }
 
             if (enableFloorGuides)
@@ -385,12 +356,6 @@ namespace VRPublicSpeaking.AppShell.Flow
         private void OnOverallProgressChanged(float progress)
         {
             UpdateProgressHud();
-
-            // Dismiss welcome panel once user starts exploring
-            if (progress > 0f && welcomePanel != null && welcomePanel.IsShowing)
-            {
-                welcomePanel.Dismiss();
-            }
 
             // Trigger celebration when all panels completed
             if (progress >= 1f && !celebrationTriggered)
@@ -573,7 +538,6 @@ namespace VRPublicSpeaking.AppShell.Flow
             CanvasGroup canvasGroup = canvasObject.GetComponent<CanvasGroup>();
 
             CreateImage(canvasRect, "Background", StretchRect(Vector2.zero, Vector2.zero), PanelColor, true);
-            Image accentBar = CreateImage(canvasRect, "AccentBar", TopRect(0f, 0f, 12f), HeaderColor, false);
 
             // Step badge (top-right corner)
             CreateText(
@@ -594,22 +558,35 @@ namespace VRPublicSpeaking.AppShell.Flow
                 canvasRect,
                 "Title",
                 title,
-                new RectOffset(54, 120, 38, 0),
-                58f,
+                new RectOffset(54, 150, 46, 0),
+                56f,
                 HeaderColor,
                 TextAlignmentOptions.TopLeft,
                 FontStyles.Bold,
                 new Vector2(0f, 1f),
                 new Vector2(1f, 1f),
                 new Vector2(0.5f, 1f),
-                new Vector2(0f, 118f));
+                new Vector2(0f, 112f));
+
+            CreateImage(
+                canvasRect,
+                "TitleSeparator",
+                new RectTransformSetup(
+                    new Vector2(0f, 1f),
+                    Vector2.one,
+                    new Vector2(0.5f, 1f),
+                    new Vector2(54f, -146f),
+                    new Vector2(-54f, -143f),
+                    Vector2.zero),
+                new Color(HeaderColor.r, HeaderColor.g, HeaderColor.b, 0.42f),
+                false);
 
             CreateText(
                 canvasRect,
                 "Body",
                 body,
-                new RectOffset(58, 58, 150, 86),
-                35f,
+                new RectOffset(58, 58, 176, 92),
+                34f,
                 BodyColor,
                 TextAlignmentOptions.TopLeft,
                 FontStyles.Normal,
@@ -646,7 +623,7 @@ namespace VRPublicSpeaking.AppShell.Flow
             if (enablePanelAnimations)
             {
                 TutorialPanelAnimator animator = canvasObject.AddComponent<TutorialPanelAnimator>();
-                animator.Initialize(canvasGroup, accentBar, null, progressFill);
+                animator.Initialize(canvasGroup, null, null, progressFill);
                 panelAnimators.Add(animator);
                 animatorsByName[panelName] = animator;
             }

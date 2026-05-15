@@ -1,6 +1,8 @@
 using TMPro;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
+using SpeechPipeline;
 using VRPublicSpeaking.AppShell.Core;
 using VRPublicSpeaking.AppShell.Data;
 
@@ -10,23 +12,45 @@ namespace VRPublicSpeaking.AppShell.UI
     {
         [SerializeField] private AppRuntimeState runtimeState;
         [SerializeField] private MainController mainController;
+        [SerializeField] private SpeechPipelineController speechPipelineController;
         [SerializeField] private CanvasGroup canvasGroup;
         [SerializeField] private TMP_Text timerLabel;
         [SerializeField] private TMP_Text statusLabel;
+        [SerializeField] private TMP_Text liveScoreLabel;
+        [SerializeField] private TMP_Text speechTranscriptLabel;
+        [SerializeField] private WorldSpaceCanvasFollower hudFollower;
         [SerializeField] private RectTransform warningRoot;
         [SerializeField] private CanvasGroup warningCanvasGroup;
         [SerializeField] private WorldSpaceCanvasFollower warningFollower;
         [SerializeField] private TMP_Text warningLabel;
+        [SerializeField] private GazeScoringSystem gazeScoringSystem;
         [SerializeField] private bool hideWhenSessionInactive = true;
+        [SerializeField] private bool showLiveWarnings;
+        [SerializeField] private bool showLiveScore = true;
+        [SerializeField] private bool showSpeechTranscriptPreview = true;
         [SerializeField] private string inactiveStatusText = "Session idle";
         [SerializeField] private Color warningTextColor = new Color(0.98f, 0.74f, 0.39f, 1f);
         [SerializeField] private Color warningBackgroundColor = new Color(0.08f, 0.11f, 0.15f, 0.92f);
+        [SerializeField] private Vector3 hudFollowOffset = new Vector3(0f, -0.48f, 0.98f);
         [SerializeField] private Vector3 warningFollowOffset = new Vector3(0f, -0.12f, 0.92f);
+        [SerializeField] private Vector3 raisedSceneHudFollowOffset = new Vector3(0f, -0.26f, 0.98f);
+        [SerializeField] private Vector3 raisedSceneWarningFollowOffset = new Vector3(0f, 0.04f, 0.92f);
+        [SerializeField] private Vector2 vrHudSize = new Vector2(340f, 142f);
+        [SerializeField] private Vector2 desktopHudSize = new Vector2(560f, 210f);
         [SerializeField] private Vector2 desktopWarningAnchoredPosition = new Vector2(0f, -135f);
         [SerializeField] private Vector2 desktopWarningSize = new Vector2(540f, 90f);
+        [SerializeField] private float minimumHudTargetY = 1.55f;
+        [SerializeField] private float raisedSceneMinimumHudTargetY = 1.82f;
+        [SerializeField] private float vrTimerFontSize = 28f;
+        [SerializeField] private float vrScoreFontSize = 14f;
+        [SerializeField] private float vrStatusFontSize = 11f;
+        [SerializeField] private float desktopTimerFontSize = 40f;
+        [SerializeField] private float desktopScoreFontSize = 16f;
         [SerializeField] private float desktopWarningFontSize = 16f;
+        [SerializeField] private float desktopSpeechPreviewFontSize = 15f;
 
         private bool warningVisible;
+        private bool hudVisible;
 
         private void Awake()
         {
@@ -48,6 +72,16 @@ namespace VRPublicSpeaking.AppShell.UI
             if (mainController == null)
             {
                 mainController = FindFirstObjectByType<MainController>(FindObjectsInactive.Include);
+            }
+
+            if (gazeScoringSystem == null)
+            {
+                gazeScoringSystem = FindFirstObjectByType<GazeScoringSystem>(FindObjectsInactive.Include);
+            }
+
+            if (speechPipelineController == null)
+            {
+                speechPipelineController = FindFirstObjectByType<SpeechPipelineController>(FindObjectsInactive.Include);
             }
 
             Refresh();
@@ -80,12 +114,33 @@ namespace VRPublicSpeaking.AppShell.UI
 
             if (statusLabel != null)
             {
+                bool isScreenSpace = IsUnderScreenSpaceCanvas();
                 statusLabel.text = isActive
-                    ? $"{(runtime != null && runtime.SessionPaused ? "Paused" : "Target")}: {FormatStopwatchTime(targetDurationSeconds)} | {GetPracticeModeLabel(config?.PracticeMode ?? PracticeMode.GuidedPractice)}"
+                    ? BuildStatusText(runtime, config, targetDurationSeconds, isScreenSpace, BuildVoiceStatus(config))
                     : inactiveStatusText;
             }
 
-            RefreshLiveWarning(isActive && !hideForOverlay);
+            if (liveScoreLabel != null)
+            {
+                liveScoreLabel.gameObject.SetActive(showLiveScore);
+                liveScoreLabel.text = BuildLiveScoreText(isActive);
+            }
+
+            if (speechTranscriptLabel != null)
+            {
+                bool showSpeechPreview =
+                    showSpeechTranscriptPreview &&
+                    isActive &&
+                    config != null &&
+                    config.VoiceAnalysisEnabled;
+                speechTranscriptLabel.gameObject.SetActive(showSpeechPreview);
+                if (showSpeechPreview)
+                {
+                    speechTranscriptLabel.text = BuildSpeechTranscriptPreviewText(config);
+                }
+            }
+
+            RefreshLiveWarning(showLiveWarnings && isActive && !hideForOverlay);
         }
 
         private void SetVisible(bool isVisible)
@@ -95,14 +150,26 @@ namespace VRPublicSpeaking.AppShell.UI
                 return;
             }
 
+            if (isVisible && !hudVisible && hudFollower != null && hudFollower.enabled)
+            {
+                hudFollower.SnapToTarget();
+            }
+
             canvasGroup.alpha = isVisible ? 1f : 0f;
             canvasGroup.interactable = false;
             canvasGroup.blocksRaycasts = false;
+            hudVisible = isVisible;
         }
 
         private void RefreshLiveWarning(bool canShow)
         {
             EnsureHudLayout();
+
+            if (!showLiveWarnings)
+            {
+                SetWarningVisible(false);
+                return;
+            }
 
             if (warningLabel == null || warningRoot == null)
             {
@@ -132,25 +199,162 @@ namespace VRPublicSpeaking.AppShell.UI
 
         private void EnsureHudLayout()
         {
+            bool useScreenSpacePlacement = IsUnderScreenSpaceCanvas();
             RectTransform hudRect = transform as RectTransform;
             if (hudRect != null)
             {
-                hudRect.sizeDelta = new Vector2(Mathf.Max(hudRect.sizeDelta.x, 460f), 140f);
+                hudRect.anchorMin = new Vector2(0.5f, 0.5f);
+                hudRect.anchorMax = new Vector2(0.5f, 0.5f);
+                hudRect.pivot = new Vector2(0.5f, 0.5f);
+                hudRect.sizeDelta = useScreenSpacePlacement ? desktopHudSize : vrHudSize;
+                if (useScreenSpacePlacement)
+                {
+                    hudRect.anchoredPosition = new Vector2(0f, -340f);
+                }
             }
 
             if (timerLabel != null)
             {
-                ConfigureHudLabel(timerLabel, new Vector2(420f, 60f), new Vector2(0f, 18f));
+                ConfigureHudLabel(
+                    timerLabel,
+                    useScreenSpacePlacement ? new Vector2(460f, 62f) : new Vector2(250f, 40f),
+                    useScreenSpacePlacement ? new Vector2(0f, 58f) : new Vector2(0f, 44f));
+                timerLabel.fontSize = useScreenSpacePlacement ? desktopTimerFontSize : vrTimerFontSize;
+                timerLabel.alignment = TextAlignmentOptions.Center;
+                timerLabel.overflowMode = TextOverflowModes.Ellipsis;
+                timerLabel.raycastTarget = false;
+            }
+
+            EnsureLiveScoreLabel();
+
+            if (liveScoreLabel != null)
+            {
+                ConfigureHudLabel(
+                    liveScoreLabel,
+                    useScreenSpacePlacement ? new Vector2(460f, 34f) : new Vector2(250f, 22f),
+                    useScreenSpacePlacement ? new Vector2(0f, 12f) : new Vector2(0f, 14f));
+                liveScoreLabel.fontSize = useScreenSpacePlacement ? desktopScoreFontSize : vrScoreFontSize;
+                liveScoreLabel.alignment = TextAlignmentOptions.Center;
+                liveScoreLabel.textWrappingMode = TextWrappingModes.NoWrap;
+                liveScoreLabel.overflowMode = TextOverflowModes.Ellipsis;
+                liveScoreLabel.color = liveScoreLabel.color.a > 0f ? liveScoreLabel.color : new Color(0.98f, 0.84f, 0.42f, 1f);
+                liveScoreLabel.raycastTarget = false;
             }
 
             if (statusLabel != null)
             {
-                ConfigureHudLabel(statusLabel, new Vector2(420f, 60f), new Vector2(0f, -24f));
-                statusLabel.fontSize = 18f;
+                ConfigureHudLabel(
+                    statusLabel,
+                    useScreenSpacePlacement ? new Vector2(500f, 44f) : new Vector2(310f, 26f),
+                    useScreenSpacePlacement ? new Vector2(0f, -26f) : new Vector2(0f, -18f));
+                statusLabel.fontSize = useScreenSpacePlacement ? 18f : vrStatusFontSize;
+                statusLabel.alignment = TextAlignmentOptions.Center;
+                statusLabel.textWrappingMode = useScreenSpacePlacement ? TextWrappingModes.Normal : TextWrappingModes.NoWrap;
+                statusLabel.overflowMode = TextOverflowModes.Ellipsis;
                 statusLabel.color = statusLabel.color.a > 0f ? statusLabel.color : new Color(0.70f, 0.78f, 0.90f, 1f);
+                statusLabel.raycastTarget = false;
             }
 
+            EnsureSpeechTranscriptLabel();
+
+            if (speechTranscriptLabel != null)
+            {
+                ConfigureHudLabel(
+                    speechTranscriptLabel,
+                    useScreenSpacePlacement ? new Vector2(500f, 50f) : new Vector2(320f, 42f),
+                    useScreenSpacePlacement ? new Vector2(0f, -76f) : new Vector2(0f, -56f));
+                speechTranscriptLabel.fontSize = useScreenSpacePlacement ? desktopSpeechPreviewFontSize : 10f;
+                speechTranscriptLabel.enableAutoSizing = true;
+                speechTranscriptLabel.fontSizeMax = useScreenSpacePlacement ? desktopSpeechPreviewFontSize : 10f;
+                speechTranscriptLabel.fontSizeMin = useScreenSpacePlacement ? 11f : 7f;
+                speechTranscriptLabel.alignment = TextAlignmentOptions.Center;
+                speechTranscriptLabel.textWrappingMode = TextWrappingModes.Normal;
+                speechTranscriptLabel.overflowMode = TextOverflowModes.Ellipsis;
+                speechTranscriptLabel.color = speechTranscriptLabel.color.a > 0f ? speechTranscriptLabel.color : new Color(0.54f, 0.92f, 1f, 1f);
+                speechTranscriptLabel.raycastTarget = false;
+            }
+
+            Image background = GetComponent<Image>();
+            if (background != null)
+            {
+                background.raycastTarget = false;
+            }
+
+            EnsureHudFollower(useScreenSpacePlacement);
             EnsureWarningPanel();
+        }
+
+        private void EnsureLiveScoreLabel()
+        {
+            if (liveScoreLabel == null)
+            {
+                Transform existingLabel = transform.Find("LiveScoreLabel");
+                if (existingLabel != null)
+                {
+                    liveScoreLabel = existingLabel.GetComponent<TMP_Text>();
+                }
+            }
+
+            if (liveScoreLabel != null)
+            {
+                return;
+            }
+
+            GameObject labelObject = new GameObject("LiveScoreLabel", typeof(RectTransform));
+            labelObject.transform.SetParent(transform, false);
+            liveScoreLabel = labelObject.AddComponent<TextMeshProUGUI>();
+            liveScoreLabel.text = "Gaze --";
+        }
+
+        private void EnsureSpeechTranscriptLabel()
+        {
+            if (speechTranscriptLabel == null)
+            {
+                Transform existingLabel = transform.Find("SpeechTranscriptPreviewLabel");
+                if (existingLabel != null)
+                {
+                    speechTranscriptLabel = existingLabel.GetComponent<TMP_Text>();
+                }
+            }
+
+            if (speechTranscriptLabel != null)
+            {
+                return;
+            }
+
+            GameObject labelObject = new GameObject("SpeechTranscriptPreviewLabel", typeof(RectTransform));
+            labelObject.transform.SetParent(transform, false);
+            speechTranscriptLabel = labelObject.AddComponent<TextMeshProUGUI>();
+            speechTranscriptLabel.text = "Mic > listening...";
+        }
+
+        private void EnsureHudFollower(bool useScreenSpacePlacement)
+        {
+            if (hudFollower == null)
+            {
+                hudFollower = GetComponent<WorldSpaceCanvasFollower>();
+            }
+
+            if (useScreenSpacePlacement)
+            {
+                if (hudFollower != null)
+                {
+                    hudFollower.enabled = false;
+                }
+
+                transform.localScale = Vector3.one;
+                return;
+            }
+
+            if (hudFollower == null)
+            {
+                hudFollower = gameObject.AddComponent<WorldSpaceCanvasFollower>();
+            }
+
+            hudFollower.enabled = true;
+            hudFollower.Configure(null, ResolveHudFollowOffset(), false, true, 16f, 18f);
+            hudFollower.SetMinimumTargetY(ResolveMinimumHudTargetY());
+            hudFollower.SetFollowContinuously(true);
         }
 
         private void EnsureWarningPanel()
@@ -161,6 +365,17 @@ namespace VRPublicSpeaking.AppShell.UI
             {
                 Transform existingRoot = warningParent.Find("LiveWarningPanel");
                 warningRoot = existingRoot as RectTransform;
+            }
+
+            if (!showLiveWarnings)
+            {
+                SetWarningVisible(false);
+                if (warningFollower != null)
+                {
+                    warningFollower.enabled = false;
+                }
+
+                return;
             }
 
             if (warningRoot == null)
@@ -215,7 +430,8 @@ namespace VRPublicSpeaking.AppShell.UI
             warningFollower.enabled = !useScreenSpacePlacement;
             if (!useScreenSpacePlacement)
             {
-                warningFollower.Configure(null, warningFollowOffset, false, true, 14f, 16f);
+                warningFollower.Configure(null, ResolveWarningFollowOffset(), false, true, 14f, 16f);
+                warningFollower.SetMinimumTargetY(ResolveMinimumHudTargetY());
                 warningFollower.SetFollowContinuously(true);
             }
 
@@ -252,6 +468,33 @@ namespace VRPublicSpeaking.AppShell.UI
             warningLabel.raycastTarget = false;
 
             SetWarningVisible(warningVisible);
+        }
+
+        private Vector3 ResolveHudFollowOffset()
+        {
+            return UsesRaisedVrPlacementForActiveScene()
+                ? raisedSceneHudFollowOffset
+                : hudFollowOffset;
+        }
+
+        private Vector3 ResolveWarningFollowOffset()
+        {
+            return UsesRaisedVrPlacementForActiveScene()
+                ? raisedSceneWarningFollowOffset
+                : warningFollowOffset;
+        }
+
+        private float ResolveMinimumHudTargetY()
+        {
+            return UsesRaisedVrPlacementForActiveScene()
+                ? Mathf.Max(minimumHudTargetY, raisedSceneMinimumHudTargetY)
+                : minimumHudTargetY;
+        }
+
+        private static bool UsesRaisedVrPlacementForActiveScene()
+        {
+            string sceneName = SceneManager.GetActiveScene().name;
+            return sceneName.Contains("Conference") || sceneName.Contains("Meeting");
         }
 
         private void SetWarningVisible(bool isVisible)
@@ -318,6 +561,107 @@ namespace VRPublicSpeaking.AppShell.UI
             int minutes = totalSeconds / 60;
             int remainingSeconds = totalSeconds % 60;
             return $"{minutes:00}:{remainingSeconds:00}";
+        }
+
+        private string BuildLiveScoreText(bool isActive)
+        {
+            if (!showLiveScore)
+            {
+                return string.Empty;
+            }
+
+            if (!isActive)
+            {
+                return "Gaze --";
+            }
+
+            if (gazeScoringSystem == null)
+            {
+                gazeScoringSystem = FindFirstObjectByType<GazeScoringSystem>(FindObjectsInactive.Include);
+            }
+
+            return gazeScoringSystem != null
+                ? $"Gaze {gazeScoringSystem.GazeScore:0}"
+                : "Gaze --";
+        }
+
+        private static string BuildStatusText(
+            SessionRuntimeState runtime,
+            SessionConfig config,
+            float targetDurationSeconds,
+            bool isScreenSpace,
+            string voiceStatus)
+        {
+            string pausePrefix = runtime != null && runtime.SessionPaused ? "Paused" : "Target";
+            string voiceSuffix = string.IsNullOrWhiteSpace(voiceStatus) ? string.Empty : $" | {voiceStatus}";
+            if (!isScreenSpace)
+            {
+                return $"{pausePrefix} {FormatStopwatchTime(targetDurationSeconds)}{voiceSuffix} | Menu/B hold: pause";
+            }
+
+            return $"{pausePrefix}: {FormatStopwatchTime(targetDurationSeconds)}{voiceSuffix} | Esc pause | {GetPracticeModeLabel(config?.PracticeMode ?? PracticeMode.GuidedPractice)}";
+        }
+
+        private string BuildVoiceStatus(SessionConfig config)
+        {
+            if (config == null || !config.VoiceAnalysisEnabled)
+            {
+                return "Voice off";
+            }
+
+            int microphoneCount = Microphone.devices != null ? Microphone.devices.Length : 0;
+            if (microphoneCount <= 0)
+            {
+                return "Mic missing";
+            }
+
+            if (speechPipelineController == null)
+            {
+                return "Voice starting";
+            }
+
+            if (speechPipelineController.IsRecording)
+            {
+                return "Voice rec";
+            }
+
+            if (speechPipelineController.IsPaused)
+            {
+                return "Voice paused";
+            }
+
+            return speechPipelineController.IsReady ? "Voice ready" : "Voice loading";
+        }
+
+        private string BuildSpeechTranscriptPreviewText(SessionConfig config)
+        {
+            if (config == null || !config.VoiceAnalysisEnabled)
+            {
+                return string.Empty;
+            }
+
+            int microphoneCount = Microphone.devices != null ? Microphone.devices.Length : 0;
+            if (microphoneCount <= 0)
+            {
+                return "Mic > missing";
+            }
+
+            if (speechPipelineController == null)
+            {
+                return "Mic > starting...";
+            }
+
+            if (!speechPipelineController.IsRecording)
+            {
+                return speechPipelineController.IsReady
+                    ? "Mic > ready"
+                    : "Mic > loading...";
+            }
+
+            string preview = speechPipelineController.GetLiveTranscriptPreview(130);
+            return string.IsNullOrWhiteSpace(preview)
+                ? "Mic > listening..."
+                : $"Mic > {preview}";
         }
 
         private static string GetPracticeModeLabel(PracticeMode practiceMode)

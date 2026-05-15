@@ -342,6 +342,10 @@ public class ProceduralAudienceAnimator : MonoBehaviour
                 currentState = StudentState.NoteTaking;
                 if (_animator != null) _animator.SetTrigger("Writing");
                 break;
+            case AudienceState.Bored:
+            case AudienceState.ChinResting:
+                currentState = StudentState.ChinResting;
+                break;
             case AudienceState.Distracted:
                 currentState = StudentState.Distracted;
                 TriggerRandomDistraction();

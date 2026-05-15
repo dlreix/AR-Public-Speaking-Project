@@ -17,6 +17,11 @@ namespace VRPublicSpeaking.AppShell.UI
         public AppPanelType PanelType => panelType;
         public bool IsVisible => gameObject.activeSelf;
 
+        public void SetPanelType(AppPanelType value)
+        {
+            panelType = value;
+        }
+
         protected virtual void Awake()
         {
             if (canvasGroup == null)

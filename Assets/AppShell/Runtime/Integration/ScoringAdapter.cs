@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using VRPublicSpeaking.AppShell.Data;
 
@@ -34,17 +35,22 @@ namespace VRPublicSpeaking.AppShell.Integration
 
             var summary = new SessionResultSummary();
             summary.Reset();
+            summary.SessionId = Guid.NewGuid().ToString("N");
+            summary.SessionTimestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
             summary.DurationSeconds = sessionDurationSeconds;
 
-            if (gazeScoringSystem != null)
+            // Gaze skoru: fallback öncelikli, yoksa GazeScoringSystem'den al
+            float gazeScore = fallbackGazeScore >= 0f
+                ? fallbackGazeScore
+                : (gazeScoringSystem != null ? gazeScoringSystem.GazeScore : 0f);
+
+            summary.EyeContactScore    = gazeScore;
+            summary.HasEyeContactScore = true;
+
+            // PerformanceScoringEngine'e set et ki toplam skor doğru hesaplansın
+            if (performanceScoringEngine != null)
             {
-                summary.EyeContactScore = gazeScoringSystem.GazeScore;
-                summary.HasEyeContactScore = true;
-            }
-            else if (fallbackGazeScore >= 0f)
-            {
-                summary.EyeContactScore = fallbackGazeScore;
-                summary.HasEyeContactScore = true;
+                performanceScoringEngine.SetEyeContactRatio(gazeScore / 100f);
             }
 
             if (performanceScoringEngine != null)
@@ -63,21 +69,34 @@ namespace VRPublicSpeaking.AppShell.Integration
                     summary.PostureScore = report.postureScore;
                     summary.HasPostureScore = true;
 
-                    if (!summary.HasEyeContactScore)
-                    {
-                        summary.EyeContactScore = report.eyeScore;
-                        summary.HasEyeContactScore = true;
-                    }
+                    // EyeContactScore zaten yukarıda set edildi
 
                     summary.StrongestArea = report.strongestArea;
                     summary.WeakestArea = report.weakestArea;
                     summary.PerformanceBand = report.performanceBand;
                     summary.SetRecommendations(report.improvements);
+                    summary.SetDetailedReport(report);
 
                     float estimatedFillerWords =
                         performanceScoringEngine.speechMetrics.fillerWordsPerMinute *
                         Mathf.Max(0f, sessionDurationSeconds / 60f);
                     summary.FillerWordCount = estimatedFillerWords;
+
+                    summary.Wpm = performanceScoringEngine.speechMetrics.wpm;
+                    summary.HasWpm = true;
+                    summary.FillerWordsPerMinute = performanceScoringEngine.speechMetrics.fillerWordsPerMinute;
+                    summary.HasFillerWordsPerMinute = true;
+                    summary.AveragePauseDuration = performanceScoringEngine.speechMetrics.averagePauseDuration;
+                    summary.HasAveragePauseDuration = true;
+                    summary.ToneVariationScore = performanceScoringEngine.speechMetrics.toneVariationScore;
+                    summary.HasToneVariationScore = true;
+
+                    summary.HeadMovementPercent = performanceScoringEngine.postureMetrics.swayDurationPercent;
+                    summary.HasHeadMovementPercent = true;
+                    summary.HeadSpeedEventsPerMinute = performanceScoringEngine.postureMetrics.slouchEventsPerMinute;
+                    summary.HasHeadSpeedEventsPerMinute = true;
+                    summary.CrossedArmsPercent = performanceScoringEngine.postureMetrics.crossedArmsPercent;
+                    summary.HasCrossedArmsPercent = true;
                 }
             }
 

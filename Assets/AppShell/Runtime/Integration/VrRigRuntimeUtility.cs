@@ -6,7 +6,11 @@ namespace VRPublicSpeaking.AppShell.Integration
 {
     public static class VrRigRuntimeUtility
     {
-        public static Camera EnsureSceneVrReady(string context = null)
+        public static Camera EnsureSceneVrReady(
+            string context = null,
+            bool? useFloorTrackingWhenXrRunning = null,
+            float? deviceCameraYOffset = null,
+            bool? keepGravityDisabled = null)
         {
             Camera camera = ResolveSceneCamera();
             if (camera == null)
@@ -18,7 +22,12 @@ namespace VRPublicSpeaking.AppShell.Integration
             EnsureMainCameraTag(camera);
             EnsureAudioListener(camera.gameObject);
             EnsureTrackedPoseDriver(camera);
-            EnsureHeightSafety(camera);
+            EnsureHeadsetPoseRuntimeDriverFallback(camera);
+            EnsureHeightSafety(
+                camera,
+                useFloorTrackingWhenXrRunning,
+                deviceCameraYOffset,
+                keepGravityDisabled);
             return camera;
         }
 
@@ -133,7 +142,11 @@ namespace VRPublicSpeaking.AppShell.Integration
             return action;
         }
 
-        private static void EnsureHeightSafety(Camera camera)
+        private static void EnsureHeightSafety(
+            Camera camera,
+            bool? useFloorTrackingWhenXrRunning,
+            float? deviceCameraYOffset,
+            bool? keepGravityDisabled)
         {
             if (camera == null)
             {
@@ -150,14 +163,50 @@ namespace VRPublicSpeaking.AppShell.Integration
             }
 
             safety.Configure(camera, xrOrigin);
+            if (useFloorTrackingWhenXrRunning.HasValue ||
+                deviceCameraYOffset.HasValue ||
+                keepGravityDisabled.HasValue)
+            {
+                safety.ConfigureRuntimeHeight(
+                    useFloorTrackingWhenXrRunning,
+                    deviceCameraYOffset,
+                    keepGravityDisabled);
+            }
+        }
+
+        private static void EnsureHeadsetPoseRuntimeDriverFallback(Camera camera)
+        {
+            if (camera == null)
+            {
+                return;
+            }
+
+            if (camera.GetComponent<UnityEngine.InputSystem.XR.TrackedPoseDriver>() != null)
+            {
+                HeadsetPoseRuntimeDriver duplicateDriver = camera.GetComponent<HeadsetPoseRuntimeDriver>();
+                if (duplicateDriver != null)
+                {
+                    Object.Destroy(duplicateDriver);
+                }
+
+                return;
+            }
+
+            if (camera.GetComponent<HeadsetPoseRuntimeDriver>() == null)
+            {
+                camera.gameObject.AddComponent<HeadsetPoseRuntimeDriver>();
+            }
         }
 
         private static XROrigin ResolveXrOrigin(Camera camera)
         {
             XROrigin xrOrigin = camera != null ? camera.GetComponentInParent<XROrigin>(true) : null;
-            return xrOrigin != null
-                ? xrOrigin
-                : Object.FindFirstObjectByType<XROrigin>(FindObjectsInactive.Include);
+            if (xrOrigin != null || camera != null)
+            {
+                return xrOrigin;
+            }
+
+            return Object.FindFirstObjectByType<XROrigin>(FindObjectsInactive.Include);
         }
 
         private static string BuildMessage(string context, string message)

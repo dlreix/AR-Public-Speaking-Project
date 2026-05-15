@@ -790,6 +790,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::VRPublicSpeaking.AppShell.Results.DashboardAdapter
   dashboardController: {fileID: 0}
   dashboardRoot: {fileID: 0}
+  dashboardSceneName: Overview
+  dashboardLoadingMessage: Opening dashboard...
   openMessage: Open
   alternateOpenMessages:
   - OpenDashboard
@@ -6137,7 +6139,7 @@ MonoBehaviour:
   m_FallbackScreenDPI: 96
   m_DefaultSpriteDPI: 96
   m_DynamicPixelsPerUnit: 12
-  m_PresetInfoIsWorld: 0
+  m_PresetInfoIsWorld: 1
 --- !u!223 &477327376
 Canvas:
   m_ObjectHideFlags: 0
@@ -7276,7 +7278,7 @@ Transform:
   m_GameObject: {fileID: 669201332}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0.32639313, z: 0, w: 0.9452341}
-  m_LocalPosition: {x: -2.549, y: 0.639, z: 1.676}
+  m_LocalPosition: {x: -2.549, y: 0.08, z: 1.676}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -12746,7 +12748,7 @@ Transform:
   m_GameObject: {fileID: 1228337131}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: -1, z: -0, w: -0.00000004371139}
-  m_LocalPosition: {x: 2.525, y: 0.639, z: 5.573}
+  m_LocalPosition: {x: 2.525, y: 1.271, z: 5.573}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -21694,6 +21696,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::VRPublicSpeaking.AppShell.Integration.ExistingSceneFlowAdapter
   mainController: {fileID: 0}
   scoringAdapter: {fileID: 2046564770}
+  speechPipelineController: {fileID: 0}
   environmentSessionOverlayController: {fileID: 477327371}
   routeAfterSessionEnd: 1
   autoStartDelay: 0.35
@@ -21714,6 +21717,8 @@ MonoBehaviour:
   playerRigAdapter: {fileID: 2046564769}
   trackingAdapter: {fileID: 2046564771}
   scoringAdapter: {fileID: 2046564770}
+  speechAdapter: {fileID: 0}
+  speechPipelineController: {fileID: 0}
   existingSceneFlowAdapter: {fileID: 2046564772}
   environmentSessionOverlayController: {fileID: 477327371}
   installOnStart: 1

@@ -125,7 +125,7 @@ namespace VRPublicSpeaking.AppShell.UI
 
             if (primaryActionLabel != null)
             {
-                primaryActionLabel.text = "Start Practice Demo";
+                primaryActionLabel.text = "Start Practice";
                 primaryActionLabel.fontStyle = FontStyles.Bold;
             }
 

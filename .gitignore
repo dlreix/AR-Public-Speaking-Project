@@ -37,3 +37,11 @@ Assets/StreamingAssets/vosk-model*
 # UI Toolkit (auto-generated)
 Assets/UI Toolkit.meta
 Assets/UI Toolkit/
+
+# Local LLM credentials
+Assets/StreamingAssets/LLM/llm_config.local.json
+Assets/StreamingAssets/LLM/llm_config.local.json.meta
+Assets/StreamingAssets/Gemini/gemini_config.local.json
+Assets/StreamingAssets/Gemini/gemini_config.local.json.meta
+Assets/StreamingAssets/OpenAI/openai_config.local.json
+Assets/StreamingAssets/OpenAI/openai_config.local.json.meta

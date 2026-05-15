@@ -228,10 +228,23 @@ namespace VRPublicSpeaking.AppShell.Editor
             }
             AppShellEditorCommon.ApplyOutline(dropdownObject, AppShellEditorCommon.SoftBorderColor, new Vector2(1f, -1f));
 
+            ColorBlock dropdownColors = dropdown.colors;
+            dropdownColors.normalColor = Color.white;
+            dropdownColors.highlightedColor = new Color(0.86f, 0.95f, 1f, 1f);
+            dropdownColors.pressedColor = new Color(0.70f, 0.86f, 0.98f, 1f);
+            dropdownColors.selectedColor = new Color(0.86f, 0.95f, 1f, 1f);
+            dropdownColors.disabledColor = new Color(0.45f, 0.52f, 0.60f, 0.55f);
+            dropdownColors.colorMultiplier = 1f;
+            dropdownColors.fadeDuration = 0.06f;
+            dropdown.colors = dropdownColors;
+
             if (dropdown.captionText != null)
             {
                 dropdown.captionText.color = AppShellEditorCommon.TextColor;
-                dropdown.captionText.fontSize = 20f;
+                dropdown.captionText.fontSize = 19f;
+                dropdown.captionText.fontStyle = FontStyles.Bold;
+                dropdown.captionText.overflowMode = TextOverflowModes.Ellipsis;
+                dropdown.captionText.textWrappingMode = TextWrappingModes.NoWrap;
             }
 
             if (dropdown.itemText != null)
@@ -240,7 +253,95 @@ namespace VRPublicSpeaking.AppShell.Editor
                 dropdown.itemText.fontSize = 18f;
             }
 
+            StyleDropdownTemplate(dropdown);
+
             return dropdown;
+        }
+
+        private static void StyleDropdownTemplate(TMP_Dropdown dropdown)
+        {
+            if (dropdown == null || dropdown.template == null)
+            {
+                return;
+            }
+
+            RectTransform templateRect = dropdown.template;
+            float optionHeight = 34f;
+            float templateHeight = Mathf.Clamp((dropdown.options.Count * optionHeight) + 8f, 116f, 190f);
+            templateRect.sizeDelta = new Vector2(templateRect.sizeDelta.x, templateHeight);
+
+            Image templateBackground = dropdown.template.GetComponent<Image>();
+            if (templateBackground != null)
+            {
+                AppShellEditorCommon.StyleSlicedImage(templateBackground, new Color(0.06f, 0.09f, 0.13f, 0.98f));
+            }
+
+            Image viewportBackground = AppShellEditorCommon.FindDescendantComponent<Image>(dropdown.template, "Viewport");
+            if (viewportBackground != null)
+            {
+                viewportBackground.color = new Color(0.06f, 0.09f, 0.13f, 0.98f);
+            }
+
+            Transform item = AppShellEditorCommon.FindDescendant(dropdown.template, "Item");
+            if (item != null)
+            {
+                RectTransform itemRect = item as RectTransform;
+                if (itemRect != null)
+                {
+                    itemRect.sizeDelta = new Vector2(itemRect.sizeDelta.x, optionHeight);
+                }
+
+                LayoutElement itemLayout = AppShellEditorCommon.GetOrAddComponent<LayoutElement>(item.gameObject);
+                itemLayout.minHeight = optionHeight;
+                itemLayout.preferredHeight = optionHeight;
+
+                Image itemBackground = AppShellEditorCommon.FindDescendantComponent<Image>(item, "Item Background");
+                if (itemBackground != null)
+                {
+                    itemBackground.color = new Color(0.09f, 0.14f, 0.20f, 1f);
+                }
+
+                Toggle itemToggle = item.GetComponent<Toggle>();
+                if (itemToggle != null)
+                {
+                    ColorBlock colors = itemToggle.colors;
+                    colors.normalColor = new Color(0.09f, 0.14f, 0.20f, 1f);
+                    colors.highlightedColor = new Color(0.18f, 0.30f, 0.42f, 1f);
+                    colors.pressedColor = new Color(0.16f, 0.42f, 0.65f, 1f);
+                    colors.selectedColor = new Color(0.15f, 0.36f, 0.55f, 1f);
+                    colors.disabledColor = new Color(0.05f, 0.07f, 0.10f, 0.8f);
+                    colors.colorMultiplier = 1f;
+                    colors.fadeDuration = 0.06f;
+                    itemToggle.colors = colors;
+
+                    if (itemBackground != null)
+                    {
+                        itemToggle.targetGraphic = itemBackground;
+                    }
+                }
+
+                TMP_Text itemLabel = AppShellEditorCommon.FindDescendantComponent<TMP_Text>(item, "Item Label");
+                if (itemLabel != null)
+                {
+                    itemLabel.color = AppShellEditorCommon.TextColor;
+                    itemLabel.fontSize = 19f;
+                    itemLabel.fontStyle = FontStyles.Bold;
+                    itemLabel.overflowMode = TextOverflowModes.Ellipsis;
+                    itemLabel.textWrappingMode = TextWrappingModes.NoWrap;
+
+                    RectTransform labelRect = itemLabel.rectTransform;
+                    labelRect.anchorMin = Vector2.zero;
+                    labelRect.anchorMax = Vector2.one;
+                    labelRect.offsetMin = new Vector2(34f, 2f);
+                    labelRect.offsetMax = new Vector2(-8f, -2f);
+                }
+
+                Image checkmark = AppShellEditorCommon.FindDescendantComponent<Image>(item, "Item Checkmark");
+                if (checkmark != null)
+                {
+                    checkmark.color = AppShellEditorCommon.SelectedAccentColor;
+                }
+            }
         }
 
         internal static Toggle CreateToggle(Transform parent, string name, string label, bool defaultValue)

@@ -21,7 +21,7 @@ namespace VRPublicSpeaking.AppShell.Flow
         [SerializeField] private float menuFollowRotationSpeed = 14f;
         [SerializeField] private bool keepRigStationary = true;
         [SerializeField] private XROrigin.TrackingOriginMode requestedTrackingOriginMode = XROrigin.TrackingOriginMode.Device;
-        [SerializeField] private float cameraYOffset = 1.36f;
+        [SerializeField] private float cameraYOffset = 3.00f;
         [SerializeField] private float stabilizationDuration;
         [SerializeField] private bool useFloorTrackingWhenXrRunning = true;
         [SerializeField] private bool keepUnlockedRigGravityDisabled = true;
@@ -29,6 +29,8 @@ namespace VRPublicSpeaking.AppShell.Flow
         [SerializeField] private float floorTrackingMinimumHeadHeight = 0.35f;
 
         private const float FloatEpsilon = 0.0001f;
+        private const float MainHubMinimumCameraYOffset = 3.00f;
+        private const string MainHubBackdropName = "MainHubBackdrop";
 
         private WorldSpaceCanvasFollower shellCanvasFollower;
         private Vector3 initialOriginPosition;
@@ -38,6 +40,7 @@ namespace VRPublicSpeaking.AppShell.Flow
         private bool shellCanvasSnapped;
         private bool rigSafetyApplied;
         private bool backdropSafetyApplied;
+        private VrControllerLocomotion controllerLocomotion;
 
         private static readonly string[] MainHubBackdropViewBlockers =
         {
@@ -81,7 +84,8 @@ namespace VRPublicSpeaking.AppShell.Flow
             float canvasRotationSpeed,
             bool lockRigInPlace,
             float stableCameraYOffset,
-            XROrigin.TrackingOriginMode trackingOriginMode)
+            XROrigin.TrackingOriginMode trackingOriginMode,
+            bool? useFloorTrackingInXr = null)
         {
             shellCanvas = targetCanvas;
             backdropRootName = targetBackdropRootName ?? string.Empty;
@@ -90,14 +94,29 @@ namespace VRPublicSpeaking.AppShell.Flow
             menuFollowPositionSpeed = canvasPositionSpeed;
             menuFollowRotationSpeed = canvasRotationSpeed;
             keepRigStationary = lockRigInPlace;
-            cameraYOffset = stableCameraYOffset;
             requestedTrackingOriginMode = trackingOriginMode;
+            cameraYOffset = string.Equals(backdropRootName, MainHubBackdropName, StringComparison.Ordinal)
+                ? Mathf.Max(MainHubMinimumCameraYOffset, stableCameraYOffset)
+                : stableCameraYOffset;
+
+            if (useFloorTrackingInXr.HasValue)
+            {
+                useFloorTrackingWhenXrRunning = useFloorTrackingInXr.Value;
+            }
+            else
+            {
+                useFloorTrackingWhenXrRunning = trackingOriginMode == XROrigin.TrackingOriginMode.Floor;
+            }
         }
 
         public void InitializeNow()
         {
             elapsed = 0f;
-            VrRigRuntimeUtility.EnsureSceneVrReady("[ShellSceneRigController]");
+            VrRigRuntimeUtility.EnsureSceneVrReady(
+                "[ShellSceneRigController]",
+                ShouldUseFloorTrackingInXr(),
+                cameraYOffset,
+                keepUnlockedRigGravityDisabled);
             EnsureBackdropSafety();
             EnsureCanvasFollower();
             ApplyStableRigState();
@@ -479,8 +498,9 @@ namespace VRPublicSpeaking.AppShell.Flow
             }
 
             bool xrRunning = IsXrDisplayRunning();
+            bool useFloorTrackingInXr = ShouldUseFloorTrackingInXr();
             XROrigin.TrackingOriginMode effectiveTrackingOriginMode =
-                xrRunning && useFloorTrackingWhenXrRunning
+                xrRunning && useFloorTrackingInXr
                     ? XROrigin.TrackingOriginMode.Floor
                     : requestedTrackingOriginMode;
             float effectiveCameraYOffset =
@@ -569,6 +589,22 @@ namespace VRPublicSpeaking.AppShell.Flow
             return xrOrigin.Camera.transform.localPosition.y < floorTrackingMinimumHeadHeight;
         }
 
+        private bool ShouldUseFloorTrackingInXr()
+        {
+            if (ShouldUseStableDeviceHeight())
+            {
+                return false;
+            }
+
+            return useFloorTrackingWhenXrRunning;
+        }
+
+        private bool ShouldUseStableDeviceHeight()
+        {
+            return keepRigStationary &&
+                   string.Equals(backdropRootName, MainHubBackdropName, StringComparison.Ordinal);
+        }
+
         private bool TryResolveOrigin()
         {
             if (xrOrigin != null && xrOrigin.Camera != null && xrOrigin.Origin != null)
@@ -617,9 +653,9 @@ namespace VRPublicSpeaking.AppShell.Flow
                 return;
             }
 
-            ToggleChildActive(xrOrigin.transform, "Gravity", !keepUnlockedRigGravityDisabled);
-            ToggleChildActive(xrOrigin.transform, "Teleportation", true);
-            ToggleChildActive(xrOrigin.transform, "Locomotion", true);
+            ToggleChildActive(xrOrigin.transform, "Gravity", false);
+            ToggleChildActive(xrOrigin.transform, "Teleportation", false);
+            ToggleChildActive(xrOrigin.transform, "Locomotion", false);
 
             CharacterController characterController = xrOrigin.GetComponent<CharacterController>();
             if (characterController != null && !characterController.enabled)
@@ -627,7 +663,51 @@ namespace VRPublicSpeaking.AppShell.Flow
                 characterController.enabled = true;
             }
 
+            if (controllerLocomotion == null)
+            {
+                controllerLocomotion = VrControllerLocomotion.EnsureForScene(xrOrigin.Camera);
+            }
+            else if (!controllerLocomotion.enabled)
+            {
+                controllerLocomotion.enabled = true;
+            }
+
+            ClampUnlockedHubHeight();
+
             rigSafetyApplied = false;
+        }
+
+        private void ClampUnlockedHubHeight()
+        {
+            if (!string.Equals(backdropRootName, MainHubBackdropName, StringComparison.Ordinal) ||
+                !initialPoseCached ||
+                xrOrigin == null ||
+                xrOrigin.Origin == null)
+            {
+                return;
+            }
+
+            Transform originTransform = xrOrigin.Origin.transform;
+            Vector3 position = originTransform.position;
+            if (Mathf.Abs(position.y - initialOriginPosition.y) <= FloatEpsilon)
+            {
+                return;
+            }
+
+            CharacterController characterController = xrOrigin.GetComponent<CharacterController>();
+            bool controllerWasEnabled = characterController != null && characterController.enabled;
+            if (controllerWasEnabled)
+            {
+                characterController.enabled = false;
+            }
+
+            position.y = initialOriginPosition.y;
+            originTransform.position = position;
+
+            if (controllerWasEnabled)
+            {
+                characterController.enabled = true;
+            }
         }
 
         private static void EnsureMeshCollider(GameObject target)
