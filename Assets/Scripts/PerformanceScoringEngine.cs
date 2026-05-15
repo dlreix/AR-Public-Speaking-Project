@@ -130,12 +130,15 @@ public class PerformanceScoringEngine : MonoBehaviour
     [Tooltip("Main Camera üzerindeki EyeTrackingSystem. Bağlanırsa baş hareketinden posture tahmini yapılır.")]
     [SerializeField] private EyeTrackingSystem eyeTrackingSystem;
 
+    // DEĞİŞTİ: 40 → 15. Normal konuşmada baş hareketi 15°/s'yi kolayca aşar,
+    // böylece sway verisi gerçekçi birikir ve skor 100'de saplanmaz.
     [Tooltip("Sway hesabı için baş hız eşiği (°/s). Bu değerin üzeri sway sayılır.")]
-    [SerializeField] private float swaySpeedThreshold = 40f;
+    [SerializeField] private float swaySpeedThreshold = 15f;
 
+    // DEĞİŞTİ: 0.95 → 0.6. Daha düşük smoothing = değişimler daha hızlı yansır.
     [Tooltip("Sway yüzdesi yumuşatma faktörü (0=anlık, 1=hiç değişmez).")]
     [Range(0f, 0.99f)]
-    [SerializeField] private float swaySmoothing = 0.95f;
+    [SerializeField] private float swaySmoothing = 0.6f;
 
     // Posture tracking iç değişkenleri
     private float _postureSessionStart;
@@ -175,8 +178,12 @@ public class PerformanceScoringEngine : MonoBehaviour
     public float maxAcceptablePause = 3.0f;
 
     [Header("Posture Penalty Constants")]
-    public float slouchPenalty      = 8f;
-    public float swayPenalty        = 0.5f;
+    // DEĞİŞTİ: slouchPenalty 8 → 3. Dakikada 1-2 uyarı normaldir,
+    // 8 ile skor çok hızlı düşüyordu; 3 daha dengeli bir ceza verir.
+    public float slouchPenalty      = 3f;
+    // DEĞİŞTİ: swayPenalty 0.5 → 1.5. swaySpeedThreshold düştüğü için
+    // sway yüzdesi artık daha yüksek çıkacak; penalty de buna göre ayarlandı.
+    public float swayPenalty        = 3f;
     public float crossedArmsPenalty = 0.4f;
 
     [Header("Feedback Thresholds")]
@@ -195,7 +202,6 @@ public class PerformanceScoringEngine : MonoBehaviour
         if (Instance == null || Instance == this)
             Instance = this;
 
-        // Inspector'da atanmamışsa otomatik bul
         if (eyeTrackingSystem == null)
             eyeTrackingSystem = FindObjectOfType<EyeTrackingSystem>(true);
     }
@@ -221,13 +227,9 @@ public class PerformanceScoringEngine : MonoBehaviour
 
     // ── Posture Head Tracking ─────────────────────────────────────────────────
 
-    /// <summary>
-    /// Her frame çağrılır. EyeTrackingSystem aktifse baş hızından
-    /// sway ve slouch tahminlerini günceller.
-    /// </summary>
     private void UpdatePostureFromHeadTracking()
     {
-        if (eyeTrackingSystem == null || !eyeTrackingSystem.IsActive || eyeTrackingSystem.IsPaused)
+        if (eyeTrackingSystem == null || eyeTrackingSystem.IsPaused)
         {
             _postureTrackingActive = false;
             return;
@@ -236,7 +238,6 @@ public class PerformanceScoringEngine : MonoBehaviour
         float dt = Time.deltaTime;
         _totalActiveSec += dt;
 
-        // İlk aktif frame'de sıfırla
         if (!_postureTrackingActive)
         {
             _postureTrackingActive = true;
@@ -249,40 +250,32 @@ public class PerformanceScoringEngine : MonoBehaviour
 
         float headSpeed = eyeTrackingSystem.SmoothedHeadSpeed;
 
-        // Baş hızı eşiği aşıyorsa sway zamanı biriktir
         if (headSpeed > swaySpeedThreshold)
             _swayAccumSec += dt;
 
-        // Sway yüzdesi = sway süresi / toplam aktif süre
         float rawSwayPercent = _totalActiveSec > 0.5f
             ? Mathf.Clamp(_swayAccumSec / _totalActiveSec * 100f, 0f, 100f)
             : 0f;
 
-        // Yumuşat — ani spike'ları önler
         _smoothedSwayPercent = Mathf.Lerp(rawSwayPercent, _smoothedSwayPercent, swaySmoothing);
 
-        // Baş uyarısından slouch tahmini (dakika başına uyarı sayısı)
         if (eyeTrackingSystem.IsHeadWarning)
             _headWarningCount++;
 
         float sessionMinutes = _totalActiveSec / 60f;
         float slouchPerMin   = sessionMinutes > 0f ? _headWarningCount / sessionMinutes : 0f;
 
-        // PostureMetrics'e yaz — SetPostureMetrics üzerinden
         postureMetrics.swayDurationPercent   = _smoothedSwayPercent;
         postureMetrics.slouchEventsPerMinute = slouchPerMin;
-        postureMetrics.crossedArmsPercent    = 0f; // VR'da ölçülemiyor
+        postureMetrics.crossedArmsPercent    = 0f;
     }
 
-    /// <summary>
-    /// Posture tracking iç sayaçlarını sıfırlar. Session başlangıcında çağrılabilir.
-    /// </summary>
     public void ResetPostureTracking()
     {
-        _swayAccumSec        = 0f;
-        _totalActiveSec      = 0f;
-        _headWarningCount    = 0;
-        _smoothedSwayPercent = 0f;
+        _swayAccumSec          = 0f;
+        _totalActiveSec        = 0f;
+        _headWarningCount      = 0;
+        _smoothedSwayPercent   = 0f;
         _postureTrackingActive = false;
     }
 
@@ -367,7 +360,6 @@ public class PerformanceScoringEngine : MonoBehaviour
 
     private float CalculatePostureScore()
     {
-        // Henüz posture tracking başlamadıysa skor 0
         if (!_postureTrackingActive)
         {
             scoreBreakdown.slouchScore      = 0f;
@@ -376,8 +368,8 @@ public class PerformanceScoringEngine : MonoBehaviour
             return 0f;
         }
 
-        scoreBreakdown.slouchScore      = ClampScore(100f - slouchPenalty * postureMetrics.slouchEventsPerMinute);
-        scoreBreakdown.swayScore        = ClampScore(100f - swayPenalty * postureMetrics.swayDurationPercent);
+        scoreBreakdown.slouchScore      = ClampScore(100f - slouchPenalty      * postureMetrics.slouchEventsPerMinute);
+        scoreBreakdown.swayScore        = ClampScore(100f - swayPenalty        * postureMetrics.swayDurationPercent);
         scoreBreakdown.crossedArmsScore = ClampScore(100f - crossedArmsPenalty * postureMetrics.crossedArmsPercent);
 
         return ClampScore(
