@@ -3,14 +3,10 @@ using UnityEngine;
 
 namespace SpeechPipeline
 {
-    /// <summary>
-    /// Produces every console log line in the exact format requested.
-    /// All methods are static — call from SpeechPipelineController.
-    /// </summary>
+    // Formats all console log output for the speech pipeline.
+    // All methods are static — called from SpeechPipelineController.
     public static class ConsoleDisplay
     {
-        // ── Startup ───────────────────────────────────────────────────────────
-
         public static void LoadingModel()
         {
             Debug.Log("[SpeechPipeline] Loading model in background...");
@@ -24,17 +20,12 @@ namespace SpeechPipeline
                 "─────── Press SPACE ───────");
         }
 
-        // ── Recording ─────────────────────────────────────────────────────────
-
         public static void RecordingStarted()
         {
             Debug.Log("\n● RECORDING  —  speak freely. Press SPACE to stop.\n");
         }
 
-        /// <summary>
-        /// Printed once per TickInterval while the speaker is voiced.
-        /// If a partial transcript is available it is appended to the same line.
-        /// </summary>
+        // Printed once per TickInterval while the speaker is voiced.
         public static void LiveTick(float speakingSec, float pitchHz, float rms, string partial)
         {
             string pitchStr = pitchHz > 0f ? $"{pitchHz:F0} Hz" : "–";
@@ -42,16 +33,10 @@ namespace SpeechPipeline
             Debug.Log($"  ● {speakingSec:F1}s  |  Pitch {pitchStr}  |  Vol {rms:F3}{tail}");
         }
 
-        /// <summary>
-        /// Printed immediately when a new partial transcript arrives mid-tick.
-        /// The transcript will also be appended on the next LiveTick call.
-        /// </summary>
         public static void PartialTranscript(string text)
         {
             Debug.Log($"  [Transcript...] \"{text}\"");
         }
-
-        // ── Utterance summary ─────────────────────────────────────────────────
 
         public static void Utterance(UtteranceMetrics m)
         {
@@ -77,8 +62,6 @@ namespace SpeechPipeline
                 $"└─ Quality  : {quality:F1}/10  {qualLabel}{tipsLine}\n\n" +
                 $"─────── Press SPACE again ───────");
         }
-
-        // ── Session summary ───────────────────────────────────────────────────
 
         public static void SessionSummary(
             float        totalSec,

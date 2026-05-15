@@ -28,6 +28,11 @@ public class SpeechAdapter : MonoBehaviour
     public void OnSpeechAnalysisComplete(float wpm, float fillerPerMin,
                                           float avgPause, float toneScore)
     {
+        wpm          = float.IsNaN(wpm)          ? 0f : Mathf.Max(0f, wpm);
+        fillerPerMin = float.IsNaN(fillerPerMin) ? 0f : Mathf.Clamp(fillerPerMin, 0f, 60f);
+        avgPause     = float.IsNaN(avgPause)     ? 0f : Mathf.Max(0f, avgPause);
+        toneScore    = float.IsNaN(toneScore)    ? 0f : Mathf.Clamp(toneScore, 0f, 100f);
+
         AutoWireIfNeeded();
 
         if (scoringEngine == null)

@@ -2,11 +2,9 @@ using UnityEngine;
 
 namespace SpeechPipeline
 {
-    /// <summary>
-    /// Measures Words Per Minute for a single utterance.
-    /// Call StartUtterance() when the speaker first produces voiced audio.
-    /// Call StopUtterance(wordCount) when the STT final result arrives.
-    /// </summary>
+    // Measures Words Per Minute for a single utterance.
+    // Call StartUtterance() when the speaker first produces voiced audio,
+    // then StopUtterance(wordCount) when the STT final result arrives.
     public sealed class PaceTracker
     {
         public const float WPM_Slow   = 100f;
@@ -22,13 +20,13 @@ namespace SpeechPipeline
             _running = true;
         }
 
-        /// <summary>Cancels a running utterance without producing a result. Call when the session is externally paused mid-utterance.</summary>
+        // Call when the session is externally paused mid-utterance to avoid an orphaned timer.
         public void CancelUtterance()
         {
             _running = false;
         }
 
-        /// <summary>Returns (wpm, durationSeconds). Both 0 if not started or word count is 0.</summary>
+        // Returns (wpm, durationSeconds). Both 0 if not started or word count is 0.
         public (float wpm, float sec) StopUtterance(int wordCount)
         {
             if (!_running) return (0f, 0f);

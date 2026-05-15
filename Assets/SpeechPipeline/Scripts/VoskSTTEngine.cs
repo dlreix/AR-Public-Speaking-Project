@@ -6,11 +6,9 @@ using Vosk;
 
 namespace SpeechPipeline
 {
-    /// <summary>
-    /// Wraps Vosk on a background thread so the Unity main thread is never blocked.
-    /// The constructor returns immediately — model loading happens in the background.
-    /// Poll IsReady before sending audio; check LoadError if it stays false.
-    /// </summary>
+    // Wraps Vosk on a background thread so the Unity main thread is never blocked.
+    // The constructor returns immediately — model loading happens in the background.
+    // Poll IsReady before sending audio; check LoadError if it stays false.
     public sealed class VoskSTTEngine : IDisposable
     {
         public readonly struct PartialResult
@@ -33,9 +31,10 @@ namespace SpeechPipeline
 
         private volatile bool   _isReady;
         private volatile bool   _running = true;
+        private volatile bool   _disposed;
         private volatile string _loadError;
 
-        // Use full qualifier to avoid name clash with this class
+        // Use full qualifier to avoid name clash with this class.
         private global::Vosk.VoskRecognizer _recognizer;
         private readonly Thread _worker;
         private readonly string _modelPath;
@@ -56,7 +55,7 @@ namespace SpeechPipeline
             _worker.Start();
         }
 
-        /// <summary>Enqueue a mono float[] chunk from the main thread.</summary>
+        // Enqueue a mono float[] chunk from the main thread.
         public void EnqueueAudio(float[] samples)
         {
             if (!_isReady || !_running || samples == null || samples.Length == 0) return;
@@ -65,22 +64,22 @@ namespace SpeechPipeline
             _audioQueue.Enqueue(copy);
         }
 
-        /// <summary>Drain one result per call. Returns false when queue is empty.</summary>
+        // Drain one result per call. Returns false when queue is empty.
         public bool TryDequeueResult(out object result) =>
             _resultQueue.TryDequeue(out result);
 
+        // Signal the worker to stop. The worker thread owns _recognizer disposal.
         public void Dispose()
         {
-            _running = false;
-            _worker?.Join(1000);
-            _recognizer?.Dispose();
+            if (_disposed) return;
+            _disposed = true;
+            _running  = false;
+            _worker?.Join(2000);
         }
-
-        // ── Worker thread ────────────────────────────────────────────────
 
         private void WorkerLoop()
         {
-            // Phase 1: load model (heavy — off main thread)
+            // Phase 1: load model off the main thread.
             try
             {
                 var model   = new Model(_modelPath);
@@ -96,7 +95,7 @@ namespace SpeechPipeline
                 return;
             }
 
-            // Phase 2: process audio
+            // Phase 2: process audio chunks.
             while (_running)
             {
                 if (_audioQueue.TryDequeue(out float[] samples))
@@ -123,16 +122,17 @@ namespace SpeechPipeline
                 }
             }
 
-            // Flush on shutdown
-            if (_recognizer != null)
+            // Flush the final result before shutting down.
+            // Skip flush if Dispose was called — avoids using a partially-torn-down recognizer.
+            if (_recognizer != null && !_disposed)
             {
                 string text = ParseJson(_recognizer.FinalResult(), KeyText);
                 if (!string.IsNullOrWhiteSpace(text))
                     _resultQueue.Enqueue(new FinalResult(text));
             }
+            _recognizer?.Dispose();
+            _recognizer = null;
         }
-
-        // ── Helpers ──────────────────────────────────────────────────────
 
         private static byte[] ToPCM16(float[] samples)
         {

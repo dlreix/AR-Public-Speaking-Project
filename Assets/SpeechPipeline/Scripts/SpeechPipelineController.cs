@@ -10,24 +10,15 @@ using UnityEngine.InputSystem;
 
 namespace SpeechPipeline
 {
-    /// <summary>
-    /// Attach to any persistent GameObject.
-    /// Set ModelFolder in the Inspector to the StreamingAssets subfolder name.
-    ///
-    /// Flow:
-    ///   Play  → model loads in background, logs ready once done.
-    ///   SPACE → start recording.
-    ///   SPACE → stop, print session summary.
-    ///   SPACE → start a new session.
-    /// </summary>
+    // Attach to any persistent GameObject.
+    // Set ModelFolder in the Inspector to the StreamingAssets subfolder.
+    // Recording starts only after the STT model finishes loading.
     [RequireComponent(typeof(AudioSource))]
     [AddComponentMenu("Speech Pipeline/Controller")]
     public sealed class SpeechPipelineController : MonoBehaviour
     {
         public const string DefaultModelFolder = "vosk-model-en-us-0.42-gigaspeech";
         private const string LegacySmallEnglishModelFolder = "vosk-model-small-en-us-0.15";
-
-        // ── Inspector ─────────────────────────────────────────────────────────
 
         [Header("STT")]
         [Tooltip("Subfolder name inside StreamingAssets")]
@@ -57,11 +48,16 @@ namespace SpeechPipeline
         public SpeechAdapter SpeechAdapter;
         public bool UpdateScoringOnSessionEnd = true;
 
+        [Header("Lifecycle")]
+        [Tooltip("Keep this object alive across scene loads so the STT model loads during the menu/lobby instead of waiting until the presentation scene.")]
+        public bool PersistAcrossScenes = false;
+
         [Header("Debug Input")]
         [Tooltip("Allow SPACE key to start/stop recording without MainController. Disable in VR builds.")]
         public bool EnableSpaceKeyInput = false;
 
-        // ── State machine ─────────────────────────────────────────────────────
+        // Singleton reference used to prevent duplicate instances across scene loads.
+        private static SpeechPipelineController _instance;
 
         private enum PipelineState { Loading, Ready, Recording }
         private PipelineState _state = PipelineState.Loading;
@@ -80,8 +76,6 @@ namespace SpeechPipeline
         public float LastTranscriptUpdateTime { get; private set; }
         public event Action<string> FinalTranscriptReceived;
 
-        // ── Subsystems ────────────────────────────────────────────────────────
-
         private AudioCaptureBuffer _capture;
         private VoskSTTEngine      _stt;
         private RMSPauseDetector   _pause;
@@ -90,8 +84,6 @@ namespace SpeechPipeline
         private FillerDetector     _filler;
         private AudioSource        _spectrumSrc;
 
-        // ── Live tick accumulators ────────────────────────────────────────────
-
         private float  _speakingTimer;
         private float  _tickTimer;
         private bool   _wasSpeaking;
@@ -99,15 +91,11 @@ namespace SpeechPipeline
         private float  _lastRMS;
         private string _currentPartial;
 
-        // ── Per-utterance accumulators ────────────────────────────────────────
-
         private int   _uttPauseCount;
         private float _uttLastPause;
         private float _uttRmsSum;
         private float _uttRmsMax;
         private int   _uttRmsCount;
-
-        // ── Session accumulators ──────────────────────────────────────────────
 
         private float        _sessionStart;
         private float        _sessionSpeaking;
@@ -117,24 +105,31 @@ namespace SpeechPipeline
         private int          _sessionFillers;
         private List<string> _sessionFillerList = new List<string>();
         private List<string> _sessionTranscript = new List<string>();
-        private float        _sessionWpmSum;
-        private int          _sessionWpmCount;
         private float        _sessionPitchStdSum;
         private int          _sessionPitchCount;
-
-        // ── Misc ──────────────────────────────────────────────────────────────
 
         private bool  _modelReadyLogged;
         private float _chunkTimer;
         private float _totalPausedSec;
         private float _pauseStartedAt = -1f;
+        private bool  _discardNextFinalResult;
         private const float ChunkSec = 0.1f;
-
-        // ── Unity lifecycle ───────────────────────────────────────────────────
 
         private void Awake()
         {
             UseDefaultModelWhenUnsetOrLegacy();
+
+            if (!PersistAcrossScenes) return;
+
+            // If another instance already exists (carried over from a previous scene), destroy this duplicate.
+            if (_instance != null && _instance != this)
+            {
+                Destroy(gameObject);
+                return;
+            }
+
+            _instance = this;
+            DontDestroyOnLoad(gameObject);
         }
 
         private IEnumerator Start()
@@ -201,7 +196,6 @@ namespace SpeechPipeline
         {
             if (_stt == null) return;
 
-            // ── Wait for model ────────────────────────────────────────────────
             if (!_stt.IsReady)
             {
                 if (!_loadErrorLogged && _stt.LoadError != null)
@@ -227,7 +221,7 @@ namespace SpeechPipeline
                 }
             }
 
-            // ── Space key (debug only — disabled by default in VR) ────────────
+            // SPACE key is debug-only and disabled by default in VR builds.
             if (EnableSpaceKeyInput && Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame)
             {
                 switch (_state)
@@ -240,10 +234,8 @@ namespace SpeechPipeline
 
             if (_state != PipelineState.Recording || _isPaused) return;
 
-            // ── Drain STT results ─────────────────────────────────────────────
             DrainSTT();
 
-            // ── Audio chunk timer ─────────────────────────────────────────────
             _chunkTimer += Time.unscaledDeltaTime;
             if (_chunkTimer < ChunkSec) return;
             _chunkTimer = 0f;
@@ -293,8 +285,6 @@ namespace SpeechPipeline
             }
         }
 
-        // ── Session control ───────────────────────────────────────────────────
-
         public bool BeginRecordingFromShell()
         {
             if (_state == PipelineState.Recording)
@@ -342,13 +332,13 @@ namespace SpeechPipeline
 
             _isPaused = true;
             _pauseStartedAt = Time.realtimeSinceStartup;
-            _capture?.Poll(); // flush buffered audio so we don't process dead air on resume
+            _capture?.Poll(); // flush buffered audio to avoid processing dead air on resume
             if (_wasSpeaking)
             {
-                _pace?.CancelUtterance(); // avoid orphaned StartUtterance inflating WPM on resume
-                _wasSpeaking   = false;
-                _speakingTimer = 0f;
-                _tickTimer     = 0f;
+                _pace?.CancelUtterance();
+                _discardNextFinalResult = true; // drop the STT result that arrives after this pause
+                _pitch?.Reset();
+                ResetUtteranceAccumulators();
             }
         }
 
@@ -367,16 +357,17 @@ namespace SpeechPipeline
 
             _isPaused = false;
             _capture?.Poll(); // discard audio captured while paused
-            _pause?.Reset();  // clear stale SilenceTimer so resume doesn't fire a spurious OnPauseDetected
+            _pause?.Reset();  // clear stale silence timer so resume doesn't fire a spurious pause event
         }
 
         private void BeginSession()
         {
             _state = PipelineState.Recording;
-            _isPaused       = false;
-            _pauseStartedAt = -1f;
-            _totalPausedSec = 0f;
-            _capture.Poll(); // flush stale audio
+            _isPaused               = false;
+            _pauseStartedAt         = -1f;
+            _totalPausedSec         = 0f;
+            _discardNextFinalResult = false;
+            _capture.Poll(); // discard audio recorded before session started
 
             _sessionStart       = Time.realtimeSinceStartup;
             _sessionSpeaking    = 0f;
@@ -388,7 +379,6 @@ namespace SpeechPipeline
             _sessionTranscript.Clear();
             LatestFinalTranscript = string.Empty;
             LastTranscriptUpdateTime = 0f;
-            _sessionWpmSum      = 0f; _sessionWpmCount   = 0;
             _sessionPitchStdSum = 0f; _sessionPitchCount = 0;
 
             ResetUtteranceAccumulators();
@@ -405,11 +395,13 @@ namespace SpeechPipeline
                 FinaliseUtterance(_currentPartial);
             }
 
-            float avgWpm      = _sessionWpmCount   > 0 ? _sessionWpmSum      / _sessionWpmCount   : EstimateSessionWpm();
+            _pitch?.Reset(); // clear any remaining pitch samples so they don't leak into the next session
+
+            float totalSec    = Mathf.Max(0.1f, Time.realtimeSinceStartup - _sessionStart - _totalPausedSec);
+            float avgWpm      = _sessionWords > 0 ? (_sessionWords / totalSec) * 60f : 0f;
             float avgPitchStd = _sessionPitchCount > 0 ? _sessionPitchStdSum / _sessionPitchCount : 0f;
-            float totalSec    = Mathf.Max(0f, Time.realtimeSinceStartup - _sessionStart - _totalPausedSec);
-            float totalMin    = totalSec / 60f;
-            float fillerPerMin = totalMin > 0f ? _sessionFillers / totalMin : 0f;
+            float totalMin     = Mathf.Max(5f, totalSec) / 60f; // clamp to 5s minimum to prevent extreme filler rates
+            float fillerPerMin = _sessionFillers / totalMin;
             float avgPause = _sessionPauses > 0 ? _sessionPauseTotal / _sessionPauses : 0f;
             float toneScore = NormalizePitchStd(avgPitchStd);
 
@@ -441,8 +433,6 @@ namespace SpeechPipeline
             _tickTimer      = 0f;
         }
 
-        // ── STT drain ────────────────────────────────────────────────────────
-
         private void DrainSTT()
         {
             while (_stt.TryDequeueResult(out object result))
@@ -462,13 +452,17 @@ namespace SpeechPipeline
                 else if (result is VoskSTTEngine.FinalResult f)
                 {
                     _currentPartial = null;
-                    if (!string.IsNullOrWhiteSpace(f.Text))
+                    if (_discardNextFinalResult)
+                    {
+                        _discardNextFinalResult = false;
+                    }
+                    else if (!string.IsNullOrWhiteSpace(f.Text))
+                    {
                         FinaliseUtterance(f.Text);
+                    }
                 }
             }
         }
-
-        // ── Pause event ───────────────────────────────────────────────────────
 
         private void HandlePause(float duration)
         {
@@ -477,8 +471,6 @@ namespace SpeechPipeline
             _sessionPauses++;
             _sessionPauseTotal += duration;
         }
-
-        // ── Utterance finalisation ────────────────────────────────────────────
 
         private void FinaliseUtterance(string text)
         {
@@ -514,8 +506,7 @@ namespace SpeechPipeline
             LatestFinalTranscript = text;
             LastTranscriptUpdateTime = Time.realtimeSinceStartup;
             FinalTranscriptReceived?.Invoke(text);
-            if (wpm > 0f) { _sessionWpmSum      += wpm; _sessionWpmCount++;   }
-            if (sd  > 0f) { _sessionPitchStdSum += sd;  _sessionPitchCount++; }
+            if (avg > 0f && float.IsFinite(sd)) { _sessionPitchStdSum += sd; _sessionPitchCount++; }
 
             ConsoleDisplay.Utterance(m);
             ResetUtteranceAccumulators();
@@ -591,29 +582,12 @@ namespace SpeechPipeline
             Debug.LogWarning("[SpeechPipeline] No SpeechAdapter or PerformanceScoringEngine found for speech metrics.");
         }
 
-        private float EstimateSessionWpm()
-        {
-            if (_sessionSpeaking <= 0f || _sessionWords <= 0)
-            {
-                return 0f;
-            }
-
-            return (_sessionWords / _sessionSpeaking) * 60f;
-        }
-
+        // Maps pitch std dev to a 0-100 tone score. 0 = no data or flat, 100 = very expressive.
         private static float NormalizePitchStd(float pitchStdHz)
         {
-            if (pitchStdHz <= 10f)
-            {
-                return 0f;
-            }
-
-            if (pitchStdHz >= 55f)
-            {
-                return 100f;
-            }
-
-            return Mathf.InverseLerp(10f, 55f, pitchStdHz) * 100f;
+            if (pitchStdHz < 0f) return 0f;
+            if (pitchStdHz >= 55f) return 100f;
+            return Mathf.InverseLerp(0f, 55f, pitchStdHz) * 100f;
         }
 
         private string ResolveModelPath()
@@ -702,10 +676,9 @@ namespace SpeechPipeline
             return Directory.GetFiles(modelPath).Length > 0 || Directory.GetDirectories(modelPath).Length > 0;
         }
 
-        // ── Cleanup ───────────────────────────────────────────────────────────
-
         private void OnDestroy()
         {
+            if (_instance == this) _instance = null;
             if (_pause != null) _pause.OnPauseDetected -= HandlePause;
             _stt?.Dispose();
             _capture?.Dispose();

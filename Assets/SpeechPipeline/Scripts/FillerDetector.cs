@@ -3,11 +3,8 @@ using System.Text.RegularExpressions;
 
 namespace SpeechPipeline
 {
-    /// <summary>
-    /// Scans a normalised English transcript for filler words/phrases.
-    /// Uses whole-word regex boundaries to avoid false positives
-    /// (e.g. "like" inside "likewise" is not matched).
-    /// </summary>
+    // Scans a transcript for filler words using whole-word regex boundaries.
+    // Word boundaries prevent false positives (e.g. "like" inside "likewise").
     public sealed class FillerDetector
     {
         private static readonly string[] DefaultFillers =
@@ -32,7 +29,7 @@ namespace SpeechPipeline
                     RegexOptions.IgnoreCase | RegexOptions.Compiled)));
         }
 
-        /// <summary>Returns all filler occurrences found (with duplicates).</summary>
+        // Returns all filler occurrences found, including duplicates.
         public List<string> Detect(string text)
         {
             var found = new List<string>();

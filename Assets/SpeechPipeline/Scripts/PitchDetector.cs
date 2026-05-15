@@ -4,14 +4,8 @@ using UnityEngine;
 
 namespace SpeechPipeline
 {
-    /// <summary>
-    /// Estimates fundamental frequency (F0) each frame via Harmonic Product Spectrum (HPS).
-    /// HPS is more robust than naive peak-picking because harmonics reinforce the fundamental.
-    ///
-    /// Usage:
-    ///   - Call AnalyzeFrame() every voiced audio chunk.
-    ///   - Call FlushStats() at utterance end to get avg/stdDev/min/max, then the history clears.
-    /// </summary>
+    // Estimates fundamental frequency (F0) each voiced frame via Harmonic Product Spectrum.
+    // HPS is more robust than naive peak-picking because harmonics reinforce the fundamental.
     public sealed class PitchDetector
     {
         public float MinHz = 70f;
@@ -29,7 +23,7 @@ namespace SpeechPipeline
             _specBuf  = new float[specSize];
         }
 
-        /// <summary>Call while the speaker is voiced. Returns F0 in Hz (0 if no clear pitch).</summary>
+        // Call while the speaker is voiced. Returns F0 in Hz (0 if no clear pitch).
         public float AnalyzeFrame()
         {
             _src.GetSpectrumData(_specBuf, 0, FFTWindow.BlackmanHarris);
@@ -38,10 +32,8 @@ namespace SpeechPipeline
             return f0;
         }
 
-        /// <summary>
-        /// Flush collected samples, compute stats, clear history.
-        /// Returns (average, stdDev, min, max) — all 0 if no samples.
-        /// </summary>
+        // Computes avg/stdDev/min/max from collected samples and clears history.
+        // Returns all zeros if no voiced frames were recorded.
         public (float avg, float stdDev, float min, float max) FlushStats()
         {
             if (_history.Count == 0) return (0f, 0f, 0f, 0f);
@@ -64,14 +56,11 @@ namespace SpeechPipeline
 
         public void Reset() => _history.Clear();
 
-        // ── HPS implementation ────────────────────────────────────────────
-
         private float HPS(float[] spec)
         {
             int n = spec.Length;
             const int order = 5;
 
-            // Copy and multiply downsampled versions element-wise
             var hps = new float[n];
             Array.Copy(spec, hps, n);
             for (int h = 2; h <= order; h++)
@@ -89,7 +78,7 @@ namespace SpeechPipeline
 
             if (bin < 0 || peak < 1e-8f) return 0f;
 
-            // Parabolic interpolation for sub-bin accuracy
+            // Parabolic interpolation for sub-bin frequency accuracy.
             float f0 = Parabolic(hps, bin) * hzPerBin;
             return f0 >= MinHz && f0 <= MaxHz ? f0 : 0f;
         }
