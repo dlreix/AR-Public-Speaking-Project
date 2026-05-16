@@ -9,13 +9,15 @@ public class AudienceMember : MonoBehaviour
     public float personalWpmTolerance;
     public float personalEyeContactTolerance;
     [SerializeField] private Vector2 stateDwellSeconds = new Vector2(4f, 10f);
+    [SerializeField] private float cooldownSeconds = 5.0f;
     private AudienceState _currentState = AudienceState.Idle;
     private Coroutine _stateRoutine;
     private int _stateVersion;
     private float _nextStateChangeTime;
+    private float _cooldownEndTime;
     
     public AudienceState CurrentState => _currentState;
-    public bool CanConsiderStateChange => Time.time >= _nextStateChangeTime;
+    public bool CanConsiderStateChange => Time.time >= _nextStateChangeTime && Time.time >= _cooldownEndTime;
 
     void Awake()
     {
@@ -40,10 +42,30 @@ public class AudienceMember : MonoBehaviour
 
     public void SetState(AudienceState newState, bool force)
     {
-        if (_currentState == newState) return;
-        if (!force && _currentState != AudienceState.Idle && Time.time < _nextStateChangeTime)
+        if (!force)
         {
-            return;
+            if (_currentState != AudienceState.Idle && Time.time < _nextStateChangeTime)
+                return;
+            
+            if (Time.time < _cooldownEndTime)
+            {
+                newState = AudienceState.Neutral;
+            }
+        }
+
+        if (_currentState == newState) return;
+
+        if (_currentState != AudienceState.Idle && _currentState != AudienceState.Neutral && 
+            (newState == AudienceState.Idle || newState == AudienceState.Neutral))
+        {
+            _cooldownEndTime = Time.time + cooldownSeconds;
+        }
+
+        if (!force && _currentState != AudienceState.Idle && _currentState != AudienceState.Neutral && 
+            newState != AudienceState.Idle && newState != AudienceState.Neutral)
+        {
+            newState = AudienceState.Neutral;
+            _cooldownEndTime = Time.time + cooldownSeconds;
         }
 
         _currentState = newState;

@@ -427,11 +427,6 @@ public class AudienceSpawner : MonoBehaviour
             }
         }
 
-        if (prefabs.Count > 0)
-        {
-            return prefabs;
-        }
-
 #if UNITY_EDITOR
         string folder = "Assets/AudienceSimulation_Arda/Models";
         if (System.IO.Directory.Exists(Application.dataPath + "/" + folder.Replace("Assets/", "")))
@@ -452,6 +447,30 @@ public class AudienceSpawner : MonoBehaviour
 
     [ContextMenu("Force Spawn Now")]
     public void ForceSpawn() { SpawnAudience(); }
+
+    [ContextMenu("Auto Find All Prefabs (Click before Build)")]
+    public void AutoFindPrefabs()
+    {
+#if UNITY_EDITOR
+        if (audiencePrefabs == null) audiencePrefabs = new List<GameObject>();
+        audiencePrefabs.Clear();
+        string folder = "Assets/AudienceSimulation_Arda/Models";
+        if (System.IO.Directory.Exists(Application.dataPath + "/" + folder.Replace("Assets/", "")))
+        {
+            string[] guids = UnityEditor.AssetDatabase.FindAssets("t:Model t:Prefab", new[] { folder });
+            foreach (string guid in guids)
+            {
+                string path = UnityEditor.AssetDatabase.GUIDToAssetPath(guid);
+                string fileName = System.IO.Path.GetFileName(path).ToLower();
+                if (fileName.Contains("@") || fileName.Contains("material") || fileName.Contains("anim") || fileName.Contains("sitting")) continue;
+                GameObject go = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>(path);
+                if (go != null && go.GetComponentInChildren<SkinnedMeshRenderer>() != null) { if (!audiencePrefabs.Contains(go)) audiencePrefabs.Add(go); }
+            }
+            UnityEditor.EditorUtility.SetDirty(this);
+            Debug.Log($"[AudienceSpawner] Başarıyla {audiencePrefabs.Count} adet karakter bulundu ve listeye eklendi. Lütfen sahneyi kaydedin (Ctrl+S)!");
+        }
+#endif
+    }
 
     private void ApplyRandomPersonality(AudienceMember am)
     {

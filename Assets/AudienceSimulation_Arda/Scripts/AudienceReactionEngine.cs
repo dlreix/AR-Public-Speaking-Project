@@ -49,6 +49,10 @@ public class AudienceReactionEngine : MonoBehaviour
         {
             scoringEngine.RefreshScoreSilently();
             nextScoreRefreshTime = Time.time + Mathf.Max(0.1f, scoreRefreshInterval);
+            Debug.Log($"[AudienceReactionEngine] Raw Final Score: {scoringEngine.GetFinalScore():F1}, " +
+                      $"Smoothed Score: {smoothedScore:F1}, " +
+                      $"Eye Contact: {scoringEngine.eyeMetrics.eyeContactRatio:P1}, " +
+                      $"WPM: {scoringEngine.speechMetrics.wpm:F1}");
         }
 
         float rawScore = scoringEngine.GetFinalScore();
