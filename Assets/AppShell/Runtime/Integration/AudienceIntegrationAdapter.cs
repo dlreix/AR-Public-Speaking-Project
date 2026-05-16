@@ -54,6 +54,14 @@ namespace VRPublicSpeaking.AppShell.Integration
             {
                 Debug.LogWarning("[AudienceIntegrationAdapter] ScoringEngine veya ReactionEngine bulunamadigi icin performans baglantisi kurulamadi.");
             }
+
+            // 3. MainController'ın oturum bitiş event'ine abone ol (Alkışlatmak için)
+            MainController mainController = Object.FindFirstObjectByType<MainController>();
+            if (mainController != null)
+            {
+                mainController.SessionEnded += (duration, score) => TriggerSessionEnd();
+                Debug.Log("[AudienceIntegrationAdapter] MainController.SessionEnded event'ine abone olundu.");
+            }
         }
 
         private StressLevel ConvertDifficultyToStress(SessionConfig config)
