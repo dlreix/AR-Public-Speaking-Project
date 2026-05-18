@@ -267,7 +267,7 @@ public class PerformanceScoringEngine : MonoBehaviour
 
         postureMetrics.swayDurationPercent   = _smoothedSwayPercent;
         postureMetrics.slouchEventsPerMinute = slouchPerMin;
-        postureMetrics.crossedArmsPercent    = 0f;
+        postureMetrics.crossedArmsPercent    = 20f;
     }
 
     public void ResetPostureTracking()

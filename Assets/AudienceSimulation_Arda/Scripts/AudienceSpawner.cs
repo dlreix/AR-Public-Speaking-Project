@@ -23,6 +23,13 @@ public class AudienceSpawner : MonoBehaviour
     [Header("Placement Tuning")]
     public float seatBackOffset = 0.05f;
 
+    [Header("Meeting Room")]
+    public float meetingRoomVisualYawOffset = 0f;
+    public float meetingRoomMinimumSideDistance = 3f;
+    public float meetingRoomMarkerHipsYOffset = 0.18f;
+    public float meetingRoomMarkerCharacterHeight = 1.95f;
+    public bool drawMeetingRoomFacingDebug = false;
+
     private RuntimeAnimatorController sharedAnimatorController;
 
     IEnumerator Start()
@@ -42,19 +49,13 @@ public class AudienceSpawner : MonoBehaviour
             return;
         }
 
-        GameObject[] allObjects = FindObjectsByType<GameObject>(FindObjectsSortMode.None);
-        foreach (var go in allObjects)
-        {
-            if (go != null && (go.name == "Sitting" || go.name.StartsWith("Sitting (")))
-            {
-                if (go.hideFlags == HideFlags.None) Destroy(go);
-            }
-        }
+        ClearExistingAudience();
 
-        foreach (var m in controller.audienceMembers) if (m != null) Destroy(m.gameObject);
-        controller.audienceMembers.Clear();
-
-        List<GameObject> allSeats = FindAllSeats();
+        Transform meetingSeatMarkers = FindMeetingRoomSeatMarkerRoot();
+        Transform meetingTable = FindMeetingRoomTable();
+        bool isMeetingRoom = meetingTable != null || meetingSeatMarkers != null;
+        bool useMeetingSeatMarkers = meetingSeatMarkers != null;
+        List<GameObject> allSeats = FindAllSeats(meetingTable, meetingSeatMarkers);
         if (allSeats.Count == 0) { SpawnGrid(); return; }
 
         // Shuffle
@@ -66,43 +67,29 @@ public class AudienceSpawner : MonoBehaviour
 
         int maxToSpawn = Mathf.Min(GetAudienceCount(), allSeats.Count);
 
-        // ── TOPLANTI ODASI TESPİTİ ──
-        bool isMeetingRoom = false;
-        foreach (var s in allSeats) {
-            if (s.name.ToLower().Contains("zero7") || s.name.ToLower().Contains("office")) {
-                isMeetingRoom = true;
-                break;
-            }
-        }
-
+        // Meeting room characters face the opposite side of the table, not one shared diagonal.
         Vector3 meetingFocalPoint = new Vector3(-0.044f, 0.75f, 5.65f);
+        Transform meetingLookTarget = isMeetingRoom ? EnsureMeetingRoomLookTarget(meetingTable, meetingFocalPoint) : null;
+        Dictionary<GameObject, Vector3> meetingFacingDirections = null;
+        if (isMeetingRoom)
+        {
+            meetingFacingDirections = useMeetingSeatMarkers
+                ? BuildMeetingRoomMarkerFacingDirections(allSeats)
+                : BuildMeetingRoomFacingDirections(allSeats, meetingTable, meetingLookTarget);
+        }
 
         for (int i = 0; i < maxToSpawn; i++)
         {
             GameObject seat = allSeats[i];
             int prefabIdx = Random.Range(0, audiencePrefabs.Count);
             GameObject memberObj = Instantiate(audiencePrefabs[prefabIdx], Vector3.zero, Quaternion.identity);
-            
-            if (isMeetingRoom)
-            {
-                Vector3 lookPos = meetingFocalPoint;
-                if (seat.transform.parent != null && 
-                    (seat.transform.parent.name.ToLower().Contains("table") || 
-                     seat.transform.parent.name.ToLower().Contains("desk"))) 
-                {
-                    lookPos = seat.transform.parent.position;
-                }
-                lookPos.y = seat.transform.position.y;
-                memberObj.transform.LookAt(lookPos);
-                memberObj.transform.Rotate(0, 180, 0); 
-            }
-            else
+            if (!isMeetingRoom)
             {
                 memberObj.transform.rotation = Quaternion.Euler(0, seat.transform.eulerAngles.y + 180f, 0);
             }
             
             FixInstanceMaterials(memberObj);
-            FixProceduralHeight(memberObj);
+            FixProceduralHeight(memberObj, useMeetingSeatMarkers ? meetingRoomMarkerCharacterHeight : 1.95f);
 
             Animator anim = memberObj.GetComponent<Animator>();
             if (anim == null) anim = memberObj.AddComponent<Animator>();
@@ -124,14 +111,14 @@ public class AudienceSpawner : MonoBehaviour
             Bounds seatBounds;
             if (!TryGetBounds(seat, out seatBounds)) seatBounds = new Bounds(seat.transform.position, new Vector3(0.5f, 0.05f, 0.3f));
 
-            Vector3 seatInset = GetSeatBackwardOffset(seat);
+            Vector3 seatInset = useMeetingSeatMarkers ? Vector3.zero : GetSeatBackwardOffset(seat);
             
             // HEIGHT LOGIC (Surgical fix for both environments)
             float hipsY = 0;
             if (isMeetingRoom)
             {
                 // Toplantı Odası: Pivot bazlı (Daha yüksek)
-                hipsY = seat.transform.position.y + 0.68f; 
+                hipsY = seat.transform.position.y + meetingRoomMarkerHipsYOffset; 
             }
             else
             {
@@ -153,6 +140,12 @@ public class AudienceSpawner : MonoBehaviour
             else
             {
                 memberObj.transform.position = seatBounds.center + seatInset + new Vector3(0, -0.45f, 0);
+            }
+
+            if (isMeetingRoom)
+            {
+                Vector3 facingDirection = GetMeetingRoomSeatFacingDirection(seat, meetingTable, meetingLookTarget, meetingFacingDirections);
+                AttachMeetingRoomFacing(memberObj, facingDirection);
             }
 
             ApplyRandomPersonality(am);
@@ -270,15 +263,58 @@ public class AudienceSpawner : MonoBehaviour
         }
     }
 
-    private void FixProceduralHeight(GameObject target)
+    private void FixProceduralHeight(GameObject target, float targetHeight = 1.95f)
     {
         Bounds bounds;
         if (TryGetBounds(target, out bounds))
         {
             float currentHeight = Mathf.Max(bounds.size.y, 0.01f);
-            float targetHeight = 1.95f; 
             float scaleFactor = targetHeight / currentHeight;
             target.transform.localScale *= Mathf.Clamp(scaleFactor, 0.01f, 100.0f);
+        }
+    }
+
+    private void ClearExistingAudience()
+    {
+        GameObject[] allObjects = FindObjectsByType<GameObject>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (GameObject go in allObjects)
+        {
+            if (go != null && go.hideFlags == HideFlags.None &&
+                (go.name == "Sitting" || go.name.StartsWith("Sitting (")))
+            {
+                DestroyAudienceObject(go);
+            }
+        }
+
+        AudienceMember[] existingMembers = FindObjectsByType<AudienceMember>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (AudienceMember member in existingMembers)
+        {
+            if (member != null)
+            {
+                DestroyAudienceObject(member.gameObject);
+            }
+        }
+
+        if (controller != null)
+        {
+            controller.audienceMembers.Clear();
+        }
+    }
+
+    private void DestroyAudienceObject(GameObject go)
+    {
+        if (go == null)
+        {
+            return;
+        }
+
+        if (Application.isPlaying)
+        {
+            Destroy(go);
+        }
+        else
+        {
+            DestroyImmediate(go);
         }
     }
 
@@ -309,20 +345,58 @@ public class AudienceSpawner : MonoBehaviour
         }
     }
 
-    private List<GameObject> FindAllSeats()
+    private List<GameObject> FindAllSeats(Transform meetingTable, Transform meetingSeatMarkers)
     {
+        if (meetingSeatMarkers != null)
+        {
+            List<GameObject> markerSeats = FindMeetingRoomMarkerSeats(meetingSeatMarkers);
+            if (markerSeats.Count > 0)
+            {
+                return markerSeats;
+            }
+        }
+
+        if (meetingTable != null)
+        {
+            List<GameObject> meetingSeats = FindMeetingRoomSeats(meetingTable);
+            if (meetingSeats.Count > 0)
+            {
+                return meetingSeats;
+            }
+        }
+
         List<GameObject> seats = new List<GameObject>();
         GameObject[] allObjects = FindObjectsByType<GameObject>(FindObjectsSortMode.None);
         foreach (GameObject go in allObjects)
         {
+            if (!IsSeatCandidate(go))
+            {
+                continue;
+            }
+
+            if (IsMeetingRoomSeatPart(go))
+            {
+                continue;
+            }
+
+            if (IsMeetingRoomPresenterSideSeat(go))
+            {
+                continue;
+            }
+
+            if (IsMeetingRoomSeatRoot(go))
+            {
+                if (!ContainsNearbySeat(seats, go.transform.position, 0.1f))
+                {
+                    seats.Add(go);
+                }
+
+                continue;
+            }
+
             string n = go.name.ToLower();
             if (n.Contains("seat") || n.Contains("bench") || n.Contains("chair"))
             {
-                if (!IsSeatCandidate(go))
-                {
-                    continue;
-                }
-
                 if (!n.Contains("leg") && !n.Contains("side") && !n.Contains("back") && !n.Contains("frame"))
                 {
                     Renderer r = go.GetComponent<Renderer>();
@@ -344,9 +418,10 @@ public class AudienceSpawner : MonoBehaviour
                     }
                     else
                     {
-                        bool exists = false;
-                        foreach(var s in seats) if(Vector3.Distance(s.transform.position, go.transform.position) < 0.1f) exists = true;
-                        if(!exists) seats.Add(go);
+                        if (!ContainsNearbySeat(seats, go.transform.position, 0.1f))
+                        {
+                            seats.Add(go);
+                        }
                     }
                 }
             }
@@ -378,6 +453,8 @@ public class AudienceSpawner : MonoBehaviour
             path.Contains("projection") ||
             path.Contains("screen") ||
             path.Contains("presentation") ||
+            path.Contains("school chair") ||
+            path.Contains("desktop") ||
             path.Contains("desk_surface") ||
             path.Contains("desk_body") ||
             path.Contains("monitor"))
@@ -386,6 +463,559 @@ public class AudienceSpawner : MonoBehaviour
         }
 
         return true;
+    }
+
+    private Transform FindMeetingRoomSeatMarkerRoot()
+    {
+        GameObject[] allObjects = FindObjectsByType<GameObject>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (GameObject go in allObjects)
+        {
+            if (go == null)
+            {
+                continue;
+            }
+
+            string normalizedName = go.name.Replace("_", "").Replace("-", "").Replace(" ", "").ToLowerInvariant();
+            if ((normalizedName == "auidence" ||
+                 normalizedName == "audience" ||
+                 normalizedName == "meetingroomaudienceseats") &&
+                HasNumberedSeatMarkerChildren(go.transform))
+            {
+                return go.transform;
+            }
+        }
+
+        return null;
+    }
+
+    private bool HasNumberedSeatMarkerChildren(Transform root)
+    {
+        return root != null && FindMeetingRoomMarkerSeats(root).Count > 0;
+    }
+
+    private List<GameObject> FindMeetingRoomMarkerSeats(Transform markerRoot)
+    {
+        List<GameObject> markerSeats = new List<GameObject>();
+        if (markerRoot == null)
+        {
+            return markerSeats;
+        }
+
+        for (int i = 0; i < markerRoot.childCount; i++)
+        {
+            Transform child = markerRoot.GetChild(i);
+            if (child.gameObject.activeInHierarchy && GetSeatMarkerNumber(child) > 0)
+            {
+                markerSeats.Add(child.gameObject);
+            }
+        }
+
+        markerSeats.Sort((a, b) => GetSeatMarkerNumber(a.transform).CompareTo(GetSeatMarkerNumber(b.transform)));
+        return markerSeats;
+    }
+
+    private int GetSeatMarkerNumber(Transform marker)
+    {
+        if (marker == null)
+        {
+            return -1;
+        }
+
+        string name = marker.name.ToLowerInvariant();
+        if (!name.StartsWith("seat"))
+        {
+            return -1;
+        }
+
+        int multiplier = 1;
+        int value = 0;
+        bool hasDigits = false;
+        for (int i = name.Length - 1; i >= 0; i--)
+        {
+            if (name[i] < '0' || name[i] > '9')
+            {
+                break;
+            }
+
+            hasDigits = true;
+            value += (name[i] - '0') * multiplier;
+            multiplier *= 10;
+        }
+
+        return hasDigits ? value : -1;
+    }
+
+    private Transform FindMeetingRoomTable()
+    {
+        GameObject exact = GameObject.Find("MeetingTable_Center");
+        if (exact != null)
+        {
+            return exact.transform;
+        }
+
+        GameObject[] allObjects = FindObjectsByType<GameObject>(FindObjectsSortMode.None);
+        foreach (GameObject go in allObjects)
+        {
+            string normalizedName = go.name.Replace("_", "").Replace("-", "").Replace(" ", "").ToLowerInvariant();
+            if (normalizedName.Contains("meetingtablecenter") ||
+                (normalizedName.Contains("meeting") && normalizedName.Contains("table")))
+            {
+                return go.transform;
+            }
+        }
+
+        Transform bestParent = null;
+        int bestCount = 0;
+        Dictionary<Transform, int> chairCountsByParent = new Dictionary<Transform, int>();
+        foreach (GameObject go in allObjects)
+        {
+            Transform parent = go.transform.parent;
+            if (parent == null || !LooksLikeMeetingRoomImportedChair(go.transform))
+            {
+                continue;
+            }
+
+            chairCountsByParent.TryGetValue(parent, out int count);
+            count++;
+            chairCountsByParent[parent] = count;
+            if (count > bestCount)
+            {
+                bestCount = count;
+                bestParent = parent;
+            }
+        }
+
+        return bestCount >= 4 ? bestParent : null;
+    }
+
+    private List<GameObject> FindMeetingRoomSeats(Transform meetingTable)
+    {
+        List<GameObject> seats = new List<GameObject>();
+        if (meetingTable == null)
+        {
+            return seats;
+        }
+
+        for (int i = 0; i < meetingTable.childCount; i++)
+        {
+            Transform child = meetingTable.GetChild(i);
+            if (!child.gameObject.activeInHierarchy ||
+                IsMeetingRoomPresenterSeat(child) ||
+                !IsMeetingRoomSideSeat(child, meetingTable) ||
+                !LooksLikeMeetingRoomChair(child))
+            {
+                continue;
+            }
+
+            seats.Add(child.gameObject);
+        }
+
+        return seats;
+    }
+
+    private bool LooksLikeMeetingRoomChair(Transform candidate)
+    {
+        if (candidate == null)
+        {
+            return false;
+        }
+
+        string name = candidate.name.ToLowerInvariant();
+        return name.Contains("chair") ||
+               name.Contains("zero7") ||
+               name.Contains("[900486]") ||
+               HasDescendantName(candidate, "zero7");
+    }
+
+    private bool LooksLikeMeetingRoomImportedChair(Transform candidate)
+    {
+        if (candidate == null)
+        {
+            return false;
+        }
+
+        string name = candidate.name.ToLowerInvariant();
+        return name.Contains("zero7") ||
+               name.Contains("[900486]") ||
+               HasDescendantName(candidate, "zero7");
+    }
+
+    private bool IsMeetingRoomPresenterSeat(Transform seat)
+    {
+        return seat != null && seat.localPosition.z < -7f;
+    }
+
+    private bool IsMeetingRoomSideSeat(Transform seat, Transform meetingTable)
+    {
+        if (seat == null || meetingTable == null)
+        {
+            return false;
+        }
+
+        if (HasMeetingRoomSideName(seat, "left") || HasMeetingRoomSideName(seat, "right"))
+        {
+            return true;
+        }
+
+        Vector3 localSeatPosition = meetingTable.InverseTransformPoint(seat.position);
+        return Mathf.Abs(localSeatPosition.z) >= meetingRoomMinimumSideDistance;
+    }
+
+    private bool HasMeetingRoomSideName(Transform seat, string side)
+    {
+        if (seat == null)
+        {
+            return false;
+        }
+
+        string name = seat.name.ToLowerInvariant();
+        return name.EndsWith(side) ||
+               name.Contains("_" + side) ||
+               name.Contains("-" + side) ||
+               name.Contains(" " + side);
+    }
+
+    private bool IsMeetingRoomSeatRoot(GameObject go)
+    {
+        if (go == null)
+        {
+            return false;
+        }
+
+        Transform parent = go.transform.parent;
+        if (parent == null || !parent.name.ToLowerInvariant().Contains("meetingtable_center"))
+        {
+            return false;
+        }
+
+        string name = go.name.ToLowerInvariant();
+        return name.Contains("zero7") ||
+               name.Contains("[900486]") ||
+               HasDescendantName(go.transform, "zero7");
+    }
+
+    private bool IsMeetingRoomPresenterSideSeat(GameObject go)
+    {
+        if (!IsMeetingRoomSeatRoot(go))
+        {
+            return false;
+        }
+
+        return go.transform.localPosition.z < -7f;
+    }
+
+    private bool IsMeetingRoomSeatPart(GameObject go)
+    {
+        if (go == null)
+        {
+            return false;
+        }
+
+        string path = BuildTransformPath(go.transform);
+        return path.Contains("meetingtable_center") &&
+               path.Contains("zero7") &&
+               (path.Contains("geometry_") || path.Contains("_navisworks"));
+    }
+
+    private bool ContainsNearbySeat(List<GameObject> seats, Vector3 position, float distance)
+    {
+        foreach (GameObject seat in seats)
+        {
+            if (seat != null && Vector3.Distance(seat.transform.position, position) < distance)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private Transform EnsureMeetingRoomLookTarget(Transform meetingTable, Vector3 fallbackFocalPoint)
+    {
+        const string targetName = "AudienceLookTarget_MeetingRoom";
+        GameObject target = GameObject.Find(targetName);
+
+        if (target == null)
+        {
+            target = new GameObject(targetName);
+        }
+
+        if (meetingTable != null)
+        {
+            target.transform.SetParent(meetingTable, false);
+            target.transform.localPosition = new Vector3(0f, 0.75f, 0f);
+            target.transform.localRotation = Quaternion.identity;
+            target.transform.localScale = Vector3.one;
+        }
+        else
+        {
+            target.transform.SetParent(null);
+            target.transform.position = fallbackFocalPoint;
+            target.transform.rotation = Quaternion.identity;
+            target.transform.localScale = Vector3.one;
+        }
+
+        return target.transform;
+    }
+
+    private Dictionary<GameObject, Vector3> BuildMeetingRoomMarkerFacingDirections(List<GameObject> seats)
+    {
+        Dictionary<GameObject, Vector3> directions = new Dictionary<GameObject, Vector3>();
+        if (seats == null || seats.Count == 0)
+        {
+            return directions;
+        }
+
+        List<GameObject> rightSide = new List<GameObject>();
+        List<GameObject> leftSide = new List<GameObject>();
+        foreach (GameObject seat in seats)
+        {
+            if (seat == null)
+            {
+                continue;
+            }
+
+            int seatNumber = GetSeatMarkerNumber(seat.transform);
+            if (seatNumber >= 1 && seatNumber <= 3)
+            {
+                rightSide.Add(seat);
+            }
+            else
+            {
+                leftSide.Add(seat);
+            }
+        }
+
+        if (rightSide.Count > 0 && leftSide.Count > 0)
+        {
+            Vector3 rightCenter = GetAverageSeatPosition(rightSide);
+            Vector3 leftCenter = GetAverageSeatPosition(leftSide);
+            AddDirectionsTowardCenter(directions, rightSide, leftCenter);
+            AddDirectionsTowardCenter(directions, leftSide, rightCenter);
+        }
+
+        foreach (GameObject seat in seats)
+        {
+            if (seat != null && !directions.ContainsKey(seat))
+            {
+                Vector3 direction = seat.transform.forward;
+                direction.y = 0f;
+                directions[seat] = direction.sqrMagnitude > 0.0001f ? direction.normalized : Vector3.forward;
+            }
+        }
+
+        return directions;
+    }
+
+    private Dictionary<GameObject, Vector3> BuildMeetingRoomFacingDirections(List<GameObject> seats, Transform meetingTable, Transform fallbackTarget)
+    {
+        Dictionary<GameObject, Vector3> directions = new Dictionary<GameObject, Vector3>();
+        if (seats == null || seats.Count == 0 || meetingTable == null)
+        {
+            return directions;
+        }
+
+        List<GameObject> sideA = new List<GameObject>();
+        List<GameObject> sideB = new List<GameObject>();
+        foreach (GameObject seat in seats)
+        {
+            if (seat == null)
+            {
+                continue;
+            }
+
+            if (HasMeetingRoomSideName(seat.transform, "left"))
+            {
+                sideA.Add(seat);
+            }
+            else if (HasMeetingRoomSideName(seat.transform, "right"))
+            {
+                sideB.Add(seat);
+            }
+        }
+
+        if (sideA.Count > 0 && sideB.Count == 0)
+        {
+            foreach (GameObject seat in seats)
+            {
+                if (seat != null && !sideA.Contains(seat))
+                {
+                    sideB.Add(seat);
+                }
+            }
+        }
+        else if (sideB.Count > 0 && sideA.Count == 0)
+        {
+            foreach (GameObject seat in seats)
+            {
+                if (seat != null && !sideB.Contains(seat))
+                {
+                    sideA.Add(seat);
+                }
+            }
+        }
+
+        if (sideA.Count == 0 || sideB.Count == 0)
+        {
+            sideA.Clear();
+            sideB.Clear();
+            foreach (GameObject seat in seats)
+            {
+                if (seat == null)
+                {
+                    continue;
+                }
+
+                Vector3 localSeatPosition = meetingTable.InverseTransformPoint(seat.transform.position);
+                if (localSeatPosition.z >= 0f)
+                {
+                    sideA.Add(seat);
+                }
+                else
+                {
+                    sideB.Add(seat);
+                }
+            }
+        }
+
+        if (sideA.Count > 0 && sideB.Count > 0)
+        {
+            Vector3 sideACenter = GetAverageSeatPosition(sideA);
+            Vector3 sideBCenter = GetAverageSeatPosition(sideB);
+            AddDirectionsTowardCenter(directions, sideA, sideBCenter);
+            AddDirectionsTowardCenter(directions, sideB, sideACenter);
+        }
+
+        foreach (GameObject seat in seats)
+        {
+            if (seat != null && !directions.ContainsKey(seat))
+            {
+                directions[seat] = GetMeetingRoomSeatFacingDirection(seat, meetingTable, fallbackTarget, null);
+            }
+        }
+
+        return directions;
+    }
+
+    private Vector3 GetAverageSeatPosition(List<GameObject> seats)
+    {
+        Vector3 sum = Vector3.zero;
+        int count = 0;
+        foreach (GameObject seat in seats)
+        {
+            if (seat == null)
+            {
+                continue;
+            }
+
+            sum += seat.transform.position;
+            count++;
+        }
+
+        return count > 0 ? sum / count : Vector3.zero;
+    }
+
+    private void AddDirectionsTowardCenter(Dictionary<GameObject, Vector3> directions, List<GameObject> seats, Vector3 targetCenter)
+    {
+        foreach (GameObject seat in seats)
+        {
+            if (seat == null)
+            {
+                continue;
+            }
+
+            Vector3 direction = targetCenter - seat.transform.position;
+            direction.y = 0f;
+            if (direction.sqrMagnitude > 0.0001f)
+            {
+                directions[seat] = direction.normalized;
+            }
+        }
+    }
+
+    private Vector3 GetMeetingRoomSeatFacingDirection(
+        GameObject seat,
+        Transform meetingTable,
+        Transform fallbackTarget,
+        Dictionary<GameObject, Vector3> groupedDirections)
+    {
+        if (seat != null && groupedDirections != null &&
+            groupedDirections.TryGetValue(seat, out Vector3 groupedDirection) &&
+            groupedDirection.sqrMagnitude > 0.0001f)
+        {
+            return groupedDirection.normalized;
+        }
+
+        if (seat != null && meetingTable != null)
+        {
+            Vector3 localSeatPosition = meetingTable.InverseTransformPoint(seat.transform.position);
+            Vector3 localTargetPosition = localSeatPosition;
+
+            if (Mathf.Abs(localSeatPosition.z) > 0.5f)
+            {
+                localTargetPosition.z = 0f;
+            }
+            else
+            {
+                localTargetPosition.x = 0f;
+            }
+
+            Vector3 direction = meetingTable.TransformPoint(localTargetPosition) - seat.transform.position;
+            direction.y = 0f;
+            if (direction.sqrMagnitude > 0.0001f)
+            {
+                return direction.normalized;
+            }
+        }
+
+        if (seat != null && fallbackTarget != null)
+        {
+            Vector3 fallbackDirection = fallbackTarget.position - seat.transform.position;
+            fallbackDirection.y = 0f;
+            if (fallbackDirection.sqrMagnitude > 0.0001f)
+            {
+                return fallbackDirection.normalized;
+            }
+        }
+
+        return Vector3.forward;
+    }
+
+    private void AttachMeetingRoomFacing(GameObject memberObj, Vector3 facingDirection)
+    {
+        if (memberObj == null || facingDirection.sqrMagnitude < 0.0001f)
+        {
+            return;
+        }
+
+        AudienceFaceTarget faceTarget = memberObj.GetComponent<AudienceFaceTarget>();
+        if (faceTarget == null)
+        {
+            faceTarget = memberObj.AddComponent<AudienceFaceTarget>();
+        }
+
+        faceTarget.Configure(facingDirection, meetingRoomVisualYawOffset, drawMeetingRoomFacingDebug);
+    }
+
+    private bool HasDescendantName(Transform root, string token)
+    {
+        if (root == null)
+        {
+            return false;
+        }
+
+        string normalizedToken = token.ToLowerInvariant();
+        for (int i = 0; i < root.childCount; i++)
+        {
+            Transform child = root.GetChild(i);
+            if (child.name.ToLowerInvariant().Contains(normalizedToken) ||
+                HasDescendantName(child, normalizedToken))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private string BuildTransformPath(Transform transform)
@@ -493,11 +1123,15 @@ public class AudienceSpawner : MonoBehaviour
 
     private int GetAudienceCount()
     {
-        bool isMeeting = false;
-        foreach(var s in FindObjectsByType<GameObject>(FindObjectsSortMode.None)) {
-            if(s.name.ToLower().Contains("zero7") || s.name.ToLower().Contains("office")) isMeeting = true;
+        Transform markerRoot = FindMeetingRoomSeatMarkerRoot();
+        if (markerRoot != null)
+        {
+            int markerCount = FindMeetingRoomMarkerSeats(markerRoot).Count;
+            if (markerCount > 0) return markerCount;
         }
-        if (isMeeting) return 8;
+
+        if (FindMeetingRoomTable() != null) return 8;
+
         switch (controller.currentStressLevel)
         {
             case StressLevel.Easy: return 12;
@@ -507,7 +1141,18 @@ public class AudienceSpawner : MonoBehaviour
         }
     }
 
-    private Vector3 GetSeatBackwardOffset(GameObject seat) { Vector3 b = seat.transform.forward; b.y = 0; b.Normalize(); return b * seatBackOffset; }
+    private Vector3 GetSeatBackwardOffset(GameObject seat)
+    {
+        Vector3 b = seat.transform.forward;
+        b.y = 0f;
+        if (b.sqrMagnitude < 0.0001f)
+        {
+            return Vector3.zero;
+        }
+
+        b.Normalize();
+        return b * seatBackOffset;
+    }
 
     private bool TryGetBounds(GameObject target, out Bounds bounds)
     {
@@ -541,5 +1186,80 @@ public class AudienceSpawner : MonoBehaviour
             if (guids.Length > 0) sharedAnimatorController = AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>(AssetDatabase.GUIDToAssetPath(guids[0]));
         }
 #endif
+    }
+}
+
+[DefaultExecutionOrder(200)]
+public class AudienceFaceTarget : MonoBehaviour
+{
+    [SerializeField] private Transform target;
+    [SerializeField] private bool useFixedDirection;
+    [SerializeField] private Vector3 fixedWorldDirection = Vector3.forward;
+    [SerializeField] private float yawOffsetDegrees;
+    [SerializeField] private bool drawDebugLine;
+    [SerializeField] private float minDistance = 0.05f;
+
+    public void Configure(Transform lookTarget, float visualYawOffsetDegrees, bool debugLine = false)
+    {
+        target = lookTarget;
+        useFixedDirection = false;
+        yawOffsetDegrees = visualYawOffsetDegrees;
+        drawDebugLine = debugLine;
+        enabled = target != null;
+        ApplyNow();
+    }
+
+    public void Configure(Vector3 worldDirection, float visualYawOffsetDegrees, bool debugLine = false)
+    {
+        worldDirection.y = 0f;
+        if (worldDirection.sqrMagnitude < minDistance * minDistance)
+        {
+            enabled = false;
+            return;
+        }
+
+        target = null;
+        useFixedDirection = true;
+        fixedWorldDirection = worldDirection.normalized;
+        yawOffsetDegrees = visualYawOffsetDegrees;
+        drawDebugLine = debugLine;
+        enabled = true;
+        ApplyNow();
+    }
+
+    private void LateUpdate()
+    {
+        ApplyNow();
+    }
+
+    public void ApplyNow()
+    {
+        Vector3 direction;
+        if (useFixedDirection)
+        {
+            direction = fixedWorldDirection;
+        }
+        else if (target != null)
+        {
+            direction = target.position - transform.position;
+        }
+        else
+        {
+            return;
+        }
+
+        direction.y = 0f;
+        if (direction.sqrMagnitude < minDistance * minDistance)
+        {
+            return;
+        }
+
+        Quaternion lookRotation = Quaternion.LookRotation(direction.normalized, Vector3.up);
+        transform.rotation = lookRotation * Quaternion.Euler(0f, yawOffsetDegrees, 0f);
+
+        if (drawDebugLine)
+        {
+            Debug.DrawLine(transform.position + Vector3.up, transform.position + Vector3.up + direction.normalized * 1.5f, Color.cyan, 0f, false);
+        }
     }
 }

@@ -494,7 +494,7 @@ namespace VRPublicSpeaking.AppShell.UI
         private static bool UsesRaisedVrPlacementForActiveScene()
         {
             string sceneName = SceneManager.GetActiveScene().name;
-            return sceneName.Contains("Conference") || sceneName.Contains("Meeting");
+            return sceneName.Contains("Conference");
         }
 
         private void SetWarningVisible(bool isVisible)

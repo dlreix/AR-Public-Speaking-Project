@@ -7,13 +7,12 @@ namespace VRPublicSpeaking.AppShell.PresentationQuestioning
     public class AudienceQuestionBubblePresenter : MonoBehaviour
     {
         [SerializeField] private Vector3 headOffset = new Vector3(0f, 0.34f, 0f);
-        [SerializeField] private Vector2 bubbleSize = new Vector2(720f, 300f);
-        [SerializeField] private Vector2 bubbleSizeLimits = new Vector2(580f, 780f);
-        [SerializeField] private Vector2 questionHeightLimits = new Vector2(110f, 230f);
-        [SerializeField] private float worldScale = 0.00138f;
-        [SerializeField] private float distanceScalePerMeter = 0.00042f;
-        [SerializeField] private float maxWorldScale = 0.0034f;
-        [SerializeField] private float maxQuestionCharacters = 420f;
+        [SerializeField] private Vector2 bubbleSize = new Vector2(900f, 380f);
+        [SerializeField] private Vector2 bubbleSizeLimits = new Vector2(720f, 1040f);
+        [SerializeField] private Vector2 questionHeightLimits = new Vector2(160f, 620f);
+        [SerializeField] private float worldScale = 0.00175f;
+        [SerializeField] private float distanceScalePerMeter = 0.0005f;
+        [SerializeField] private float maxWorldScale = 0.0042f;
         [SerializeField] private bool anchorToViewer = false;
         [SerializeField] private bool showQuestionText = true;
         [SerializeField] private Vector3 viewerOffset = new Vector3(0f, 0.42f, 1.42f);
@@ -30,11 +29,15 @@ namespace VRPublicSpeaking.AppShell.PresentationQuestioning
         private Vector3 resolvedTargetOffset;
         private RectTransform bubbleRect;
         private const string DefaultShortcutHint = "A/Trigger: next question  |  B/Y: finish Q&A";
-        private const float PanelHorizontalPadding = 44f;
-        private const float PanelVerticalPadding = 32f;
-        private const float PanelSpacing = 6f;
-        private const float TitleHeight = 38f;
-        private const float HintHeight = 34f;
+        private const float PanelHorizontalPadding = 64f;
+        private const float PanelVerticalPadding = 44f;
+        private const float PanelSpacing = 8f;
+        private const float TitleHeight = 48f;
+        private const float HintHeight = 42f;
+        private const float QuestionFontSizeMax = 54f;
+        private const float QuestionFontSizeMin = 28f;
+        private const float QuestionFontFitStep = 2f;
+        private const float QuestionContentPadding = 12f;
 
         public void UseAudienceAnchoredQuestionBubble()
         {
@@ -68,9 +71,7 @@ namespace VRPublicSpeaking.AppShell.PresentationQuestioning
             followTarget = member.transform;
             resolvedTargetOffset = ResolveTargetOffset(member);
             SetText(titleLabel, BuildTitle(question, questionNumber, questionCount));
-            SetText(questionLabel, showQuestionText
-                ? Compact(question.question, Mathf.RoundToInt(maxQuestionCharacters))
-                : "?");
+            SetText(questionLabel, showQuestionText ? NormalizeQuestionText(question.question) : "?");
             SetText(hintLabel, NormalizeShortcutHint(shortcutHint));
             ApplyQuestionTextMode();
             ApplyContentSize();
@@ -162,17 +163,17 @@ namespace VRPublicSpeaking.AppShell.PresentationQuestioning
             outline.effectDistance = new Vector2(3f, -3f);
 
             VerticalLayoutGroup layout = panel.GetComponent<VerticalLayoutGroup>();
-            layout.padding = new RectOffset(22, 22, 16, 16);
+            layout.padding = new RectOffset(32, 32, 22, 22);
             layout.spacing = PanelSpacing;
             layout.childControlWidth = true;
-            layout.childControlHeight = false;
+            layout.childControlHeight = true;
             layout.childForceExpandWidth = true;
             layout.childForceExpandHeight = false;
 
-            titleLabel = CreateText(panel.transform, "BubbleTitle", 30f, FontStyles.Bold, new Color(0.05f, 0.18f, 0.28f, 1f), TitleHeight);
-            questionLabel = CreateText(panel.transform, "BubbleQuestion", 42f, FontStyles.Bold, new Color(0.04f, 0.07f, 0.10f, 1f), questionHeightLimits.x);
+            titleLabel = CreateText(panel.transform, "BubbleTitle", 36f, FontStyles.Bold, new Color(0.05f, 0.18f, 0.28f, 1f), TitleHeight);
+            questionLabel = CreateText(panel.transform, "BubbleQuestion", QuestionFontSizeMax, FontStyles.Bold, new Color(0.04f, 0.07f, 0.10f, 1f), questionHeightLimits.x);
             questionLayout = questionLabel.GetComponent<LayoutElement>();
-            hintLabel = CreateText(panel.transform, "BubbleHint", 24f, FontStyles.Bold, new Color(0.02f, 0.40f, 0.60f, 1f), HintHeight);
+            hintLabel = CreateText(panel.transform, "BubbleHint", 30f, FontStyles.Bold, new Color(0.02f, 0.40f, 0.60f, 1f), HintHeight);
             hintLabel.alignment = TextAlignmentOptions.Center;
 
             GameObject tail = new GameObject("BubbleTail", typeof(RectTransform), typeof(Image));
@@ -208,13 +209,17 @@ namespace VRPublicSpeaking.AppShell.PresentationQuestioning
                 maxWidth);
 
             float textWidth = Mathf.Max(100f, desiredWidth - PanelHorizontalPadding);
+            if (showQuestionText)
+            {
+                FitQuestionFontToHeight(textWidth, Mathf.Max(questionHeightLimits.x, questionHeightLimits.y));
+            }
+
             float preferredQuestionHeight = showQuestionText
-                ? questionLabel.GetPreferredValues(questionLabel.text, textWidth, 0f).y + 8f
+                ? questionLabel.GetPreferredValues(questionLabel.text, textWidth, 0f).y + QuestionContentPadding
                 : questionHeightLimits.x;
-            float questionHeight = Mathf.Clamp(
+            float questionHeight = Mathf.Max(
                 preferredQuestionHeight,
-                Mathf.Min(questionHeightLimits.x, questionHeightLimits.y),
-                Mathf.Max(questionHeightLimits.x, questionHeightLimits.y));
+                Mathf.Min(questionHeightLimits.x, questionHeightLimits.y));
 
             if (questionLayout != null)
             {
@@ -274,6 +279,28 @@ namespace VRPublicSpeaking.AppShell.PresentationQuestioning
             return label;
         }
 
+        private void FitQuestionFontToHeight(float textWidth, float targetHeight)
+        {
+            if (questionLabel == null)
+            {
+                return;
+            }
+
+            float width = Mathf.Max(100f, textWidth);
+            for (float size = QuestionFontSizeMax; size >= QuestionFontSizeMin; size -= QuestionFontFitStep)
+            {
+                questionLabel.fontSize = size;
+                questionLabel.fontSizeMax = size;
+                questionLabel.fontSizeMin = QuestionFontSizeMin;
+
+                float height = questionLabel.GetPreferredValues(questionLabel.text, width, 0f).y + QuestionContentPadding;
+                if (height <= targetHeight || size <= QuestionFontSizeMin)
+                {
+                    return;
+                }
+            }
+        }
+
         private void ApplyQuestionTextMode()
         {
             if (questionLabel == null)
@@ -283,17 +310,19 @@ namespace VRPublicSpeaking.AppShell.PresentationQuestioning
 
             if (showQuestionText)
             {
-                questionLabel.fontSize = 42f;
-                questionLabel.fontSizeMax = 42f;
-                questionLabel.fontSizeMin = 18f;
+                questionLabel.fontSize = QuestionFontSizeMax;
+                questionLabel.fontSizeMax = QuestionFontSizeMax;
+                questionLabel.fontSizeMin = QuestionFontSizeMin;
                 questionLabel.alignment = TextAlignmentOptions.TopLeft;
+                questionLabel.overflowMode = TextOverflowModes.Overflow;
                 return;
             }
 
-            questionLabel.fontSize = 64f;
-            questionLabel.fontSizeMax = 64f;
-            questionLabel.fontSizeMin = 48f;
+            questionLabel.fontSize = 78f;
+            questionLabel.fontSizeMax = 78f;
+            questionLabel.fontSizeMin = 56f;
             questionLabel.alignment = TextAlignmentOptions.Center;
+            questionLabel.overflowMode = TextOverflowModes.Overflow;
         }
 
         private void UpdateTransform()
@@ -444,15 +473,10 @@ namespace VRPublicSpeaking.AppShell.PresentationQuestioning
             }
         }
 
-        private static string Compact(string value, int maxLength)
+        private static string NormalizeQuestionText(string value)
         {
             string text = (value ?? string.Empty).Trim();
-            if (text.Length <= maxLength)
-            {
-                return text;
-            }
-
-            return text.Substring(0, Mathf.Max(0, maxLength - 3)).TrimEnd() + "...";
+            return text.Replace("\r\n", "\n").Replace('\r', '\n');
         }
     }
 }

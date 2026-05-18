@@ -788,16 +788,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9977662543786ee4295a1f2c7abb32f2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::VRPublicSpeaking.AppShell.Results.DashboardAdapter
-  dashboardController: {fileID: 0}
-  dashboardRoot: {fileID: 0}
-  dashboardSceneName: Overview
+  mainHubSceneName: MainHubScene
   dashboardLoadingMessage: Opening dashboard...
-  openMessage: Open
-  alternateOpenMessages:
-  - OpenDashboard
-  - ShowDashboard
-  - Show
-  activateControllerGameObject: 1
 --- !u!114 &36667465
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -917,12 +909,19 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::VRPublicSpeaking.AppShell.Results.ResultsFlowController
   runtimeState: {fileID: 0}
   transitionManager: {fileID: 0}
-  dashboardAdapter: {fileID: 36667464}
+  dashboardPresenter: {fileID: 0}
   environmentSessionOverlayController: {fileID: 477327371}
   statusLabel: {fileID: 1681449865}
+  dashboardHost: {fileID: 0}
+  dashboardFirstRoot: {fileID: 0}
+  buildDashboardFirstLayout: 1
   retryLoadingMessage: Retrying session...
   changeEnvironmentLoadingMessage: Returning to environments...
   returnToHubLoadingMessage: Returning to hub...
+  applyVrUsabilityDefaults: 1
+  minimumVrFontSize: 22
+  minimumVrButtonHeight: 92
+  minimumVrPanelSize: {x: 1180, y: 820}
 --- !u!114 &36667472
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2598,6 +2597,37 @@ Camera:
   m_CorrespondingSourceObject: {fileID: 1353140723957520223, guid: ea848d8fb5c512249a6d1a24a5a965fa, type: 3}
   m_PrefabInstance: {fileID: 197632282}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &199446447
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 199446448}
+  m_Layer: 3
+  m_Name: seat5
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &199446448
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 199446447}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: -0.7071068, w: 0.7071068}
+  m_LocalPosition: {x: 305.00586, y: 1393, z: -318}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 319055443}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: -90}
 --- !u!1 &203685188
 GameObject:
   m_ObjectHideFlags: 0
@@ -2787,6 +2817,37 @@ Transform:
   m_Children:
   - {fileID: 1793060646}
   m_Father: {fileID: 525675292}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &211351619
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 211351620}
+  m_Layer: 3
+  m_Name: seat3
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &211351620
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 211351619}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 1372.0017, y: -209, z: -318}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 319055443}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &219165053
 GameObject:
@@ -4122,6 +4183,43 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 293418423}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &319055442
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 319055443}
+  m_Layer: 3
+  m_Name: auidence
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &319055443
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 319055442}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0.7071068, y: 0, z: -0, w: 0.7071068}
+  m_LocalPosition: {x: -0.89, y: 0.735, z: 3.37}
+  m_LocalScale: {x: 0.001, y: 0.0010000003, z: 0.0010000003}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 2123930181}
+  - {fileID: 1863790143}
+  - {fileID: 211351620}
+  - {fileID: 1008615269}
+  - {fileID: 199446448}
+  - {fileID: 1945240518}
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &340314264
 GameObject:
   m_ObjectHideFlags: 0
@@ -6044,20 +6142,41 @@ MonoBehaviour:
   dimmerCanvasGroup: {fileID: 1461844195}
   pausePanel: {fileID: 612148873}
   resultsPanel: {fileID: 36667473}
+  dashboardPanel: {fileID: 0}
   resultsSummaryPresenter: {fileID: 36667472}
   resultsFlowController: {fileID: 36667471}
+  dashboardPresenter: {fileID: 0}
+  dashboardHost: {fileID: 0}
+  dashboardContentRoot: {fileID: 0}
   pauseStatusLabel: {fileID: 1238032838}
+  dashboardScoreLabel: {fileID: 0}
+  dashboardMetricsLabel: {fileID: 0}
+  dashboardFocusLabel: {fileID: 0}
+  dashboardRecommendationsLabel: {fileID: 0}
   pauseDimAlpha: 0.42
   resultsDimAlpha: 0.56
   pauseStatusText: Session paused. Timing, tracking, and scoring are safely on hold.
   pauseUnavailableStatusText: Pause is available only while a live session is running.
   applyVrReadabilityDefaults: 1
   readableOverlayOffset: {x: 0, y: -0.1, z: 1.08}
+  minimumVrOverlayTargetY: 1.62
   pauseMinimumFontSize: 22
   pauseMinimumButtonHeight: 72
-  pausePanelReadableScale: 1.18
+  pauseMinimumPanelSize: {x: 1120, y: 800}
+  resultsMinimumFontSize: 22
+  resultsMinimumButtonHeight: 92
+  resultsMinimumPanelSize: {x: 1180, y: 820}
+  dashboardMinimumButtonHeight: 92
+  dashboardMinimumPanelSize: {x: 1180, y: 820}
+  overlayDynamicPixelsPerUnit: 32
   useScreenSpaceOverlayWhenNoXrDevice: 1
   desktopOverlayReferenceResolution: {x: 1540, y: 1040}
+  vrNavigationAxisThreshold: 0.55
+  vrNavigationRepeatDelay: 0.22
+  vrSelectedButtonScale: 1.08
+  vrCancelHoldSeconds: 0.6
+  overlayInputGuardSeconds: 0.35
+  pauseDestructiveConfirmSeconds: 4
 --- !u!224 &477327372
 RectTransform:
   m_ObjectHideFlags: 0
@@ -6100,6 +6219,7 @@ MonoBehaviour:
   positionLerpSpeed: 0
   rotationLerpSpeed: 0
   followContinuously: 0
+  minimumTargetY: 0
 --- !u!114 &477327374
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -7754,21 +7874,42 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::VRPublicSpeaking.AppShell.UI.InSessionHudPresenter
   runtimeState: {fileID: 0}
   mainController: {fileID: 0}
+  speechPipelineController: {fileID: 0}
   canvasGroup: {fileID: 703754267}
   timerLabel: {fileID: 1113345787}
   statusLabel: {fileID: 1223639028}
+  liveScoreLabel: {fileID: 0}
+  speechTranscriptLabel: {fileID: 0}
+  hudFollower: {fileID: 0}
   warningRoot: {fileID: 0}
   warningCanvasGroup: {fileID: 0}
   warningFollower: {fileID: 0}
   warningLabel: {fileID: 0}
+  gazeScoringSystem: {fileID: 0}
   hideWhenSessionInactive: 1
+  showLiveWarnings: 0
+  showLiveScore: 1
+  showSpeechTranscriptPreview: 1
   inactiveStatusText: Waiting for session start
   warningTextColor: {r: 0.98, g: 0.74, b: 0.39, a: 1}
   warningBackgroundColor: {r: 0.08, g: 0.11, b: 0.15, a: 0.92}
+  hudFollowOffset: {x: 0, y: -0.48, z: 0.98}
   warningFollowOffset: {x: 0, y: -0.12, z: 0.92}
+  raisedSceneHudFollowOffset: {x: 0, y: -0.26, z: 0.98}
+  raisedSceneWarningFollowOffset: {x: 0, y: 0.04, z: 0.92}
+  vrHudSize: {x: 340, y: 142}
+  desktopHudSize: {x: 560, y: 210}
   desktopWarningAnchoredPosition: {x: 0, y: -135}
   desktopWarningSize: {x: 540, y: 90}
+  minimumHudTargetY: 1.55
+  raisedSceneMinimumHudTargetY: 1.82
+  vrTimerFontSize: 28
+  vrScoreFontSize: 14
+  vrStatusFontSize: 11
+  desktopTimerFontSize: 40
+  desktopScoreFontSize: 16
   desktopWarningFontSize: 16
+  desktopSpeechPreviewFontSize: 15
 --- !u!1 &718051504
 GameObject:
   m_ObjectHideFlags: 0
@@ -10537,6 +10678,37 @@ Transform:
   - {fileID: 91983084}
   m_Father: {fileID: 219165054}
   m_LocalEulerAnglesHint: {x: -90, y: 0, z: -90}
+--- !u!1 &1008615268
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1008615269}
+  m_Layer: 3
+  m_Name: seat4
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1008615269
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1008615268}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.00000016391276, y: 0.00000008940696, z: 0.90921414, w: -0.41632867}
+  m_LocalPosition: {x: -600, y: 1436, z: -247}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 319055443}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 229.206}
 --- !u!1 &1031770360
 GameObject:
   m_ObjectHideFlags: 0
@@ -19712,6 +19884,37 @@ Material:
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
+--- !u!1 &1863790142
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1863790143}
+  m_Layer: 3
+  m_Name: seat2
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1863790143
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1863790142}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 286, y: -252, z: -318}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 319055443}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1869896122
 GameObject:
   m_ObjectHideFlags: 0
@@ -21039,6 +21242,37 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1940254241}
   m_CullTransparentMesh: 1
+--- !u!1 &1945240517
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1945240518}
+  m_Layer: 3
+  m_Name: seat6
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1945240518
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1945240517}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 1, w: 0}
+  m_LocalPosition: {x: 1238.9965, y: 1493, z: -318}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 319055443}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 180}
 --- !u!1 &1952349197
 GameObject:
   m_ObjectHideFlags: 0
@@ -21652,6 +21886,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::VRPublicSpeaking.AppShell.Integration.PlayerRigAdapter
   playerController: {fileID: 0}
+  xrOrigin: {fileID: 0}
   explicitSpawnPoint: {fileID: 0}
 --- !u!114 &2046564770
 MonoBehaviour:
@@ -21698,6 +21933,7 @@ MonoBehaviour:
   scoringAdapter: {fileID: 2046564770}
   speechPipelineController: {fileID: 0}
   environmentSessionOverlayController: {fileID: 477327371}
+  presentationQuestionSessionController: {fileID: 0}
   routeAfterSessionEnd: 1
   autoStartDelay: 0.35
   resultsLoadingMessage: Loading results...
@@ -21721,6 +21957,7 @@ MonoBehaviour:
   speechPipelineController: {fileID: 0}
   existingSceneFlowAdapter: {fileID: 2046564772}
   environmentSessionOverlayController: {fileID: 477327371}
+  presentationQuestionSessionController: {fileID: 0}
   installOnStart: 1
 --- !u!224 &2046564774
 RectTransform:
@@ -22604,6 +22841,37 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2096170363}
   m_Mesh: {fileID: -5109939278439371304, guid: 312736fb635fd7743ad88542d3bfdd1d, type: 3}
+--- !u!1 &2123930180
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2123930181}
+  m_Layer: 3
+  m_Name: seat1
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2123930181
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2123930180}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -590.99994, y: -233, z: -316}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 319055443}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &2128063202
 GameObject:
   m_ObjectHideFlags: 0
@@ -24079,4 +24347,4 @@ SceneRoots:
   - {fileID: 357225187}
   - {fileID: 2046564774}
   - {fileID: 9188866922843698516}
-
+  - {fileID: 319055443}
