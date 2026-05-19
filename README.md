@@ -1,478 +1,623 @@
-# Module Integration Guide for the App Shell Menu
+# AR/VR Public Speaking Trainer
 
-This document explains how other project members can connect their own modules to the UI shell, main menu, session setup, pause menu, and results flow without breaking the existing demo flow.
+This project is a Unity-based XR public speaking training application. It lets users practice presentations in virtual classroom, conference hall, and meeting room environments while receiving feedback from gaze tracking, speech analysis, audience simulation, session scoring, presentation support, and post-session dashboards.
 
-The goal is simple: each module should plug into the shell through the existing adapter/state system instead of directly editing unrelated menu logic.
+The application is organized around a central App Shell. The shell handles menu navigation, session setup, environment selection, runtime overlays, pause/resume flow, results, and dashboard routing.
 
-## 1. Current Shell Structure
+## Overview
 
-The menu system is generated and controlled mainly from these files:
+The user starts from the main hub, chooses a practice mode, selects an environment, configures session duration and analysis systems, then launches a live speaking session. During the session, the app tracks audience eye contact, speech pace, filler word usage, pause duration, tone variation, head movement, and audience engagement. At the end, it generates a performance score out of 100, identifies the user's strongest and weakest areas, and saves the result to local session history.
 
-- `Assets/AppShell/Editor/AppShellSceneGenerator.cs`
-- `Assets/AppShell/Runtime/Core/AppRuntimeState.cs`
-- `Assets/AppShell/Runtime/Flow/AppFlowManager.cs`
-- `Assets/AppShell/Runtime/UI/SessionConfigController.cs`
-- `Assets/AppShell/Runtime/UI/EnvironmentSessionOverlayController.cs`
-- `Assets/AppShell/Runtime/Results/ResultsFlowController.cs`
-- `Assets/AppShell/Runtime/Results/DashboardAdapter.cs`
-- `Assets/AppShell/Runtime/Integration/EnvironmentSceneInstaller.cs`
+The project supports VR workflows and editor/PC testing. When real XR eye tracking is unavailable, the gaze system can fall back to headset/camera direction.
 
-Important rule:
+## Technology Stack
 
-- Do not manually rebuild the whole menu in the scene unless necessary.
-- Prefer connecting your module through an adapter or presenter field.
-- If a screen needs to be generated consistently, update the generator instead of only editing one scene object by hand.
+| Area | Technology |
+| --- | --- |
+| Engine | Unity `6000.3.10f1` |
+| Render Pipeline | Universal Render Pipeline `17.3.0` |
+| XR | XR Interaction Toolkit `3.3.1`, XR Hands `1.7.3`, XR Management, OpenXR, Oculus, Meta XR SDK |
+| Input | Unity Input System `1.18.0` |
+| Speech Analysis | Offline Vosk speech-to-text |
+| Presentation Conversion | Poppler and LibreOffice bundled for Windows runtime |
+| LLM Question Generation | Gemini or OpenAI runtime configuration |
+| Data Storage | JSON files under `Application.persistentDataPath` |
 
-## 2. Integration Points by Module Type
+## Main Features
 
-### Dashboard Module
+- App Shell flow for login, home, practice mode selection, environment selection, session setup, ready screen, pause overlay, results, and dashboard.
+- Three primary training environments: Classroom, Conference Hall, and Meeting Room.
+- Runtime scene installation through `EnvironmentSceneInstaller`, reducing manual wiring across environment scenes.
+- Gaze tracking and gaze scoring with audience look ratio, confidence, stare warnings, head-speed penalties, and event bonus/penalty support.
+- Offline voice analysis using Vosk for transcript, words per minute, filler words, pause duration, and tone variation.
+- Audience simulation that reacts to the user's performance with attentive, neutral, distracted, bored, note-taking, nodding, stretching, and applause states.
+- Combined performance scoring across speech, eye contact, and posture metrics.
+- PDF/PPTX presentation import, slide rendering, in-scene presentation board display, and optional audience question generation.
+- Local user/session history saved as JSON and shown in the dashboard.
 
-The shell already has Dashboard Entry buttons in:
-
-- Review Center / Progress panel
-- Results Summary panel
-
-These buttons call `DashboardAdapter`.
-
-Relevant file:
-
-- `Assets/AppShell/Runtime/Results/DashboardAdapter.cs`
-
-How to connect:
-
-1. Add the dashboard UI root object or dashboard controller to the scene.
-2. Select the object that has `DashboardAdapter`.
-3. Assign one of these fields:
-   - `dashboardRoot`: use this if opening the dashboard only requires activating a GameObject.
-   - `dashboardController`: use this if your dashboard has an open method.
-4. If using a controller, the adapter can call one of these methods automatically:
-   - `Open`
-   - `OpenDashboard`
-   - `ShowDashboard`
-   - `Show`
-5. Test from the Results Summary screen by pressing `Dashboard Entry`.
-
-Expected behavior:
-
-- If wired correctly, Dashboard Entry opens the real dashboard.
-- If not wired, the shell shows a placeholder message and logs that no dashboard integration is connected.
-
-Recommended controller example:
-
-```csharp
-public class DashboardController : MonoBehaviour
-{
-    public void OpenDashboard()
-    {
-        gameObject.SetActive(true);
-        // Refresh dashboard data here.
-    }
-}
-```
-
-## 3. Adding Data to the Results Screen
-
-The results screen reads data from `SessionResultSummary`.
-
-Relevant files:
-
-- `Assets/AppShell/Runtime/Data/SessionResultSummary.cs`
-- `Assets/AppShell/Runtime/Results/ResultsSummaryPresenter.cs`
-- `Assets/AppShell/Runtime/Integration/ScoringAdapter.cs`
-- `Assets/AppShell/Runtime/Core/AppRuntimeState.cs`
-
-Current supported result fields:
-
-- `TotalScore`
-- `EyeContactScore`
-- `SpeechPaceScore`
-- `PostureScore`
-- `FillerWordCount`
-- `DurationSeconds`
-- `StrongestArea`
-- `WeakestArea`
-- `PerformanceBand`
-- `Recommendations`
-
-How result data reaches the UI:
-
-1. A session ends.
-2. `ExistingSceneFlowAdapter` calls `ScoringAdapter.CaptureSummary(...)`.
-3. `ScoringAdapter` creates a `SessionResultSummary`.
-4. `AppRuntimeState.StoreResult(summary)` stores it.
-5. `ResultsSummaryPresenter.Refresh()` displays it.
-
-If your module produces result data:
-
-- Add the data into `ScoringAdapter.CaptureSummary(...)` if it belongs in the existing summary.
-- If a new result field is required, add it to `SessionResultSummary`.
-- Then update `ResultsSummaryPresenter` only if the shell summary needs to display it.
-
-Important:
-
-- Do not make the results screen directly search for every module.
-- Let the module pass data into `SessionResultSummary` through an adapter.
-
-## 4. Voice Analysis Integration
-
-The Session Setup screen already contains a `Voice Analysis` option.
-
-Relevant files:
-
-- `Assets/AppShell/Runtime/Data/SessionConfig.cs`
-- `Assets/AppShell/Runtime/UI/SessionConfigController.cs`
-- `Assets/AppShell/Runtime/Integration/ScoringAdapter.cs`
-
-Current config flag:
-
-```csharp
-config.VoiceAnalysisEnabled
-```
-
-Recommended integration steps:
-
-1. In the voice analysis module, read the current config from:
-
-```csharp
-AppRuntimeState.GetOrCreate().CurrentSessionConfig
-```
-
-2. Only run voice analysis if:
-
-```csharp
-CurrentSessionConfig.VoiceAnalysisEnabled
-```
-
-3. During or after the session, send speech metrics into the scoring/result layer.
-4. If using the existing results screen, map values into:
-   - `SpeechPaceScore`
-   - `FillerWordCount`
-   - `Recommendations`
-5. If the module has a separate dashboard view, connect it through `DashboardAdapter`.
-
-Minimum expected behavior:
-
-- If Voice Analysis is enabled in setup, the voice module should start during the live session.
-- If it is disabled, it should not collect or affect score data.
-
-## 5. Posture Analysis Integration
-
-The Session Setup screen already contains a `Posture Analysis` option.
-
-Current config flag:
-
-```csharp
-config.PostureAnalysisEnabled
-```
-
-Recommended integration steps:
-
-1. Read the flag from `AppRuntimeState.CurrentSessionConfig`.
-2. Enable/disable posture processing based on `PostureAnalysisEnabled`.
-3. Push final posture score into:
-
-```csharp
-SessionResultSummary.PostureScore
-SessionResultSummary.HasPostureScore
-```
-
-4. If extra feedback is generated, add it to `Recommendations`.
-
-Important:
-
-- If posture is not fully implemented, keep the toggle disabled or clearly mark it as incomplete for the demo.
-
-## 6. Eye Tracking / Gaze Scoring Integration
-
-The shell already connects gaze-related systems through:
-
-- `EnvironmentSceneInstaller`
-- `TrackingAdapter`
-- `ScoringAdapter`
-
-Relevant files:
-
-- `Assets/AppShell/Runtime/Integration/EnvironmentSceneInstaller.cs`
-- `Assets/AppShell/Runtime/Integration/TrackingAdapter.cs`
-- `Assets/AppShell/Runtime/Integration/ScoringAdapter.cs`
-
-Current config flags:
-
-```csharp
-config.EyeTrackingEnabled
-config.GazeScoringEnabled
-```
-
-Current behavior:
-
-- `EnvironmentSceneInstaller` tries to find or create the runtime tracking stack.
-- `TrackingAdapter` enables/disables tracking based on session config.
-- `ScoringAdapter` captures gaze score at session end.
-
-If you update gaze or eye tracking:
-
-- Keep `EyeTrackingSystem` discoverable in the scene.
-- Keep `GazeScoringSystem.eyeTracking` assigned.
-- Do not create duplicate competing gaze systems.
-- Make sure pause state is respected so paused sessions do not collect false samples.
-
-Pause-safe expectation:
-
-- During pause, tracking/scoring should stop or ignore samples.
-- After resume, tracking/scoring should continue normally.
-
-## 7. Adding a New Menu Button
-
-If a new button is needed in the main menu or another shell panel:
-
-1. Decide which panel owns it:
-   - Main Hub
-   - Settings
-   - Review Center
-   - Results Summary
-   - Session Setup
-2. Add the button in `AppShellSceneGenerator`.
-3. Add a public method in the related presenter/controller.
-4. Wire the button using `AppShellEditorCommon.SetButtonEvent(...)`.
-5. Keep the action safe if the target module is not connected yet.
-
-Example pattern:
-
-```csharp
-public void OpenMyModule()
-{
-    if (myModuleAdapter != null && myModuleAdapter.TryOpen())
-    {
-        SetNote("Module opened.");
-        return;
-    }
-
-    SetNote("Module is not connected yet.");
-}
-```
-
-Important:
-
-- Do not make buttons silently fail.
-- If a module is missing, show a short status message.
-- If the feature is not ready for demo, mark it as staged or coming soon.
-
-## 8. Adding a New Setup Option
-
-If a module needs a setup toggle or setting:
-
-1. Add the field to `SessionConfig`.
-2. Add UI control in `AppShellSceneGenerator.BuildSessionSetupPanel(...)`.
-3. Add serialized field in `SessionConfigController`.
-4. Update:
-   - `BuildConfigSnapshot()`
-   - `LoadFromRuntime()`
-   - `RefreshSummaryPreview()`
-5. Read the value from `AppRuntimeState.CurrentSessionConfig` in your module.
-
-Do not store module settings only inside UI objects.
-
-Correct data direction:
+## Project Structure
 
 ```text
-Session Setup UI -> SessionConfig -> AppRuntimeState -> Environment Scene / Module
+Assets/
+  AppShell/
+    Config/                         Environment catalog asset
+    Editor/                         App Shell scene generation, setup, and validation tools
+    Generated/                      Generated App Shell materials
+    Runtime/
+      Core/                         AppRuntimeState and bootstrap logic
+      Data/                         SessionConfig, result summary, enums, environment models
+      Flow/                         Main hub flow, scene transitions, tutorial/hub controllers
+      Integration/                  Environment installer and scoring/tracking/player/audience adapters
+      Presentation/                 PDF/PPTX import, slide image conversion, presentation board
+      PresentationQuestioning/      LLM question generation and audience Q&A overlay
+      Results/                      Results flow and dashboard adapter
+      UI/                           Panel presenters, HUD, and world-space UI helpers
+
+  AudienceSimulation_Arda/
+    Scripts/                        Audience behavior, reaction engine, spawner, procedural animation
+    Models/                         Audience character models and materials
+    Prefabs/                        Audience and scene prefabs
+    Scenes/                         Module test/environment scenes
+
+  Scripts/                          Main gaze, session, scoring, dashboard, and environment generator scripts
+  SpeechPipeline/Scripts/           Vosk-based speech analysis pipeline
+  Scenes/                           Main app and practice scenes
+  StreamingAssets/                  Vosk models, presentation converters, LLM config templates
+  Plugins/Vosk/                     Vosk native libraries
+  Models/, Prefabs/, Materials/     3D assets used by environments and UI
+
+Packages/                           Unity package manifest and lock file
+ProjectSettings/                    Unity project settings
+docs/                               Reports and supporting documentation
+BackupScripts/                      Backup copies of earlier scripts
 ```
 
-## 9. Connecting a Module Inside Environment Scenes
+## Main Scenes
 
-Environment scenes are prepared through `EnvironmentSceneInstaller`.
+Enabled scenes in Build Settings:
 
-Current environment scenes:
+| Scene | Purpose |
+| --- | --- |
+| `Assets/Scenes/MainHubScene.unity` | Main menu, login, dashboard, practice mode, environment selection, and setup flow |
+| `Assets/Scenes/ResultsScene.unity` | Post-session results scene |
+| `Assets/Scenes/Overview.unity` | Supporting overview/dashboard scene |
+| `Assets/Scenes/Scene_Classroom.unity` | Classroom practice environment |
+| `Assets/Scenes/Scene_ConferenceHall.unity` | Large conference hall environment |
+| `Assets/Scenes/Scene_MeetingRoom.unity` | Meeting room environment |
 
-- `Scene_Classroom`
-- `Scene_ConferenceHall`
-- `Scene_MeetingRoom`
+Additional test/demo scenes:
 
-If your module must exist in every environment:
+- `Assets/Scenes/GazeTrackingSampleScene.unity`
+- `Assets/Scenes/SampleScene/SampleScene.unity`
+- `Assets/AudienceSimulation_Arda/Scenes/*`
+- Unity XR sample scenes
 
-1. Prefer adding or resolving it inside `EnvironmentSceneInstaller`.
-2. Make sure it can be found with `FindFirstObjectByType<T>(FindObjectsInactive.Include)` if needed.
-3. Avoid scene-specific hardcoding unless absolutely required.
-4. Test in all three environments.
-
-Good rule:
-
-- If the module is required for every session, installer/adapter level is the right place.
-- If the module is only visual or scene-specific, scene object wiring is acceptable.
-
-## 10. Pause Menu Compatibility
-
-During a live session, the shell uses `EnvironmentSessionOverlayController`.
-
-Relevant file:
-
-- `Assets/AppShell/Runtime/UI/EnvironmentSessionOverlayController.cs`
-
-Pause behavior:
-
-- Resume
-- Restart Session
-- End Session
-- Return To Hub
-
-Module requirement:
-
-- Any module that records runtime samples must be pause-safe.
-- Do not keep collecting analysis data while the session is paused.
-
-Recommended module methods:
-
-```csharp
-public void PauseModule()
-{
-    // Stop collecting runtime samples.
-}
-
-public void ResumeModule()
-{
-    // Continue collecting samples.
-}
-```
-
-If your module already depends on `MainController` or tracking systems, verify that pause does not corrupt your data.
-
-## 11. Scene Routing Rules
-
-Use existing flow methods instead of directly loading scenes from random module scripts.
-
-Common routes:
-
-- Main hub: `AppPanelType.Home`
-- Environment selection: `AppPanelType.EnvironmentSelection`
-- Session setup: `AppPanelType.SessionSetup`
-- Results summary: `AppPanelType.ResultsSummary`
-
-If a module needs to request a hub panel:
-
-```csharp
-AppRuntimeState.GetOrCreate().RequestHubPanel(AppPanelType.ResultsSummary);
-```
-
-Then route back to the hub scene through the existing flow/transition system.
-
-Avoid:
-
-```csharp
-SceneManager.LoadScene("SomeScene");
-```
-
-unless the module is specifically responsible for scene loading.
-
-## 12. Demo Readiness Checklist for Module Owners
-
-Before saying a module is integrated, check:
-
-- The module works from the shell flow, not only from a standalone test scene.
-- The module respects Session Setup config.
-- The module works in Classroom, Conference Hall, and Meeting Room if required.
-- The module does not break pause/resume.
-- The module does not create duplicate cameras, event systems, or audio listeners.
-- The module does not require macOS-only paths.
-- The module has a safe fallback if it is not connected.
-- The Unity Console has no new errors after a full run.
-
-Recommended full flow:
+## Application Flow
 
 ```text
-Main Hub
+MainHubScene
+-> Login / Home
 -> Practice Mode
 -> Environment Selection
 -> Session Setup
+-> Ready
+-> Environment Scene
+-> Live Session
+-> Pause / Resume / End Session
+-> Optional Audience Q&A
+-> Results Summary / Dashboard
+```
+
+The flow is coordinated through `AppRuntimeState`. `SessionConfig` stores the selected mode, environment, duration, difficulty, audience preset, analysis toggles, and selected presentation. When an environment scene loads, `EnvironmentSceneInstaller` resolves or creates the required runtime systems.
+
+## App Shell Architecture
+
+The App Shell is responsible for the user-facing flow and session state.
+
+Important files:
+
+- `Assets/AppShell/Runtime/Core/AppRuntimeState.cs`
+- `Assets/AppShell/Runtime/Data/SessionConfig.cs`
+- `Assets/AppShell/Runtime/Flow/AppFlowManager.cs`
+- `Assets/AppShell/Runtime/Flow/SessionLaunchController.cs`
+- `Assets/AppShell/Runtime/UI/SessionConfigController.cs`
+- `Assets/AppShell/Runtime/UI/EnvironmentSessionOverlayController.cs`
+- `Assets/AppShell/Runtime/Results/ResultsSummaryPresenter.cs`
+- `Assets/AppShell/Runtime/UI/MainHubDashboardPresenter.cs`
+
+Session options:
+
+- Practice mode: Guided Practice, Free Practice, Evaluation Mode, Challenge Mode
+- Difficulty: Easy, Normal, Hard, Expert
+- Audience preset: Supportive, Neutral, Distracted, Challenging
+- Feedback level: Minimal, Standard, Detailed
+- Analysis toggles: Eye Tracking, Gaze Scoring, Performance Scoring, Voice Analysis, Posture Analysis
+- Default duration: 300 seconds
+- Minimum duration: 60 seconds
+- Maximum duration: 900 seconds
+
+## Environment Catalog
+
+The environment list is stored in:
+
+```text
+Assets/AppShell/Config/DefaultEnvironmentCatalog.asset
+```
+
+| Environment | Scene | Recommended Mode | Use Case |
+| --- | --- | --- | --- |
+| Classroom | `Scene_Classroom` | Guided Practice | Classroom speaking, lecture pacing, basic eye-contact practice |
+| Conference Hall | `Scene_ConferenceHall` | Evaluation Mode | Formal presentations, stage presence, large-room pressure |
+| Meeting Room | `Scene_MeetingRoom` | Free Practice | Team updates, stakeholder briefings, close-range communication |
+
+Editor menu tools:
+
+- `Tools/VR Public Speaking/App Shell/Create Default Environment Catalog`
+- `Tools/VR Public Speaking/App Shell/Add App Shell Scenes To Build Settings`
+- `Tools/VR Public Speaking/App Shell/Create Or Update MainHubScene`
+- `Tools/VR Public Speaking/App Shell/Create Or Update ResultsScene`
+- `Tools/VR Public Speaking/App Shell/Validate App Shell`
+
+## Runtime Installer and Adapter Layer
+
+`EnvironmentSceneInstaller` automatically sets up environment scenes at runtime. It resolves or creates:
+
+- VR scene rig and active camera links
+- `EyeTrackingSystem`
+- `GazeScoringSystem`
+- `GazeEventCoordinator`
+- `CircleEventSystem`
+- Optional `QuickGazeDotSystem` and `MovingGazeDotSystem`
+- `MainController`
+- `PerformanceScoringEngine`
+- `SpeechAdapter`
+- `SpeechPipelineController`
+- `AudienceIntegrationAdapter`
+- `PresentationBoardController` when a presentation is selected
+- `PresentationQuestionSessionController` for audience Q&A
+- EventSystem and XR/UI raycaster support
+
+This keeps environment scenes lightweight and reduces repeated manual setup. New environments should be added to Build Settings and the environment catalog, then integrated through the installer/adapters instead of duplicating runtime systems by hand.
+
+## Gaze and Eye Tracking
+
+Main files:
+
+- `Assets/Scripts/EyeTrackingSystem.cs`
+- `Assets/Scripts/GazeScoringSystem.cs`
+- `Assets/Scripts/CircleEventSystem.cs`
+- `Assets/Scripts/QuickGazeDotSystem.cs`
+- `Assets/Scripts/MovingGazeDotSystem.cs`
+- `Assets/Scripts/GazeEventCoordinator.cs`
+- `Assets/Scripts/MainController.cs`
+
+`EyeTrackingSystem` attempts to use XR eye tracking data. If the device does not support it, the system can use the camera/head direction as a fallback. It exposes:
+
+- `IsLookingAtAudience`
+- `IsGazeValid`
+- `SmoothedHeadSpeed`
+- `IsStareWarning`
+- `IsHeadWarning`
+- `IsPaused`
+
+`GazeScoringSystem` computes a 0-100 gaze score from a recent ring buffer window. Score components include:
+
+- Audience look ratio
+- Data confidence
+- Long-stare penalty
+- Head-speed penalty
+- Event bonuses and penalties
+
+`CircleEventSystem`, `QuickGazeDotSystem`, and `MovingGazeDotSystem` create gaze focus events. Successful events can call `ReportBonus`, and missed events can call `ReportPenalty`.
+
+## Speech Analysis
+
+The speech pipeline lives under:
+
+```text
+Assets/SpeechPipeline/Scripts/
+```
+
+Main files:
+
+- `SpeechPipelineController.cs`
+- `AudioCaptureBuffer.cs`
+- `VoskSTTEngine.cs`
+- `RMSPauseDetector.cs`
+- `PitchDetector.cs`
+- `PaceTracker.cs`
+- `FillerDetector.cs`
+- `SpeechScorer.cs`
+- `SpeechAdapter.cs`
+
+Pipeline:
+
+1. Microphone permission is requested.
+2. The Vosk model is loaded from `Assets/StreamingAssets`.
+3. Audio chunks are split into speech/silence using RMS pause detection.
+4. When Vosk returns a final transcript, utterance metrics are computed.
+5. At session end, average WPM, filler words per minute, average pause duration, and tone variation score are generated.
+6. `SpeechAdapter` pushes these metrics into `PerformanceScoringEngine`.
+
+Expected default model folder:
+
+```text
+Assets/StreamingAssets/vosk-model-en-us-0.42-gigaspeech/
+```
+
+The older small model folder also exists in the project:
+
+```text
+Assets/StreamingAssets/vosk-model-small-en-us-0.15/
+```
+
+However, `SpeechPipelineController.UseDefaultModelWhenUnsetOrLegacy()` maps an empty or legacy model name to the default full model folder. If Voice Analysis is enabled, the full default model folder should exist and contain model files.
+
+## Performance Scoring
+
+Main files:
+
+- `Assets/Scripts/PerformanceScoringEngine.cs`
+- `Assets/AppShell/Runtime/Integration/ScoringAdapter.cs`
+- `Assets/AppShell/Runtime/Data/SessionResultSummary.cs`
+
+Metric groups:
+
+| Group | Metrics |
+| --- | --- |
+| Speech | WPM, filler words/min, average pause, tone variation |
+| Eye Contact | Eye contact ratio / gaze score |
+| Posture | Head movement, rapid head movement events, crossed arms placeholder |
+
+Default final score weights:
+
+| Component | Weight |
+| --- | --- |
+| Speech | 40% |
+| Eye Contact | 35% |
+| Posture | 25% |
+
+Speech sub-score weights:
+
+| Component | Weight |
+| --- | --- |
+| WPM | 35% |
+| Filler words | 35% |
+| Pause duration | 15% |
+| Tone variation | 15% |
+
+Default scoring ranges:
+
+- Ideal WPM: 120-160
+- Acceptable WPM: 80-220
+- Ideal pause duration: 0.5-1.5 seconds
+- Maximum filler threshold: 10 filler words/min
+
+Generated result fields include:
+
+- Total score
+- Speech score
+- Eye contact score
+- Posture score
+- Strongest area
+- Weakest area
+- Performance band: Excellent, Good, Needs Improvement, Weak Performance
+- Strength list
+- Improvement list
+- Detailed feedback items
+
+## Audience Simulation
+
+The audience system is located under:
+
+```text
+Assets/AudienceSimulation_Arda/
+```
+
+Main files:
+
+- `AudienceSpawner.cs`
+- `AudienceBehaviorController.cs`
+- `AudienceReactionEngine.cs`
+- `AudienceMember.cs`
+- `ProceduralAudienceAnimator.cs`
+- `AudienceIntegrationAdapter.cs`
+
+The system changes audience behavior based on environment type and performance score.
+
+Supported audience states:
+
+- Idle
+- Attentive
+- Neutral
+- Distracted
+- Bored
+- Applauding
+- Nodding
+- Stretching
+- NoteTaking
+- ChinResting
+
+Difficulty mapping:
+
+| Session Difficulty | Audience Stress |
+| --- | --- |
+| Easy | Easy |
+| Normal | Medium |
+| Hard | Hard |
+| Expert | Hard |
+
+Audience preset behavior:
+
+| Preset | Effect |
+| --- | --- |
+| Supportive | More tolerant and more likely to react positively |
+| Neutral | Balanced behavior |
+| Challenging | Less tolerant and more sensitive to weak performance |
+
+`AudienceReactionEngine` reads WPM, filler words, tone variation, eye contact, and posture signals to generate dominant factors such as:
+
+- `wpm_too_slow`
+- `wpm_too_fast`
+- `high_filler_words`
+- `monotone_voice`
+- `eye_contact_low`
+- `good_eye_contact`
+- `bad_posture_slouch`
+- `bad_posture_sway`
+
+When the session ends, the audience controller transitions the audience into applause.
+
+## Presentation Import and Audience Q&A
+
+Presentation support lives under:
+
+```text
+Assets/AppShell/Runtime/Presentation/
+```
+
+Supported formats:
+
+- PDF
+- PPTX
+
+Import flow:
+
+1. The user selects a presentation from the Ready screen.
+2. The file is copied to `Application.persistentDataPath/Presentations/{deckId}`.
+3. PDFs are rendered to PNG slide images using Poppler `pdftoppm`.
+4. PPTX files are converted to PDF using LibreOffice, then rendered to PNG using Poppler.
+5. A manifest and slide text files are generated.
+6. In the environment scene, `PresentationBoardController` displays slides on a projection screen, whiteboard, or runtime fallback board.
+
+Bundled converter files:
+
+```text
+Assets/StreamingAssets/PresentationConverters/win-x64/
+  LibreOffice/
+  poppler/
+```
+
+Note: Presentation conversion V1 is Windows-focused. PPTX animations, embedded media, and speaker notes are outside the current scope.
+
+Audience Q&A:
+
+- `PresentationTextExtractionService` extracts readable slide text.
+- `PresentationQuestionGenerationService` uses Gemini or OpenAI to generate short audience questions.
+- `PresentationQuestionSessionController` displays the questions after the session in a VR overlay/bubble flow.
+- The current Q&A flow is focused on asking questions and practicing responses. Data classes for answer feedback exist, but the current question prompt does not generate expected answers or grading rubrics.
+
+LLM config templates:
+
+```text
+Assets/StreamingAssets/LLM/llm_config.template.json
+Assets/StreamingAssets/Gemini/gemini_config.template.json
+Assets/StreamingAssets/OpenAI/openai_config.template.json
+```
+
+Local key files are ignored by `.gitignore`:
+
+```text
+Assets/StreamingAssets/LLM/llm_config.local.json
+Assets/StreamingAssets/Gemini/gemini_config.local.json
+Assets/StreamingAssets/OpenAI/openai_config.local.json
+```
+
+Environment variables can also be used:
+
+```text
+GEMINI_API_KEY
+GOOGLE_API_KEY
+OPENAI_API_KEY
+```
+
+## Data Storage and Dashboard
+
+`DataManager` saves post-session data to a user-specific JSON file.
+
+Main file:
+
+```text
+Assets/Scripts/DataManager.cs
+```
+
+Save location:
+
+```text
+Application.persistentDataPath/history_{currentUser}.json
+```
+
+Saved fields include:
+
+- Session id
+- Timestamp and display date
+- Overall score
+- Eye contact
+- Pace / speech score
+- Posture
+- Duration
+- Filler word count
+- WPM
+- Filler words/min
+- Average pause
+- Tone variation
+- Head movement
+- Detailed feedback report
+- Q&A result
+
+The dashboard displays the latest session and historical session data.
+
+## Procedural Environment Generators
+
+The structural parts of the environments can be regenerated from editor scripts.
+
+| Script | Generated Environment |
+| --- | --- |
+| `ClassroomGenerator.cs` | Classroom shell, whiteboard, student rows, lighting, spawn point |
+| `ConferenceHallGenerator (5).cs` | Stage, projection screen, curved/tiered seating, hall architecture |
+| `MeetingRoomGenerator.cs` | Meeting room shell, windows, door, whiteboard, projection screen, lighting |
+
+Usage:
+
+1. Add an empty GameObject to the scene.
+2. Attach the relevant generator script.
+3. Run the `Generate Scene` context menu or toggle `generateNow` in the Inspector.
+
+The generators do not rebuild geometry at runtime. Scene geometry is serialized for demo performance.
+
+## Setup
+
+1. Open the project with Unity Hub.
+2. Use Unity editor version `6000.3.10f1`.
+3. Wait for Unity package restore to finish.
+4. Open `Assets/Scenes/MainHubScene.unity`.
+5. Confirm the following scenes are enabled in Build Settings:
+   - `MainHubScene`
+   - `ResultsScene`
+   - `Overview`
+   - `Scene_Classroom`
+   - `Scene_ConferenceHall`
+   - `Scene_MeetingRoom`
+6. If Voice Analysis is required, confirm that the Vosk model folder exists under `Assets/StreamingAssets/`.
+7. If Q&A generation is required, configure a Gemini or OpenAI API key through local config or environment variables.
+8. Start Play Mode from `MainHubScene`.
+
+## Editor Test Flow
+
+Recommended full demo flow:
+
+```text
+MainHubScene
+-> Login
+-> Home
+-> Practice Mode
+-> Environment Selection
+-> Session Setup
+-> Ready
+-> Launch Session
 -> Live Session
 -> Pause / Resume
 -> End Session
--> Results Overlay
--> Dashboard or Return To Hub
+-> Results Summary
+-> Dashboard
 ```
 
-## 13. What Not To Do
+PC/editor shortcuts:
 
-Avoid these patterns:
-
-- Do not directly edit generated UI objects without updating the generator if the change must persist.
-- Do not create a separate main menu for your module.
-- Do not duplicate `AppRuntimeState`.
-- Do not bypass `SessionConfig` for settings that belong to session setup.
-- Do not collect scoring data while paused.
-- Do not assume only one environment scene exists.
-- Do not make a button fail silently when your module is missing.
-
-## 14. Quick Integration Summary
-
-Use this mapping:
-
-| Module Need | Best Integration Point |
+| Key / Input | Action |
 | --- | --- |
-| Add final dashboard | `DashboardAdapter` |
-| Add result metrics | `ScoringAdapter` + `SessionResultSummary` |
-| Read setup options | `AppRuntimeState.CurrentSessionConfig` |
-| Add setup toggle | `SessionConfig` + `SessionConfigController` + generator |
-| Add environment runtime dependency | `EnvironmentSceneInstaller` |
-| Add menu navigation | `AppFlowManager` / panel presenter |
-| Support pause | `MainController` events or module-level pause methods |
-| Show post-session data | `ResultsSummaryPresenter` or dashboard module |
+| `R` | Start/stop session in an environment scene |
+| `Esc` | Toggle pause during a session |
+| `D` | Toggle debug mode |
+| `C` or left click | Trigger/test gaze event |
 
-The safest approach is to connect modules through small adapters and keep the shell responsible only for navigation, setup state, pause/results display, and demo flow.
+VR input notes:
 
----
+- Primary button: main session action such as start/stop
+- Secondary button short press: debug
+- Secondary button long press or menu button: pause
+- Grip: can trigger gaze/circle event tests
 
-# Proje Mimarisi ve Entegrasyon Raporu (Turkish)
+## Build and Submission Notes
 
-Bu bölüm, projede yer alan modüllerin, sahnelerin ve kod yapılarının nasıl çalıştığını takım üyelerine detaylıca açıklamak amacıyla eklenmiştir. Proje, "Modüler ve Gevşek Bağlı (Loosely Coupled)" bir mimariyle inşa edilmiş olup, her sistemin kendi işini bağımsız yaptığı ve birbirlerine "Adapter" (Adaptör) scriptleri üzerinden bağlandığı modern bir yapıya sahiptir.
+When zipping the Unity project, keep:
 
-## 1. Genel Mimari Özeti
+```text
+Assets/
+Packages/
+ProjectSettings/
+README.md
+docs/                 If reports/documents are required
+BackupScripts/        If backup scripts are required
+```
 
-Proje temel olarak **4 ana yapıtaşından** oluşmaktadır:
+Do not include:
 
-1. **App Shell (Ana Çatı ve UI):** Kullanıcının ana menüde (Dashboard) ayarları yaptığı, eğitim sahnelerini başlatan, oturum (session) durumunu yöneten ve HUD (gözlük içi uyarı) ekranlarını çizen temel sistem.
-2. **Audience Simulation (Seyirci Simülasyonu):** Salonda oturan seyircilerin davranışlarını, tepkilerini ve animasyonlarını otonom olarak yöneten sistem (Arda'nın modülü).
-3. **Speech Pipeline (Ses ve Konuşma Analizi):** Çevrimdışı (offline) Vosk kütüphanesini kullanarak sesi metne çeviren, konuşma hızını (WPM) ve dolgu kelimelerini hesaplayan motor.
-4. **Performance Scoring (Puanlama Motoru):** Kullanıcının göz teması, duruş (posture) ve ses analizi sonuçlarını birleştirip oturum sonunda 100 üzerinden nihai bir skor ve geri bildirim raporu üreten sistem.
+```text
+Library/
+Temp/
+Obj/
+Logs/
+UserSettings/
+.git/
+.vs/
+.idea/
+.vscode/
+Build/
+Builds/
+*.csproj
+*.sln
+```
 
-## 2. Temel Modüller ve Çalışma Mantıkları
+Important: Keep all `.meta` files under `Assets`. Unity uses GUIDs inside `.meta` files to preserve asset references.
 
-### A. App Shell ve Otomatik Kurulum (EnvironmentSceneInstaller)
-Sistemde, içi script dolu karışık ve ağır sahneler (prefab'lar) tutmak yerine **"Dinamik Kurulum (Runtime Injection)"** mantığı kullanılır.
-- **`EnvironmentSceneInstaller.cs`**: Bir ortam sahnesi (Örn: Classroom veya Conference Hall) yüklendiğinde otomatik olarak çalışır. Sahnede eksik olan tüm sistemleri (Puanlama motoru, Seyirci yöneticisi, Ses adaptörü) kontrol eder, eğer yoklarsa **kod ile anında yaratıp sahneye ekler**. Bu sayede sahneler temiz kalır, her yeni sahnede "Acaba şu scripti eklemeyi unuttum mu?" derdi ortadan kalkar.
-- **`AppRuntimeState.cs` & `SessionConfig.cs`**: Seçilen zorluk seviyesi, süre limitleri ve hangi analizlerin açık olacağı (Eye Tracking, Voice Analysis vb.) merkezi olarak burada tutulur. Tüm modüller ayarları buradan okur.
+Voice models and presentation converter folders can be large. If the submitted zip must run without extra setup, make sure the required files under `Assets/StreamingAssets` are included.
 
-### B. Audience Simulation (Seyirci Sistemi)
-Seyirci modülü ortamdan bağımsız, otonom bir şekilde çalışır.
-- **`AudienceSpawner.cs`**: Sahne açıldığında sahnedeki "Bench" (Bank) veya "Seat" (Koltuk) isimli objeleri bulur. Boyutlarına göre bu bankları sanal koltuklara böler ve üzerlerine rastgele 3D seyirci karakterleri (Remy, Ch07 vb.) oturtur. Karakterlerin boyunu ve masaya olan yüksekliklerini geometriye göre otomatik ayarlar.
-- **`AudienceBehaviorController.cs` & `AudienceReactionEngine.cs`**: Kullanıcının konuşma hızı (WPM) çok düşerse veya göz temasından kaçınırsa, seyircilerin "Stres/Sıkılma" (Bored) seviyesi artar. Animasyonlar (dikkatli dinleme, alkışlama, esneme) mevcut skora göre prosedürel (dinamik) olarak değişir.
+Do not include API-key local config files in public submissions. Template files are enough if Q&A generation will not be tested by the evaluator.
 
-### C. Speech Pipeline (Ses ve Konuşma Analizi)
-- **`SpeechPipelineController.cs` & `VoskSTTEngine.cs`**: Kullanıcının mikrofonundan gelen sesi alır. 1.8 GB'lık ağır modeller yerine Unity için optimize edilmiş **40 MB'lık (vosk-model-small)** çevrimdışı dil modelini kullanarak sesi anlık metne döker.
-- **Gizlilik ve Performans:** Bu işlem tamamen cihazın RAM'inde gizli olarak yapılır, hiçbir ses dosyası (.wav vb.) diske kaydedilmez. İnternet bağlantısı gerektirmez.
-- Konuşulan kelime sayısı, sessiz kalınan süre ve "ııı, eee" gibi dolgu kelimelerinin sayısını hesaplayarak **`SpeechAdapter.cs`** üzerinden doğrudan Puanlama Motoruna iletir.
+## Known Limitations
 
-### D. Gaze & Event Systems (Göz Takibi ve Etkileşim)
-- **`MainController.cs`**: Kullanıcının VR başlığının nereye baktığını (Gaze) takip eder. "Kafanı çok hızlı çeviriyorsun" veya "Çok uzun süredir aynı yere bakıyorsun" şeklindeki anlık uyarıları HUD üzerine yansıtır. Eski veya çakışan Canvas arayüzleri varsa, bunları başlangıçta **otomatik olarak bularak yokedip (Auto-Cleanup)** ekranın bozulmasını engeller.
-- **`GazeEventCoordinator.cs`**: Sahnede çıkacak odaklanma noktalarını (Circle Event vb.) yönetir, aynı anda birden fazla hedefin belirmesini engeller.
+- If real eye tracking hardware is unavailable, gaze tracking uses a camera/head-direction fallback.
+- Posture analysis is based mainly on head movement and head-speed warnings; it is not full-body posture tracking.
+- Voice analysis will not start if the expected Vosk model folder is missing.
+- Presentation conversion V1 is Windows-focused.
+- PPTX animations, media, and speaker notes are not rendered.
+- LLM-based audience question generation requires internet access and an API key.
+- `Library/` should not be included in Git or submission zips; Unity regenerates it on open.
 
-### E. Performance Scoring (Puanlama ve Geri Bildirim)
-- **`PerformanceScoringEngine.cs`**: Oturum (Session) bittiği anda devreye girer. Ses motorundan WPM'i, Göz takibinden "Göz Teması Yüzdesini", Duruş motorundan "Kambur Durma" verilerini çeker.
-- Matematiksel bir ağırlıklandırma (Örn: %40 Konuşma, %35 Göz Teması, %25 Duruş) yaparak 100 üzerinden nihai bir skor çıkarır.
-- En güçlü (Strongest) ve en zayıf (Weakest) yönleri belirleyip kullanıcıya metin bazlı koçluk geri bildirimi (Örn: "Çok fazla duraksadınız, hızınızı artırın") sunar.
+## Development Rules
 
-## 3. Sahnelerin (Environments) Yapısı
-Projede her bir masanın veya sıranın elle yerleştirildiği manuel sahneler yerine **Kod ile üretilen (Procedural)** sahneler kullanılmıştır:
-- **`ClassroomGenerator.cs` & `ConferenceHallGenerator.cs`**: Editor içinde tek bir butona basılarak sınıf veya konferans salonunun geometrisi, aydınlatmaları ve oturma düzeni sıfırdan yaratılır. Bu sayede salonun boyutu, koridor genişliği veya kavisli yapısı tek bir parametre değiştirilerek saniyeler içinde baştan çizilebilir.
+- Add new session settings to `SessionConfig` first, then update `SessionConfigController` and the related UI presenter.
+- Add new environment scenes with the `Scene_` prefix under `Assets/Scenes` so App Shell setup tools can discover them.
+- Integrate runtime dependencies through `EnvironmentSceneInstaller` and adapter scripts instead of manually duplicating systems in every scene.
+- Add new result metrics through `SessionResultSummary`, then update `ScoringAdapter`, `ResultsSummaryPresenter`, and dashboard display code.
+- Systems that sample runtime data should stop or ignore samples during pause/resume.
+- Never share secret API keys stored in `Assets/StreamingAssets/*local.json`.
 
-## 4. Takım İçin Geliştirme Notları ve Kurallar
+## Quick File Reference
 
-1. **Vosk Dil Modeli Hakkında:** 
-   Ses analiz motoru artık `Assets/StreamingAssets/vosk-model-small-en-us-0.15` (veya TR modeli) üzerinden çalışmaktadır. Repoyu GitHub'dan yeni çeken takım üyelerinin modeli internetten indirip zipten çıkararak bu tam isimle `StreamingAssets` içine atması şarttır. (Büyük dosyalar GitHub .gitignore sınırlarına takıldığı için repo'da bulunmaz).
+| Need | File |
+| --- | --- |
+| App state | `Assets/AppShell/Runtime/Core/AppRuntimeState.cs` |
+| Session settings | `Assets/AppShell/Runtime/Data/SessionConfig.cs` |
+| Main menu flow | `Assets/AppShell/Runtime/Flow/AppFlowManager.cs` |
+| Session launch | `Assets/AppShell/Runtime/Flow/SessionLaunchController.cs` |
+| Runtime environment setup | `Assets/AppShell/Runtime/Integration/EnvironmentSceneInstaller.cs` |
+| Session start/end/pause | `Assets/Scripts/MainController.cs` |
+| Gaze data | `Assets/Scripts/EyeTrackingSystem.cs` |
+| Gaze score | `Assets/Scripts/GazeScoringSystem.cs` |
+| Combined scoring | `Assets/Scripts/PerformanceScoringEngine.cs` |
+| Speech pipeline | `Assets/SpeechPipeline/Scripts/SpeechPipelineController.cs` |
+| Speech-to-scoring bridge | `Assets/Scripts/SpeechAdapter.cs` |
+| Audience behavior | `Assets/AudienceSimulation_Arda/Scripts/AudienceBehaviorController.cs` |
+| Audience reaction engine | `Assets/AudienceSimulation_Arda/Scripts/AudienceReactionEngine.cs` |
+| Audience spawning | `Assets/AudienceSimulation_Arda/Scripts/AudienceSpawner.cs` |
+| Presentation import | `Assets/AppShell/Runtime/Presentation/PresentationImportService.cs` |
+| Presentation board | `Assets/AppShell/Runtime/Presentation/PresentationBoardController.cs` |
+| Question generation | `Assets/AppShell/Runtime/PresentationQuestioning/PresentationQuestionGenerationService.cs` |
+| Results summary | `Assets/AppShell/Runtime/Results/ResultsSummaryPresenter.cs` |
+| Session history | `Assets/Scripts/DataManager.cs` |
 
-2. **Dinamik Bağımlılıklar (Dependencies):** 
-   Test yaparken sahnelerdeki objeleri (Puanlama Motoru, Göz Takip objesi vb.) yanlışlıkla silseniz bile sistem çökmez; `EnvironmentSceneInstaller` başlatıldığı anda gereken tüm altyapıyı kodla yeniden inşa eder. Bu özellik size UI veya mekanik testlerinde büyük özgürlük sağlar.
+## Status
 
-3. **Eski UI ve Arayüz Çakışmaları:** 
-   Projenin önceki safhalarında kalan eski "Test Canvas"ları `MainController` tarafından sahnede tespit edildiğinde otomatik olarak silinmektedir. Eğer yeni arayüzler veya paneller tasarlayacaksanız, bunları eski sisteme değil doğrudan `AppShell` sisteminin "Overlay" yapısına veya yeni Prefab'lara entegre etmeniz gerekmektedir.
-
-*Bu doküman, sistem mimarisinin güncel ve kararlı sürümünü referans almaktadır.*
+This README was generated after scanning the project structure, Unity settings, package manifest, scenes, runtime scripts, speech pipeline, audience simulation, presentation system, scoring system, and dashboard data flow.
